@@ -295,3 +295,5 @@ postgres_data/
 .stage24-install/
 
 .stage25-install/
+
+.stage25-2-install/

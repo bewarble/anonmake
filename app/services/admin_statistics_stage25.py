@@ -1,0 +1,198 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.billing import PaymentMethod
+from app.models.delivery import DeliveryOutbox
+from app.models.marketing import SourceAttribution
+from app.models.user import User
+
+PERMANENT_ERRORS = (
+    "%bot was blocked%",
+    "%chat not found%",
+    "%user is deactivated%",
+)
+
+
+@dataclass(slots=True, frozen=True)
+class DailyStatisticsPoint:
+    label: str
+    joined: int
+    blocked: int
+
+
+@dataclass(slots=True, frozen=True)
+class StatisticsStage25:
+    users_total: int
+    users_alive: int
+    users_dead: int
+    today: int
+    week: int
+    month: int
+    all_time: int
+    organic_today: int
+    organic_week: int
+    organic_month: int
+    organic_all_time: int
+    active_cards: int
+    points: list[DailyStatisticsPoint]
+
+
+class AdminStatisticsStage25Repository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def snapshot(self, *, days: int = 20) -> StatisticsStage25:
+        now = datetime.now(timezone.utc)
+        day = now - timedelta(days=1)
+        week = now - timedelta(days=7)
+        month = now - timedelta(days=30)
+
+        users_total = await self._users_count()
+        users_dead = await self._dead_users_count()
+
+        return StatisticsStage25(
+            users_total=users_total,
+            users_alive=max(users_total - users_dead, 0),
+            users_dead=users_dead,
+            today=await self._users_since(day),
+            week=await self._users_since(week),
+            month=await self._users_since(month),
+            all_time=users_total,
+            organic_today=await self._organic_since(day),
+            organic_week=await self._organic_since(week),
+            organic_month=await self._organic_since(month),
+            organic_all_time=await self._organic_all_time(),
+            active_cards=await self._active_cards(),
+            points=await self._daily_points(days=days),
+        )
+
+    async def _users_count(self) -> int:
+        value = await self.session.scalar(select(func.count(User.id)))
+        return int(value or 0)
+
+    async def _users_since(self, since: datetime) -> int:
+        value = await self.session.scalar(
+            select(func.count(User.id)).where(User.created_at >= since)
+        )
+        return int(value or 0)
+
+    async def _dead_users_count(self) -> int:
+        value = await self.session.scalar(
+            select(func.count(func.distinct(User.id)))
+            .join(
+                DeliveryOutbox,
+                DeliveryOutbox.chat_id == User.telegram_id,
+            )
+            .where(
+                DeliveryOutbox.status == "failed",
+                self._permanent_error_condition(),
+            )
+        )
+        return int(value or 0)
+
+    async def _organic_since(self, since: datetime) -> int:
+        value = await self.session.scalar(
+            select(func.count(User.id))
+            .outerjoin(
+                SourceAttribution,
+                SourceAttribution.user_id == User.id,
+            )
+            .where(
+                User.created_at >= since,
+                SourceAttribution.id.is_(None),
+            )
+        )
+        return int(value or 0)
+
+    async def _organic_all_time(self) -> int:
+        value = await self.session.scalar(
+            select(func.count(User.id))
+            .outerjoin(
+                SourceAttribution,
+                SourceAttribution.user_id == User.id,
+            )
+            .where(SourceAttribution.id.is_(None))
+        )
+        return int(value or 0)
+
+    async def _active_cards(self) -> int:
+        value = await self.session.scalar(
+            select(func.count(PaymentMethod.id)).where(
+                PaymentMethod.is_active.is_(True),
+                PaymentMethod.is_recurrent.is_(True),
+                PaymentMethod.binding_id.is_not(None),
+                PaymentMethod.blocked_at.is_(None),
+            )
+        )
+        return int(value or 0)
+
+    async def _daily_points(self, *, days: int) -> list[DailyStatisticsPoint]:
+        now = datetime.now(timezone.utc)
+        start = (now - timedelta(days=days - 1)).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+
+        result: list[DailyStatisticsPoint] = []
+        for offset in range(days):
+            left = start + timedelta(days=offset)
+            right = left + timedelta(days=1)
+
+            joined = int(
+                await self.session.scalar(
+                    select(func.count(User.id)).where(
+                        User.created_at >= left,
+                        User.created_at < right,
+                    )
+                )
+                or 0
+            )
+
+            first_permanent_failure = (
+                select(
+                    DeliveryOutbox.chat_id.label("chat_id"),
+                    func.min(DeliveryOutbox.updated_at).label("blocked_at"),
+                )
+                .where(
+                    DeliveryOutbox.status == "failed",
+                    self._permanent_error_condition(),
+                )
+                .group_by(DeliveryOutbox.chat_id)
+                .subquery()
+            )
+
+            blocked = int(
+                await self.session.scalar(
+                    select(func.count(first_permanent_failure.c.chat_id)).where(
+                        first_permanent_failure.c.blocked_at >= left,
+                        first_permanent_failure.c.blocked_at < right,
+                    )
+                )
+                or 0
+            )
+
+            result.append(
+                DailyStatisticsPoint(
+                    label=left.strftime("%d.%m"),
+                    joined=joined,
+                    blocked=blocked,
+                )
+            )
+
+        return result
+
+    @staticmethod
+    def _permanent_error_condition():
+        return or_(
+            *(
+                DeliveryOutbox.last_error.ilike(pattern)
+                for pattern in PERMANENT_ERRORS
+            )
+        )
