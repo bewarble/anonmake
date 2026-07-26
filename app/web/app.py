@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from fastapi.responses import Response
+
 import hmac
 import logging
 from typing import Any
@@ -59,6 +62,15 @@ async def startup() -> None:
 @app.on_event("shutdown")
 async def shutdown() -> None:
     await close_database()
+
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics() -> Response:
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 
 @app.get("/health")

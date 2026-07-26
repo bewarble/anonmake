@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from app.core.logging import configure_logging
+from app.bot.middlewares.request_context import RequestContextMiddleware
+
 import asyncio
 import logging
 
@@ -14,14 +17,15 @@ from app.database.session import close_database, init_database
 
 async def main() -> None:
     settings = load_settings()
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper(), logging.INFO),
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    configure_logging(
+        settings.log_level,
+        settings.json_logs,
     )
 
     bot = Bot(token=settings.require_bot_token())
     dispatcher = Dispatcher(storage=MemoryStorage())
 
+    dispatcher.update.outer_middleware(RequestContextMiddleware())
     database_middleware = DatabaseMiddleware()
     dispatcher.message.outer_middleware(database_middleware)
     dispatcher.callback_query.outer_middleware(database_middleware)

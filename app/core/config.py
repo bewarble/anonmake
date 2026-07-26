@@ -7,6 +7,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    json_logs: bool = Field(default=True, alias="JSON_LOGS")
+    abuse_guard_enabled: bool = Field(default=True, alias="ABUSE_GUARD_ENABLED")
     """Application configuration loaded from environment variables."""
 
     model_config = SettingsConfigDict(
