@@ -43,6 +43,7 @@ def make_impaya_client() -> ImpayaClient:
         settings.impaya_terminal_name,
         auth_header=settings.impaya_auth_header,
         auth_prefix=settings.impaya_auth_prefix,
+        protocol_version=settings.impaya_protocol_version,
     )
 
 

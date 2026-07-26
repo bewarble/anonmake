@@ -47,7 +47,8 @@ class Settings(BaseSettings):
         default="Authorization",
         alias="IMPAYA_AUTH_HEADER",
     )
-    impaya_auth_prefix: str = Field(default="", alias="IMPAYA_AUTH_PREFIX")
+    impaya_auth_prefix: str = Field(default="Bearer ", alias="IMPAYA_AUTH_PREFIX")
+    impaya_protocol_version: str = Field(default="v2.0", alias="IMPAYA_PROTOCOL_VERSION")
     impaya_terminal_name: str = Field(
         default="evocloud.su_3ds_test",
         alias="IMPAYA_TERMINAL_NAME",

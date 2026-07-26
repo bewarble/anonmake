@@ -28,17 +28,23 @@ class ImpayaClient:
         terminal_name: str,
         *,
         auth_header: str = "Authorization",
-        auth_prefix: str = "",
+        auth_prefix: str = "Bearer ",
+        protocol_version: str = "v2.0",
         timeout: float = 20.0,
     ) -> None:
         self.terminal_name = terminal_name
-        auth_value = f"{auth_prefix}{token}" if auth_prefix else token
+
+        authorization = (
+            f"{auth_prefix}{token}" if auth_prefix else token
+        )
+
         self._client = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=timeout,
             headers={
-                auth_header: auth_value,
+                auth_header: authorization,
                 "Content-Type": "application/json",
+                "protocol": protocol_version,
             },
         )
 
@@ -49,10 +55,10 @@ class ImpayaClient:
         self,
         *,
         customer_operation_id: str,
+        amount: int,
         merchant_user_id: str,
         success_url: str,
         fail_url: str,
-        amount: int = 100,
     ) -> ImpayaResult:
         payload = {
             "action": "pay",
@@ -67,7 +73,7 @@ class ImpayaClient:
                 "success_redirect_url": success_url,
                 "fail_redirect_url": fail_url,
             },
-            "description": "VIP-доступ к раскрытию отправителей",
+            "description": "Доступ к информации об отправителе",
             "lifetime": 1800,
             "customization_form": {
                 "title": "Узнать отправителя",
@@ -99,7 +105,7 @@ class ImpayaClient:
                     "merchant_user_id": merchant_user_id,
                 }
             },
-            "description": "Продление VIP-подписки",
+            "description": "Продление подписки",
         }
         return await self._post("/order/pay", payload)
 
@@ -115,12 +121,9 @@ class ImpayaClient:
         data = response.json()
         return ImpayaResult(bool(data.get("success")), data)
 
-    async def _post(
-        self,
-        path: str,
-        payload: dict[str, Any],
-    ) -> ImpayaResult:
+    async def _post(self, path: str, payload: dict[str, Any]) -> ImpayaResult:
         response = await self._client.post(path, json=payload)
         response.raise_for_status()
+
         data = response.json()
         return ImpayaResult(bool(data.get("success")), data)

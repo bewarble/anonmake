@@ -23,12 +23,18 @@ def admin_menu() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="🧾 Журнал",
-                    callback_data="admin:audit",\n                ),\n                InlineKeyboardButton(\n                    text="⚙️ Система",\n                    callback_data="admin:system",
+                    callback_data="admin:audit",
                 ),
+                InlineKeyboardButton(
+                    text="⚙️ Система",
+                    callback_data="admin:system",
+                ),
+            ],
+            [
                 InlineKeyboardButton(
                     text="🔄 Обновить",
                     callback_data="admin:home",
-                ),
+                )
             ],
         ]
     )
