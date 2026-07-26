@@ -1,3 +1,4 @@
+from app.bot.handlers.admin_reply import router as admin_reply_router
 from app.bot.handlers.source_management import router as source_management_router
 from app.bot.handlers.admin_keyboard import router as admin_keyboard_router
 from app.bot.handlers.admin_minimal import router as admin_minimal_router
@@ -22,8 +23,8 @@ from app.bot.handlers.start import router as start_router
 
 def build_router() -> Router:
     router = Router(name="root")
+    router.include_router(admin_reply_router)
     router.include_router(source_management_router)
-    router.include_router(admin_keyboard_router)
     router.include_router(errors_router)
 
     router.include_router(admin_marketing_router)
