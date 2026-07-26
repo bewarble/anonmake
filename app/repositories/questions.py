@@ -1,0 +1,40 @@
+from __future__ import annotations
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.question import Question
+
+
+class QuestionRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def create(
+        self,
+        *,
+        sender_id: int,
+        recipient_id: int,
+        text: str,
+    ) -> Question:
+        question = Question(
+            sender_id=sender_id,
+            recipient_id=recipient_id,
+            text=text,
+        )
+        self.session.add(question)
+        await self.session.flush()
+        return question
+
+    async def get_with_users(self, question_id: int) -> Question | None:
+        result = await self.session.execute(
+            select(Question)
+            .where(Question.id == question_id)
+            .options(
+                selectinload(Question.sender),
+                selectinload(Question.recipient),
+                selectinload(Question.answer),
+            )
+        )
+        return result.scalar_one_or_none()

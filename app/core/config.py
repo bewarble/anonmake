@@ -1,19 +1,21 @@
-from functools import lru_cache
+from __future__ import annotations
 
-from pydantic import SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
+from dataclasses import dataclass
 
-
-class Settings(BaseSettings):
-    bot_token: SecretStr
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+from dotenv import load_dotenv
 
 
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
+@dataclass(frozen=True, slots=True)
+class Settings:
+    bot_token: str
+
+
+def load_settings() -> Settings:
+    load_dotenv()
+    token = os.getenv("BOT_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError(
+            "BOT_TOKEN is missing. Create .env from .env.example and add the token."
+        )
+    return Settings(bot_token=token)

@@ -21,10 +21,9 @@ SessionFactory = async_sessionmaker(
 
 
 async def init_database() -> None:
-    """Create the data directory and all currently registered tables."""
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    # Import models before create_all so SQLAlchemy knows their metadata.
+    # Register every model before create_all().
     import app.models  # noqa: F401
 
     async with engine.begin() as connection:
@@ -32,11 +31,9 @@ async def init_database() -> None:
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    """Yield a database session and always close it afterwards."""
     async with SessionFactory() as session:
         yield session
 
 
 async def close_database() -> None:
-    """Dispose of the SQLAlchemy connection pool."""
     await engine.dispose()

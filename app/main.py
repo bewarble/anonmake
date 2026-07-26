@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
 
-from app.bot.handlers.menu import router as menu_router
-from app.bot.handlers.start import router as start_router
-from app.core.config import get_settings
+from app.bot.handlers import build_router
+from app.bot.middlewares import DatabaseMiddleware
+from app.core.config import load_settings
+from app.database.session import close_database, init_database
 
 
 async def main() -> None:
@@ -14,19 +18,22 @@ async def main() -> None:
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
 
-    settings = get_settings()
+    settings = load_settings()
+    bot = Bot(token=settings.bot_token)
+    dispatcher = Dispatcher(storage=MemoryStorage())
 
-    bot = Bot(
-        token=settings.bot_token.get_secret_value(),
-    )
+    database_middleware = DatabaseMiddleware()
+    dispatcher.message.outer_middleware(database_middleware)
+    dispatcher.callback_query.outer_middleware(database_middleware)
+    dispatcher.include_router(build_router())
 
-    dispatcher = Dispatcher()
-    dispatcher.include_router(start_router)
-    dispatcher.include_router(menu_router)
+    await init_database()
 
     try:
+        await bot.delete_webhook(drop_pending_updates=False)
         await dispatcher.start_polling(bot)
     finally:
+        await close_database()
         await bot.session.close()
 
 
