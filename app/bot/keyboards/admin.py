@@ -16,6 +16,12 @@ def admin_menu() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    text="📈 Аналитика",
+                    callback_data="admin:analytics",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="🔎 Найти пользователя",
                     callback_data="admin:find",
                 )
