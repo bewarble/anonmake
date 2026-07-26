@@ -46,12 +46,7 @@ async def request_source_delete(
         await callback.answer("Недоступно", show_alert=True)
         return
 
-    try:
-        source_id = int((callback.data or "").rsplit(":", 1)[1])
-    except (ValueError, IndexError):
-        await callback.answer("Некорректный ID", show_alert=True)
-        return
-
+    source_id = int((callback.data or "").rsplit(":", 1)[1])
     source = await MarketingCleanupRepository(session).source(source_id)
     if source is None:
         await callback.answer("Источник не найден", show_alert=True)
@@ -76,12 +71,7 @@ async def confirm_source_delete(
         await callback.answer("Недоступно", show_alert=True)
         return
 
-    try:
-        source_id = int((callback.data or "").rsplit(":", 1)[1])
-    except (ValueError, IndexError):
-        await callback.answer("Некорректный ID", show_alert=True)
-        return
-
+    source_id = int((callback.data or "").rsplit(":", 1)[1])
     deleted = await MarketingCleanupRepository(session).delete_source(source_id)
 
     if deleted:
@@ -97,3 +87,11 @@ async def confirm_source_delete(
             "✅ Источник удалён" if deleted else "Источник уже удалён"
         )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("source:view:"))
+async def source_view_back(callback: CallbackQuery) -> None:
+    await callback.answer(
+        "Откройте раздел «📣 Источники» ещё раз",
+        show_alert=True,
+    )

@@ -1,15 +1,19 @@
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
-from app.core.config import load_settings
-
 
 def main_menu_keyboard(*, is_admin: bool = False) -> ReplyKeyboardMarkup:
     if is_admin:
         return ReplyKeyboardMarkup(
             keyboard=[
                 [KeyboardButton(text="Статистика")],
-                [KeyboardButton(text="Рассылка"), KeyboardButton(text="Прибыль")],
-                [KeyboardButton(text="Выгрузка"), KeyboardButton(text="Рефералы")],
+                [
+                    KeyboardButton(text="Рассылка"),
+                    KeyboardButton(text="Прибыль"),
+                ],
+                [
+                    KeyboardButton(text="Выгрузка"),
+                    KeyboardButton(text="Рефералы"),
+                ],
             ],
             resize_keyboard=True,
             input_field_placeholder="Админ-панель",
@@ -23,8 +27,3 @@ def main_menu_keyboard(*, is_admin: bool = False) -> ReplyKeyboardMarkup:
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
     )
-
-
-def main_menu_for(telegram_id: int | None) -> ReplyKeyboardMarkup:
-    is_admin = telegram_id is not None and telegram_id in load_settings().admin_ids_set
-    return main_menu_keyboard(is_admin=is_admin)

@@ -8,10 +8,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot.keyboards.source_admin import cancel_source_keyboard
-from app.bot.keyboards.admin_stage25_1 import referral_back_keyboard
+from app.bot.keyboards.source_admin import cancel_source_keyboard, source_card_keyboard
+from app.bot.keyboards.admin_stage25 import referral_back_keyboard
 from app.bot.keyboards.marketing import (
+    audience_keyboard,
     broadcast_confirm_keyboard,
+    broadcasts_menu,
+    source_list_keyboard,
+    sources_menu,
 )
 from app.bot.states.marketing import BroadcastCreate, SourceCreate
 from app.core.config import load_settings
@@ -23,6 +27,25 @@ router = Router(name="admin_marketing")
 
 def is_admin(telegram_id: int) -> bool:
     return telegram_id in load_settings().admin_ids_set
+
+
+@router.callback_query(F.data == "adminm:sources")
+async def sources_home(
+    callback: CallbackQuery,
+    session: AsyncSession,
+) -> None:
+    if callback.from_user is None or not is_admin(callback.from_user.id):
+        await callback.answer("Недоступно", show_alert=True)
+        return
+
+    items = await MarketingRepository(session).sources()
+    text = "📣 Источники\n\nРекламные ссылки и статистика прихода."
+    if callback.message:
+        await callback.message.edit_text(
+            text,
+            reply_markup=source_list_keyboard(items),
+        )
+    await callback.answer()
 
 
 @router.callback_query(F.data == "adminm:source:create")
@@ -108,6 +131,98 @@ async def source_spend(
         parse_mode="HTML",
         reply_markup=referral_back_keyboard(),
     )
+
+
+@router.callback_query(F.data.startswith("adminm:source:"))
+async def source_details(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    bot: Bot,
+) -> None:
+    if callback.from_user is None or not is_admin(callback.from_user.id):
+        await callback.answer("Недоступно", show_alert=True)
+        return
+
+    try:
+        source_id = int((callback.data or "").rsplit(":", 1)[1])
+    except ValueError:
+        await callback.answer("Некорректный ID", show_alert=True)
+        return
+
+    source = await session.get(__import__(
+        "app.models.marketing", fromlist=["TrafficSource"]
+    ).TrafficSource, source_id)
+    stats = await MarketingRepository(session).source_stats(source_id)
+    if source is None or stats is None:
+        await callback.answer("Источник не найден", show_alert=True)
+        return
+
+    me = await bot.get_me()
+    link = f"https://t.me/{me.username}?start=src_{source.code}"
+    attributed = stats["attributed"]
+    cpa = (
+        stats["spend_kopecks"] / attributed / 100
+        if attributed
+        else 0
+    )
+    text = (
+        f"📣 {escape(source.name)}\n\n"
+        f"Источник: {escape(source.source_url)}\n"
+        f"Закуп: {stats['spend_kopecks'] / 100:.2f} ₽\n"
+        f"Переходы: {stats['clicks']}\n"
+        f"Новые пользователи: {attributed}\n"
+        f"Цена пользователя: {cpa:.2f} ₽\n\n"
+        f"<code>{escape(link)}</code>"
+    )
+    if callback.message:
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=source_card_keyboard(source.id),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "adminm:broadcasts")
+async def broadcasts_home(callback: CallbackQuery) -> None:
+    if callback.from_user is None or not is_admin(callback.from_user.id):
+        await callback.answer("Недоступно", show_alert=True)
+        return
+    if callback.message:
+        await callback.message.edit_text(
+            "📢 Рассылки\n\nВыберите тип сообщения.",
+            reply_markup=broadcasts_menu(),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adminm:broadcast:kind:"))
+async def broadcast_kind(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    kind = (callback.data or "").rsplit(":", 1)[1]
+    await state.update_data(kind=kind)
+    await state.set_state(BroadcastCreate.waiting_audience)
+    if callback.message:
+        await callback.message.edit_text(
+            "Выберите аудиторию:",
+            reply_markup=audience_keyboard(),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adminm:broadcast:audience:"))
+async def broadcast_audience(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    audience = (callback.data or "").rsplit(":", 1)[1]
+    await state.update_data(audience=audience)
+    await state.set_state(BroadcastCreate.waiting_text)
+    if callback.message:
+        await callback.message.answer("Отправьте текст рассылки:")
+    await callback.answer()
 
 
 @router.message(BroadcastCreate.waiting_text)

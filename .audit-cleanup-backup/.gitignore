@@ -297,7 +297,3 @@ postgres_data/
 .stage25-install/
 
 .stage25-2-install/
-
-anonmake-stage-*.zip
-anonmake-stage-*.zip.sha256
-.stage*-install/

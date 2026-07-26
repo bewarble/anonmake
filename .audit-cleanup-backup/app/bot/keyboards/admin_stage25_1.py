@@ -68,35 +68,3 @@ def referral_card_keyboard(source_id: int) -> InlineKeyboardMarkup:
             ],
         ]
     )
-
-
-def export_choice_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="👥 Все пользователи",
-                    callback_data="admin25:export:all",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="✅ Только живые",
-                    callback_data="admin25:export:alive",
-                )
-            ],
-        ]
-    )
-
-
-def referral_back_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="← К списку",
-                    callback_data="admin25:referrals",
-                )
-            ]
-        ]
-    )

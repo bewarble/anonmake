@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot.keyboards import answer_question_keyboard, main_menu_for
+from app.bot.keyboards import answer_question_keyboard, main_menu_keyboard
 from app.bot.states import AskQuestion
 from app.core import texts
 from app.core.config import load_settings
@@ -43,14 +43,14 @@ async def cancel_callback(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.message.edit_reply_markup(reply_markup=None)
         await callback.message.answer(
             texts.CANCELLED,
-            reply_markup=main_menu_for(callback.from_user.id if callback.from_user else None),
+            reply_markup=main_menu_keyboard(),
         )
 
 
 @router.message(Command("cancel"))
 async def cancel_command(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer(texts.CANCELLED, reply_markup=main_menu_for(message.from_user.id if message.from_user else None))
+    await message.answer(texts.CANCELLED, reply_markup=main_menu_keyboard())
 
 
 @router.message(AskQuestion.waiting_for_text, F.text)
@@ -78,7 +78,7 @@ async def receive_question(
         await state.clear()
         await message.answer(
             texts.QUESTION_SESSION_EXPIRED,
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_keyboard(),
         )
         return
 
@@ -111,7 +111,7 @@ async def receive_question(
         await state.clear()
         await message.answer(
             texts.QUESTION_RECIPIENT_MISSING,
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_keyboard(),
         )
         return
 
@@ -119,7 +119,7 @@ async def receive_question(
         await state.clear()
         await message.answer(
             texts.SELF_MESSAGE,
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_keyboard(),
         )
         return
 
@@ -167,7 +167,7 @@ async def receive_question(
     await state.clear()
     await message.answer(
         texts.QUESTION_SENT,
-        reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+        reply_markup=main_menu_keyboard(),
     )
 
 

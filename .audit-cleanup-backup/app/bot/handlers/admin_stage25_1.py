@@ -7,9 +7,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.keyboards.admin_stage25 import export_choice_keyboard
 from app.bot.keyboards.admin_stage25_1 import (
     broadcast_audience_keyboard,
-    export_choice_keyboard,
     referral_card_keyboard,
     referrals_keyboard,
 )
@@ -159,7 +159,7 @@ async def referrals_callback(
     await callback.answer()
 
 
-@router.callback_query(F.data.regexp(r"^adminm:source:\d+$"))
+@router.callback_query(F.data.regexp(r"^adminm:source:\\d+$"))
 async def referral_details(
     callback: CallbackQuery,
     session: AsyncSession,
@@ -260,10 +260,6 @@ async def broadcast_cancel(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
-        return
-
     await state.clear()
     if callback.message:
         await callback.message.edit_text("✖️ Рассылка отменена")

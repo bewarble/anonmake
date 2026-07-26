@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot.keyboards import cancel_keyboard, main_menu_for
+from app.bot.keyboards import cancel_keyboard, main_menu_keyboard
 from app.bot.states import AnswerQuestion
 from app.core import texts
 from app.repositories import AnswerRepository, QuestionRepository, UserRepository
@@ -81,7 +81,7 @@ async def receive_answer(
         await state.clear()
         await message.answer(
             texts.ANSWER_SESSION_EXPIRED,
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_keyboard(),
         )
         return
 
@@ -94,14 +94,14 @@ async def receive_answer(
         await state.clear()
         await message.answer(
             texts.ANSWER_NOT_FOUND,
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_keyboard(),
         )
         return
     if question.answer is not None:
         await state.clear()
         await message.answer(
             texts.ANSWER_ALREADY_SENT,
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_keyboard(),
         )
         return
 
@@ -132,7 +132,7 @@ async def receive_answer(
     await state.clear()
     await message.answer(
         texts.ANSWER_SENT,
-        reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+        reply_markup=main_menu_keyboard(),
     )
 
 

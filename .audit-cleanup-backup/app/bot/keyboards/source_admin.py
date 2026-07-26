@@ -37,7 +37,7 @@ def source_delete_confirm_keyboard(source_id: int) -> InlineKeyboardMarkup:
                 ),
                 InlineKeyboardButton(
                     text="Отмена",
-                    callback_data="admin25:referrals",
+                    callback_data=f"source:view:{source_id}",
                 ),
             ]
         ]

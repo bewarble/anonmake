@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot.keyboards import cancel_keyboard, main_menu_for
+from app.bot.keyboards import cancel_keyboard, main_menu_keyboard
 from app.bot.states import AskQuestion
 from app.core import texts
 from app.repositories import UserRepository
@@ -41,7 +41,7 @@ async def command_start(
             f"{texts.WELCOME}\n\n"
             f"{texts.PERSONAL_LINK.format(link=link)}\n\n"
             f"{texts.PERSONAL_LINK_HINT}",
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_keyboard(),
         )
         return
 
@@ -49,14 +49,14 @@ async def command_start(
     if recipient is None:
         await message.answer(
             texts.INVALID_LINK,
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_keyboard(),
         )
         return
 
     if recipient.id == current_user.id:
         await message.answer(
             texts.SELF_MESSAGE,
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_keyboard(),
         )
         return
 
@@ -82,7 +82,7 @@ async def show_personal_link(
     await message.answer(
         f"{texts.PERSONAL_LINK.format(link=link)}\n\n"
         f"{texts.PERSONAL_LINK_HINT}",
-        reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+        reply_markup=main_menu_keyboard(),
     )
 
 
@@ -90,5 +90,5 @@ async def show_personal_link(
 async def show_help(message: Message) -> None:
     await message.answer(
         texts.HELP,
-        reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+        reply_markup=main_menu_keyboard(),
     )
