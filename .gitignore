@@ -222,3 +222,21 @@ __marimo__/
 .venv/
 __pycache__/
 *.py[cod]
+
+# Secrets
+.env
+
+# Virtual environments
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+
+# Local update archives
+*.zip
