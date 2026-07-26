@@ -1,3 +1,4 @@
+from app.bot.handlers.admin_bi import router as admin_bi_router
 from app.bot.handlers.admin_crm import router as admin_crm_router
 from app.bot.handlers.start_marketing import router as start_marketing_router
 from app.bot.handlers.admin_marketing import router as admin_marketing_router
@@ -22,6 +23,7 @@ def build_router() -> Router:
 
     router.include_router(admin_marketing_router)
     router.include_router(admin_router)
+    router.include_router(admin_bi_router)
     router.include_router(admin_crm_router)
     router.include_router(admin_control_router)
     router.include_router(admin_users_router)

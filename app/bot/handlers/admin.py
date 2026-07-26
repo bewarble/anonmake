@@ -11,6 +11,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.admin import admin_menu, back_to_admin, user_actions
+from app.bot.keyboards.admin_bi import admin_reply_menu
 from app.bot.states.admin import AdminLookup
 from app.core.config import load_settings
 from app.repositories.admin import AdminRepository
@@ -68,6 +69,10 @@ async def show_dashboard(
         await message.answer(
             text,
             reply_markup=admin_menu(),
+        )
+        await message.answer(
+            "Быстрое меню",
+            reply_markup=admin_reply_menu(),
         )
 
 
