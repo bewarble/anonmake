@@ -17,6 +17,7 @@ from app.services.impaya import ImpayaClient
 from app.services.reveal_checkout import RevealCheckoutService
 from app.services.sender_identity import resolve_current_sender
 from app.services.vip import has_active_vip
+from app.services.crm_tracking import CrmTrackingService
 
 router = Router(name="reveals")
 logger = logging.getLogger(__name__)
@@ -62,6 +63,11 @@ async def reveal_sender(
     )
     if has_active_vip(subscription):
         identity = await resolve_current_sender(bot, question.sender)
+        await CrmTrackingService(session).sender_revealed(
+            user_id=buyer.id,
+            question_id=question.id,
+        )
+        await session.commit()
         await callback.answer()
 
         if callback.message:

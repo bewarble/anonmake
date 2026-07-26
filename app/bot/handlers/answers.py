@@ -10,6 +10,7 @@ from app.bot.states import AnswerQuestion
 from app.core import texts
 from app.repositories import AnswerRepository, QuestionRepository, UserRepository
 from app.repositories.delivery import DeliveryRepository
+from app.services.crm_tracking import CrmTrackingService
 
 router = Router(name="answers")
 MAX_ANSWER_LENGTH = 1500
@@ -115,6 +116,17 @@ async def receive_answer(
             answer=text,
         ),
     )
+
+    tracking = CrmTrackingService(session)
+    await tracking.answer_sent(
+        user_id=current_user.id,
+        answer_id=answer.id,
+    )
+    await tracking.answer_received(
+        user_id=question.sender_id,
+        answer_id=answer.id,
+    )
+
     await session.commit()
 
     await state.clear()

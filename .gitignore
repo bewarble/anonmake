@@ -283,3 +283,5 @@ postgres_data/
 .stage19-install/
 
 .stage20-1-install/
+
+.stage20-2-install/

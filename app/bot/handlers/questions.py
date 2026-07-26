@@ -17,6 +17,7 @@ from app.repositories.delivery import DeliveryRepository
 from app.services.abuse_guard import AbuseGuard
 from app.services.delivery import serialize_markup
 from app.services.redis_client import get_redis
+from app.services.crm_tracking import CrmTrackingService
 
 router = Router(name="questions")
 logger = logging.getLogger(__name__)
@@ -138,6 +139,17 @@ async def receive_question(
             text=texts.NEW_QUESTION.format(text=question.text),
             reply_markup=serialize_markup(markup),
         )
+
+        tracking = CrmTrackingService(session)
+        await tracking.question_sent(
+            user_id=sender.id,
+            question_id=question.id,
+        )
+        await tracking.question_received(
+            user_id=recipient.id,
+            question_id=question.id,
+        )
+
         await session.commit()
     except Exception:
         await session.rollback()

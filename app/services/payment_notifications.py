@@ -12,6 +12,7 @@ from app.repositories import QuestionRepository, UserRepository
 from app.services.impaya import ImpayaClient
 from app.services.reveal_checkout import RevealCheckoutService
 from app.services.sender_identity import resolve_current_sender
+from app.services.crm_tracking import CrmTrackingService
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,20 @@ async def finalize_checkout_and_notify(
         return "notification_failed"
 
     identity = await resolve_current_sender(bot, question.sender)
+
+    tracking = CrmTrackingService(session)
+    await tracking.payment_succeeded(
+        user_id=buyer.id,
+        checkout_id=checkout.id,
+    )
+    await tracking.vip_activated(
+        user_id=buyer.id,
+        checkout_id=checkout.id,
+    )
+    await tracking.sender_revealed(
+        user_id=buyer.id,
+        question_id=question.id,
+    )
 
     try:
         await bot.send_message(
