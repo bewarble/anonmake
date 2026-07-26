@@ -79,6 +79,12 @@ def user_card_keyboard(user_id: int) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    text="🗂 CRM",
+                    callback_data=f"crm:user:{user_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="← Пользователи",
                     callback_data="admin:users:0",
                 )
