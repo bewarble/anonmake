@@ -1,0 +1,44 @@
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+
+def cancel_source_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✖️ Отменить",
+                    callback_data="source:create:cancel",
+                )
+            ]
+        ]
+    )
+
+
+def source_card_keyboard(source_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🗑 Удалить",
+                    callback_data=f"source:delete:{source_id}",
+                )
+            ]
+        ]
+    )
+
+
+def source_delete_confirm_keyboard(source_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🗑 Да, удалить",
+                    callback_data=f"source:delete_confirm:{source_id}",
+                ),
+                InlineKeyboardButton(
+                    text="Отмена",
+                    callback_data=f"source:view:{source_id}",
+                ),
+            ]
+        ]
+    )

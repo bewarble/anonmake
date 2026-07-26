@@ -9,6 +9,7 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.main_menu import main_menu_keyboard
+from app.core.config import load_settings
 from app.repositories import UserRepository
 from app.repositories.marketing import MarketingRepository
 from app.services.crm_tracking import CrmTrackingService
@@ -74,5 +75,7 @@ async def start_with_terms(
         f"<code>{escape(personal_link)}</code>\n\n"
         "Разместите её в профиле, канале или сторис.",
         parse_mode="HTML",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(
+            is_admin=message.from_user.id in load_settings().admin_ids_set
+        ),
     )

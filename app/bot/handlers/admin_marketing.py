@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.keyboards.source_admin import cancel_source_keyboard, source_card_keyboard
 from app.bot.keyboards.marketing import (
     audience_keyboard,
     broadcast_confirm_keyboard,
@@ -57,7 +58,7 @@ async def source_create_start(
 
     await state.set_state(SourceCreate.waiting_name)
     if callback.message:
-        await callback.message.answer("Название источника:")
+        await callback.message.answer("Название источника:", reply_markup=cancel_source_keyboard())
     await callback.answer()
 
 
@@ -69,7 +70,7 @@ async def source_name(message: Message, state: FSMContext) -> None:
         return
     await state.update_data(name=name)
     await state.set_state(SourceCreate.waiting_url)
-    await message.answer("Ссылка на источник рекламы:")
+    await message.answer("Ссылка на источник рекламы:", reply_markup=cancel_source_keyboard())
 
 
 @router.message(SourceCreate.waiting_url)
@@ -81,7 +82,7 @@ async def source_url(message: Message, state: FSMContext) -> None:
         return
     await state.update_data(source_url=value)
     await state.set_state(SourceCreate.waiting_spend)
-    await message.answer("Сумма закупа в рублях, например 15000:")
+    await message.answer("Сумма закупа в рублях, например 15000:", reply_markup=cancel_source_keyboard())
 
 
 @router.message(SourceCreate.waiting_spend)
@@ -176,7 +177,7 @@ async def source_details(
         await callback.message.edit_text(
             text,
             parse_mode="HTML",
-            reply_markup=sources_menu(),
+            reply_markup=source_card_keyboard(source.id),
         )
     await callback.answer()
 
