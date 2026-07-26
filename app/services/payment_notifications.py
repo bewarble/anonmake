@@ -11,19 +11,9 @@ from app.models.reveal import RevealCheckout
 from app.repositories import QuestionRepository, UserRepository
 from app.services.impaya import ImpayaClient
 from app.services.reveal_checkout import RevealCheckoutService
+from app.services.sender_identity import resolve_current_sender
 
 logger = logging.getLogger(__name__)
-
-
-def sender_label(question) -> str:
-    sender = question.sender
-    if sender.username:
-        return f"@{sender.username}"
-
-    full_name = " ".join(
-        part for part in (sender.first_name, sender.last_name) if part
-    ).strip()
-    return full_name or "Username не указан"
 
 
 async def finalize_checkout_and_notify(
@@ -47,17 +37,21 @@ async def finalize_checkout_and_notify(
         return "already_notified"
 
     buyer = await UserRepository(session).get_by_id(checkout.buyer_id)
-    question = await QuestionRepository(session).get_with_users(checkout.question_id)
+    question = await QuestionRepository(session).get_with_users(
+        checkout.question_id
+    )
     if buyer is None or question is None:
         checkout.notification_error = "Buyer or question was not found"
         await session.commit()
         return "notification_failed"
 
+    identity = await resolve_current_sender(bot, question.sender)
+
     try:
         await bot.send_message(
             buyer.telegram_id,
             texts.VIP_ACTIVATED_WITH_SENDER.format(
-                sender=sender_label(question)
+                sender=identity.label
             ),
         )
     except Exception as exc:

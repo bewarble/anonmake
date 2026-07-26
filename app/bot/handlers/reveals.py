@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from aiogram import F, Router
+import logging
+
+from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,20 +15,11 @@ from app.repositories.billing import BillingRepository
 from app.repositories.reveals import RevealRepository
 from app.services.impaya import ImpayaClient
 from app.services.reveal_checkout import RevealCheckoutService
+from app.services.sender_identity import resolve_current_sender
 from app.services.vip import has_active_vip
 
 router = Router(name="reveals")
-
-
-def sender_label(question) -> str:
-    sender = question.sender
-    if sender.username:
-        return f"@{sender.username}"
-
-    full_name = " ".join(
-        part for part in (sender.first_name, sender.last_name) if part
-    ).strip()
-    return full_name or "Username не указан"
+logger = logging.getLogger(__name__)
 
 
 def build_client(settings) -> ImpayaClient:
@@ -43,6 +37,7 @@ def build_client(settings) -> ImpayaClient:
 async def reveal_sender(
     callback: CallbackQuery,
     session: AsyncSession,
+    bot: Bot,
 ) -> None:
     if callback.from_user is None:
         return
@@ -53,32 +48,45 @@ async def reveal_sender(
         await callback.answer(texts.INVALID_LINK, show_alert=True)
         return
 
-    buyer = await UserRepository(session).upsert_from_telegram(callback.from_user)
+    buyer = await UserRepository(session).upsert_from_telegram(
+        callback.from_user
+    )
     question = await QuestionRepository(session).get_with_users(question_id)
 
     if question is None or question.recipient_id != buyer.id:
         await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
         return
 
-    subscription = await BillingRepository(session).subscription_for_user(buyer.id)
+    subscription = await BillingRepository(session).subscription_for_user(
+        buyer.id
+    )
     if has_active_vip(subscription):
+        identity = await resolve_current_sender(bot, question.sender)
         await callback.answer()
+
         if callback.message:
             await callback.message.answer(
-                texts.VIP_SENDER.format(sender=sender_label(question))
+                texts.VIP_SENDER.format(sender=identity.label)
             )
         return
 
     settings = load_settings()
     if not settings.billing_enabled:
-        await callback.answer(texts.VIP_PAYMENT_UNAVAILABLE, show_alert=True)
+        await callback.answer(
+            texts.VIP_PAYMENT_UNAVAILABLE,
+            show_alert=True,
+        )
         return
+
     if (
         not settings.impaya_api_token.strip()
         or not settings.impaya_payment_form_url_template.strip()
         or not settings.public_base_url.strip()
     ):
-        await callback.answer(texts.VIP_CONFIGURATION_ERROR, show_alert=True)
+        await callback.answer(
+            texts.VIP_CONFIGURATION_ERROR,
+            show_alert=True,
+        )
         return
 
     checkout = await RevealRepository(session).get_or_create(
@@ -94,13 +102,25 @@ async def reveal_sender(
         payment_url = await RevealCheckoutService(
             session,
             client,
-            payment_form_url_template=settings.impaya_payment_form_url_template,
+            payment_form_url_template=(
+                settings.impaya_payment_form_url_template
+            ),
         ).create(
             checkout,
             user_id=buyer.id,
             success_url=success_url,
             fail_url=fail_url,
         )
+    except Exception:
+        logger.exception(
+            "Could not create reveal checkout",
+            extra={"telegram_user_id": callback.from_user.id},
+        )
+        await callback.answer(
+            texts.VIP_PAYMENT_UNAVAILABLE,
+            show_alert=True,
+        )
+        return
     finally:
         await client.close()
 
