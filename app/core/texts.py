@@ -71,3 +71,6 @@ VIP_PAYMENT_PROCESSING = (
 VIP_PAYMENT_FAILED = "Оплата не завершена"
 
 TEMPORARY_ERROR = "Что-то пошло не так. Попробуйте ещё раз"
+
+QUESTION_TOO_FAST = "Слишком быстро 🙂 Подождите пару секунд"
+QUESTION_DUPLICATE = "Такое сообщение уже отправлено"

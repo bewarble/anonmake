@@ -7,6 +7,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    question_burst_limit: int = Field(default=4, alias="QUESTION_BURST_LIMIT")
+    question_burst_window_seconds: int = Field(default=8, alias="QUESTION_BURST_WINDOW_SECONDS")
+    question_minute_limit: int = Field(default=20, alias="QUESTION_MINUTE_LIMIT")
+    question_duplicate_window_seconds: int = Field(default=180, alias="QUESTION_DUPLICATE_WINDOW_SECONDS")
     admin_ids: str = Field(default="", alias="ADMIN_IDS")
 
     @property
