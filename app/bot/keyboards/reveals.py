@@ -12,7 +12,7 @@ def reveal_checkout_keyboard(
                 text="Открыть за 1 ₽",
                 url=payment_url,
             )
-        ],
+        ]
     ]
     if offer_url:
         rows.append(

@@ -1,3 +1,4 @@
+from app.bot.handlers.errors import router as errors_router
 from app.bot.handlers.admin_analytics import router as admin_analytics_router
 from app.bot.handlers.admin_delivery import router as admin_delivery_router
 from aiogram import Router
@@ -12,6 +13,7 @@ from app.bot.handlers.start import router as start_router
 
 def build_router() -> Router:
     router = Router(name="root")
+    router.include_router(errors_router)
 
     router.include_router(admin_router)
     router.include_router(admin_analytics_router)
