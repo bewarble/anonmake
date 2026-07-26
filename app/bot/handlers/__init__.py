@@ -1,4 +1,4 @@
-from app.bot.handlers.admin import router as admin_router
+    router.include_router(admin_system_router)\nfrom app.bot.handlers.admin_system import router as admin_system_router\nfrom app.bot.handlers.admin import router as admin_router
 from aiogram import Router
 
 from app.bot.handlers.answers import router as answers_router
