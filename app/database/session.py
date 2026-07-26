@@ -24,6 +24,9 @@ async def init_database() -> None:
     """Create the data directory and all currently registered tables."""
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+    # Import models before create_all so SQLAlchemy knows their metadata.
+    import app.models  # noqa: F401
+
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
 
