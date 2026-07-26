@@ -9,7 +9,13 @@ def answer_question_keyboard(question_id: int) -> InlineKeyboardMarkup:
                     text="✍️ Ответить",
                     callback_data=f"answer:{question_id}",
                 )
-            ]
+            ],
+            [
+                InlineKeyboardButton(
+                    text="👤 Узнать кто это",
+                    callback_data=f"reveal:{question_id}",
+                )
+            ],
         ]
     )
 

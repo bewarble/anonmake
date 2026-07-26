@@ -21,12 +21,6 @@ class ImpayaResult:
 
 
 class ImpayaClient:
-    """Minimal asynchronous Impaya API client.
-
-    Authentication header is configurable because terminal credentials can be
-    issued in different formats. By default the token is sent in Authorization.
-    """
-
     def __init__(
         self,
         base_url: str,
@@ -38,26 +32,31 @@ class ImpayaClient:
         timeout: float = 20.0,
     ) -> None:
         self.terminal_name = terminal_name
-        value = f"{auth_prefix}{token}" if auth_prefix else token
+        auth_value = f"{auth_prefix}{token}" if auth_prefix else token
         self._client = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=timeout,
-            headers={auth_header: value, "Content-Type": "application/json"},
+            headers={
+                auth_header: auth_value,
+                "Content-Type": "application/json",
+            },
         )
 
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def bind_init(
+    async def create_trial_invoice(
         self,
         *,
         customer_operation_id: str,
         merchant_user_id: str,
         success_url: str,
         fail_url: str,
+        amount: int = 100,
     ) -> ImpayaResult:
         payload = {
-            "action": "verify_and_bind",
+            "action": "pay",
+            "amount": amount,
             "customer_operation_id": customer_operation_id,
             "merchant_user_id": merchant_user_id,
             "payment_option_action": "bind_recurrent",
@@ -68,9 +67,14 @@ class ImpayaClient:
                 "success_redirect_url": success_url,
                 "fail_redirect_url": fail_url,
             },
-            "description": "Подключение подписки",
+            "description": "VIP-доступ к раскрытию отправителей",
+            "lifetime": 1800,
+            "customization_form": {
+                "title": "Узнать отправителя",
+                "button_label": "Оплатить 1 ₽",
+            },
         }
-        return await self._post("/payment-option/bind-init", payload)
+        return await self._post("/invoice", payload)
 
     async def recurrent_pay(
         self,
@@ -95,13 +99,11 @@ class ImpayaClient:
                     "merchant_user_id": merchant_user_id,
                 }
             },
-            "description": "Продление подписки",
+            "description": "Продление VIP-подписки",
         }
         return await self._post("/order/pay", payload)
 
-    async def state(
-        self, *, customer_operation_id: str
-    ) -> ImpayaResult:
+    async def state(self, *, customer_operation_id: str) -> ImpayaResult:
         response = await self._client.get(
             "/order/state/extended",
             params={
@@ -113,7 +115,11 @@ class ImpayaClient:
         data = response.json()
         return ImpayaResult(bool(data.get("success")), data)
 
-    async def _post(self, path: str, payload: dict[str, Any]) -> ImpayaResult:
+    async def _post(
+        self,
+        path: str,
+        payload: dict[str, Any],
+    ) -> ImpayaResult:
         response = await self._client.post(path, json=payload)
         response.raise_for_status()
         data = response.json()

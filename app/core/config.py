@@ -24,6 +24,30 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     sql_echo: bool = Field(default=False, alias="SQL_ECHO")
 
+    billing_enabled: bool = Field(default=False, alias="BILLING_ENABLED")
+    impaya_api_url: str = Field(
+        default="https://ag-stage.impaya.ru",
+        alias="IMPAYA_API_URL",
+    )
+    impaya_api_token: str = Field(default="", alias="IMPAYA_API_TOKEN")
+    impaya_auth_header: str = Field(
+        default="Authorization",
+        alias="IMPAYA_AUTH_HEADER",
+    )
+    impaya_auth_prefix: str = Field(default="", alias="IMPAYA_AUTH_PREFIX")
+    impaya_terminal_name: str = Field(
+        default="evocloud.su_3ds_test",
+        alias="IMPAYA_TERMINAL_NAME",
+    )
+    impaya_payment_form_url_template: str = Field(
+        default="",
+        alias="IMPAYA_PAYMENT_FORM_URL_TEMPLATE",
+    )
+    offer_url: str = Field(default="", alias="OFFER_URL")
+    public_base_url: str = Field(default="", alias="PUBLIC_BASE_URL")
+    impaya_webhook_secret: str = Field(default="", alias="IMPAYA_WEBHOOK_SECRET")
+    billing_worker_interval_seconds: int = Field(default=60, alias="BILLING_WORKER_INTERVAL_SECONDS")
+
     def require_bot_token(self) -> str:
         token = self.bot_token.strip()
         if not token:
