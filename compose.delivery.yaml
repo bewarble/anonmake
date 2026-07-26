@@ -1,0 +1,23 @@
+services:
+  delivery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-anonmake}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-anonmake}
+      REDIS_URL: redis://redis:6379/0
+      DELIVERY_BATCH_SIZE: ${DELIVERY_BATCH_SIZE:-100}
+      DELIVERY_POLL_INTERVAL_SECONDS: ${DELIVERY_POLL_INTERVAL_SECONDS:-1}
+      DELIVERY_MAX_ATTEMPTS: ${DELIVERY_MAX_ATTEMPTS:-10}
+      DELIVERY_LOCK_STALE_SECONDS: ${DELIVERY_LOCK_STALE_SECONDS:-120}
+    command: ["python", "-m", "app.delivery_worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - anonmake
+    stop_grace_period: 30s

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from aiogram import Bot, F, Router
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +9,7 @@ from app.bot.keyboards import cancel_keyboard, main_menu_keyboard
 from app.bot.states import AnswerQuestion
 from app.core import texts
 from app.repositories import AnswerRepository, QuestionRepository, UserRepository
+from app.repositories.delivery import DeliveryRepository
 
 router = Router(name="answers")
 MAX_ANSWER_LENGTH = 1500
@@ -59,7 +60,6 @@ async def receive_answer(
     message: Message,
     state: FSMContext,
     session: AsyncSession,
-    bot: Bot,
 ) -> None:
     if message.from_user is None:
         return
@@ -104,24 +104,18 @@ async def receive_answer(
         )
         return
 
-    await AnswerRepository(session).create(question=question, text=text)
-    await session.commit()
+    answer = await AnswerRepository(session).create(question=question, text=text)
 
-    try:
-        await bot.send_message(
-            question.sender.telegram_id,
-            texts.ANSWER_RECEIVED.format(
-                question=question.text,
-                answer=text,
-            ),
-        )
-    except Exception:
-        await state.clear()
-        await message.answer(
-            texts.ANSWER_DELIVERY_FAILED,
-            reply_markup=main_menu_keyboard(),
-        )
-        return
+    await DeliveryRepository(session).enqueue(
+        kind="answer",
+        dedupe_key=f"answer:{answer.id}",
+        chat_id=question.sender.telegram_id,
+        text=texts.ANSWER_RECEIVED.format(
+            question=question.text,
+            answer=text,
+        ),
+    )
+    await session.commit()
 
     await state.clear()
     await message.answer(

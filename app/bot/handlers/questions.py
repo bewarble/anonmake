@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from aiogram import Bot, F, Router
+from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -13,7 +13,9 @@ from app.bot.states import AskQuestion
 from app.core import texts
 from app.core.config import load_settings
 from app.repositories import QuestionRepository, UserRepository
+from app.repositories.delivery import DeliveryRepository
 from app.services.abuse_guard import AbuseGuard
+from app.services.delivery import serialize_markup
 from app.services.redis_client import get_redis
 
 router = Router(name="questions")
@@ -55,7 +57,6 @@ async def receive_question(
     message: Message,
     state: FSMContext,
     session: AsyncSession,
-    bot: Bot,
 ) -> None:
     if message.from_user is None:
         return
@@ -92,8 +93,6 @@ async def receive_question(
                 text=text,
             )
         except Exception:
-            # Redis protection must fail open: a temporary Redis incident must
-            # not stop the primary messaging product.
             logger.exception("Question abuse guard is unavailable")
         else:
             if not decision.allowed:
@@ -129,6 +128,16 @@ async def receive_question(
             recipient_id=recipient.id,
             text=text,
         )
+        question.status = "queued"
+
+        markup = answer_question_keyboard(question.id)
+        await DeliveryRepository(session).enqueue(
+            kind="question",
+            dedupe_key=f"question:{question.id}",
+            chat_id=recipient.telegram_id,
+            text=texts.NEW_QUESTION.format(text=question.text),
+            reply_markup=serialize_markup(markup),
+        )
         await session.commit()
     except Exception:
         await session.rollback()
@@ -142,33 +151,6 @@ async def receive_question(
             except Exception:
                 logger.exception("Could not rollback duplicate key")
         raise
-
-    try:
-        await bot.send_message(
-            recipient.telegram_id,
-            texts.NEW_QUESTION.format(text=question.text),
-            reply_markup=answer_question_keyboard(question.id),
-        )
-    except Exception:
-        question.status = "delivery_failed"
-        await session.commit()
-
-        if guard is not None:
-            try:
-                await guard.rollback_duplicate(
-                    sender_telegram_id=message.from_user.id,
-                    recipient_user_id=recipient_id,
-                    text=text,
-                )
-            except Exception:
-                logger.exception("Could not rollback duplicate key")
-
-        await state.clear()
-        await message.answer(
-            texts.QUESTION_DELIVERY_FAILED,
-            reply_markup=main_menu_keyboard(),
-        )
-        return
 
     await state.clear()
     await message.answer(
