@@ -277,3 +277,5 @@ postgres_data/
 .stage16-install/
 
 .stage17-install/
+
+.stage18-install/

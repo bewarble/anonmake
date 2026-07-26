@@ -6,44 +6,48 @@ def admin_menu() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="📊 Статистика",
-                    callback_data="admin:stats",
+                    text="🛠 Центр управления",
+                    callback_data="adminx:home",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="👥 Пользователи",
+                    callback_data="adminx:users:recent:0",
                 ),
                 InlineKeyboardButton(
+                    text="👑 Подписки",
+                    callback_data="adminx:subs:active:0",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
                     text="💳 Платежи",
-                    callback_data="admin:payments",
+                    callback_data="adminx:payments:all:0",
+                ),
+                InlineKeyboardButton(
+                    text="📨 Доставка",
+                    callback_data="admin:delivery",
                 ),
             ],
             [
                 InlineKeyboardButton(
                     text="📈 Аналитика",
                     callback_data="admin:analytics",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="👥 Пользователи",
-                    callback_data="admin:users:0",
-                ),
-                InlineKeyboardButton(
-                    text="🔎 Найти",
-                    callback_data="admin:find",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="📨 Доставка",
-                    callback_data="admin:delivery",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="🧾 Журнал",
-                    callback_data="admin:audit",
                 ),
                 InlineKeyboardButton(
                     text="⚙️ Система",
                     callback_data="admin:system",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔎 Найти",
+                    callback_data="admin:find",
+                ),
+                InlineKeyboardButton(
+                    text="🧾 Журнал",
+                    callback_data="admin:audit",
                 ),
             ],
             [
@@ -82,7 +86,7 @@ def user_actions(user_id: int) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="← В админ-панель",
-                    callback_data="admin:home",
+                    callback_data="adminx:home",
                 )
             ],
         ]
@@ -95,7 +99,7 @@ def back_to_admin() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="← Назад",
-                    callback_data="admin:home",
+                    callback_data="adminx:home",
                 )
             ]
         ]
