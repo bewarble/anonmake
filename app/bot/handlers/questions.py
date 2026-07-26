@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import answer_question_keyboard, main_menu_keyboard
 from app.bot.states import AskQuestion
+from app.core import texts
 from app.repositories import QuestionRepository, UserRepository
 
 router = Router(name="questions")
@@ -17,11 +18,11 @@ MAX_QUESTION_LENGTH = 1500
 @router.callback_query(F.data == "cancel")
 async def cancel_callback(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await callback.answer("Отменено")
+    await callback.answer(texts.CANCELLED)
     if callback.message:
         await callback.message.edit_reply_markup(reply_markup=None)
         await callback.message.answer(
-            "Действие отменено.",
+            texts.CANCELLED,
             reply_markup=main_menu_keyboard(),
         )
 
@@ -29,7 +30,7 @@ async def cancel_callback(callback: CallbackQuery, state: FSMContext) -> None:
 @router.message(Command("cancel"))
 async def cancel_command(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer("Действие отменено.", reply_markup=main_menu_keyboard())
+    await message.answer(texts.CANCELLED, reply_markup=main_menu_keyboard())
 
 
 @router.message(AskQuestion.waiting_for_text, F.text)
@@ -44,11 +45,11 @@ async def receive_question(
 
     text = (message.text or "").strip()
     if not text:
-        await message.answer("Вопрос не может быть пустым.")
+        await message.answer(texts.QUESTION_EMPTY)
         return
     if len(text) > MAX_QUESTION_LENGTH:
         await message.answer(
-            f"Слишком длинный вопрос. Максимум — {MAX_QUESTION_LENGTH} символов."
+            texts.QUESTION_TOO_LONG.format(limit=MAX_QUESTION_LENGTH)
         )
         return
 
@@ -57,7 +58,7 @@ async def receive_question(
     if not isinstance(recipient_id, int):
         await state.clear()
         await message.answer(
-            "Сессия устарела. Откройте персональную ссылку ещё раз.",
+            texts.QUESTION_SESSION_EXPIRED,
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -69,7 +70,7 @@ async def receive_question(
     if recipient is None:
         await state.clear()
         await message.answer(
-            "Получатель больше не найден.",
+            texts.QUESTION_RECIPIENT_MISSING,
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -77,7 +78,7 @@ async def receive_question(
     if sender.id == recipient.id:
         await state.clear()
         await message.answer(
-            "Нельзя отправить вопрос самому себе.",
+            texts.SELF_MESSAGE,
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -92,8 +93,7 @@ async def receive_question(
     try:
         await bot.send_message(
             recipient.telegram_id,
-            "📩 Вам пришёл новый анонимный вопрос:\n\n"
-            f"{question.text}",
+            texts.NEW_QUESTION.format(text=question.text),
             reply_markup=answer_question_keyboard(question.id),
         )
     except Exception:
@@ -101,18 +101,18 @@ async def receive_question(
         await session.commit()
         await state.clear()
         await message.answer(
-            "Не удалось доставить вопрос. Возможно, получатель заблокировал бота.",
+            texts.QUESTION_DELIVERY_FAILED,
             reply_markup=main_menu_keyboard(),
         )
         return
 
     await state.clear()
     await message.answer(
-        "✅ Вопрос отправлен анонимно.",
+        texts.QUESTION_SENT,
         reply_markup=main_menu_keyboard(),
     )
 
 
 @router.message(AskQuestion.waiting_for_text)
 async def question_requires_text(message: Message) -> None:
-    await message.answer("Пожалуйста, отправьте вопрос текстовым сообщением.")
+    await message.answer(texts.TEXT_ONLY)

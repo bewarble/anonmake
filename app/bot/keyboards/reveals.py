@@ -9,13 +9,13 @@ def reveal_checkout_keyboard(
     rows = [
         [
             InlineKeyboardButton(
-                text="👑 Получить VIP за 1 ₽",
+                text="Открыть за 1 ₽",
                 url=payment_url,
             )
         ],
     ]
     if offer_url:
         rows.append(
-            [InlineKeyboardButton(text="📄 Оферта", url=offer_url)]
+            [InlineKeyboardButton(text="Условия", url=offer_url)]
         )
     return InlineKeyboardMarkup(inline_keyboard=rows)

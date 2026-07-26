@@ -6,6 +6,7 @@ import logging
 from aiogram import Bot
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import texts
 from app.models.reveal import RevealCheckout
 from app.repositories import QuestionRepository, UserRepository
 from app.services.impaya import ImpayaClient
@@ -22,9 +23,7 @@ def sender_label(question) -> str:
     full_name = " ".join(
         part for part in (sender.first_name, sender.last_name) if part
     ).strip()
-    if full_name:
-        return f"{full_name}\nПубличный username отсутствует."
-    return "Публичный username отсутствует."
+    return full_name or "Username не указан"
 
 
 async def finalize_checkout_and_notify(
@@ -35,11 +34,6 @@ async def finalize_checkout_and_notify(
     *,
     payment_form_url_template: str,
 ) -> str:
-    """Reconcile with Impaya, activate VIP and notify the buyer.
-
-    The incoming callback is never trusted as proof of payment. The final state
-    is always fetched from Impaya by customer_operation_id.
-    """
     paid = await RevealCheckoutService(
         session,
         client,
@@ -49,8 +43,6 @@ async def finalize_checkout_and_notify(
     if not paid:
         return "pending"
 
-    # A completed checkout may be delivered more than once. notified_at makes
-    # repeated callbacks harmless in the normal single-web-worker deployment.
     if checkout.notified_at is not None:
         return "already_notified"
 
@@ -64,8 +56,9 @@ async def finalize_checkout_and_notify(
     try:
         await bot.send_message(
             buyer.telegram_id,
-            "✅ VIP активирован на 1 день.\n\n"
-            f"👤 Отправитель сообщения:\n\n{sender_label(question)}",
+            texts.VIP_ACTIVATED_WITH_SENDER.format(
+                sender=sender_label(question)
+            ),
         )
     except Exception as exc:
         checkout.notification_error = str(exc)[:512]

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import cancel_keyboard, main_menu_keyboard
 from app.bot.states import AnswerQuestion
+from app.core import texts
 from app.repositories import AnswerRepository, QuestionRepository, UserRepository
 
 router = Router(name="answers")
@@ -25,7 +26,7 @@ async def begin_answer(
     try:
         question_id = int(callback.data.split(":", maxsplit=1)[1])
     except (ValueError, IndexError):
-        await callback.answer("Некорректный вопрос", show_alert=True)
+        await callback.answer(texts.INVALID_LINK, show_alert=True)
         return
 
     question = await QuestionRepository(session).get_with_users(question_id)
@@ -34,13 +35,13 @@ async def begin_answer(
     )
 
     if question is None or current_user is None:
-        await callback.answer("Вопрос не найден", show_alert=True)
+        await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
         return
     if question.recipient_id != current_user.id:
-        await callback.answer("Это не ваш вопрос", show_alert=True)
+        await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
         return
     if question.answer is not None:
-        await callback.answer("На этот вопрос уже был дан ответ", show_alert=True)
+        await callback.answer(texts.ANSWER_ALREADY_SENT, show_alert=True)
         return
 
     await state.set_state(AnswerQuestion.waiting_for_text)
@@ -48,7 +49,7 @@ async def begin_answer(
     await callback.answer()
     if callback.message:
         await callback.message.answer(
-            "Напишите ответ одним текстовым сообщением.",
+            texts.ANSWER_PROMPT,
             reply_markup=cancel_keyboard(),
         )
 
@@ -65,11 +66,11 @@ async def receive_answer(
 
     text = (message.text or "").strip()
     if not text:
-        await message.answer("Ответ не может быть пустым.")
+        await message.answer(texts.ANSWER_EMPTY)
         return
     if len(text) > MAX_ANSWER_LENGTH:
         await message.answer(
-            f"Слишком длинный ответ. Максимум — {MAX_ANSWER_LENGTH} символов."
+            texts.ANSWER_TOO_LONG.format(limit=MAX_ANSWER_LENGTH)
         )
         return
 
@@ -78,7 +79,7 @@ async def receive_answer(
     if not isinstance(question_id, int):
         await state.clear()
         await message.answer(
-            "Сессия устарела.",
+            texts.ANSWER_SESSION_EXPIRED,
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -91,14 +92,14 @@ async def receive_answer(
     if question is None or question.recipient_id != current_user.id:
         await state.clear()
         await message.answer(
-            "Вопрос не найден.",
+            texts.ANSWER_NOT_FOUND,
             reply_markup=main_menu_keyboard(),
         )
         return
     if question.answer is not None:
         await state.clear()
         await message.answer(
-            "На этот вопрос уже был дан ответ.",
+            texts.ANSWER_ALREADY_SENT,
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -109,25 +110,26 @@ async def receive_answer(
     try:
         await bot.send_message(
             question.sender.telegram_id,
-            "💬 Получен ответ на ваш анонимный вопрос:\n\n"
-            f"❓ {question.text}\n\n"
-            f"✅ {text}",
+            texts.ANSWER_RECEIVED.format(
+                question=question.text,
+                answer=text,
+            ),
         )
     except Exception:
         await state.clear()
         await message.answer(
-            "Ответ сохранён, но отправитель сейчас недоступен.",
+            texts.ANSWER_DELIVERY_FAILED,
             reply_markup=main_menu_keyboard(),
         )
         return
 
     await state.clear()
     await message.answer(
-        "✅ Ответ отправлен.",
+        texts.ANSWER_SENT,
         reply_markup=main_menu_keyboard(),
     )
 
 
 @router.message(AnswerQuestion.waiting_for_text)
 async def answer_requires_text(message: Message) -> None:
-    await message.answer("Пожалуйста, отправьте ответ текстовым сообщением.")
+    await message.answer(texts.TEXT_ONLY)

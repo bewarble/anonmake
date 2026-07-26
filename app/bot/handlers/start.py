@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import cancel_keyboard, main_menu_keyboard
 from app.bot.states import AskQuestion
+from app.core import texts
 from app.repositories import UserRepository
 
 router = Router(name="start")
@@ -37,9 +38,9 @@ async def command_start(
     if not code:
         link = await personal_link(bot, current_user.public_code)
         await message.answer(
-            "👋 Добро пожаловать в AnonMake!\n\n"
-            "Получайте анонимные вопросы по своей персональной ссылке.\n\n"
-            f"Ваша ссылка:\n{link}",
+            f"{texts.WELCOME}\n\n"
+            f"{texts.PERSONAL_LINK.format(link=link)}\n\n"
+            f"{texts.PERSONAL_LINK_HINT}",
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -47,14 +48,14 @@ async def command_start(
     recipient = await users.get_by_public_code(code)
     if recipient is None:
         await message.answer(
-            "Эта ссылка недействительна или устарела.",
+            texts.INVALID_LINK,
             reply_markup=main_menu_keyboard(),
         )
         return
 
     if recipient.id == current_user.id:
         await message.answer(
-            "Нельзя отправить анонимный вопрос самому себе 🙂",
+            texts.SELF_MESSAGE,
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -62,8 +63,7 @@ async def command_start(
     await state.set_state(AskQuestion.waiting_for_text)
     await state.update_data(recipient_id=recipient.id)
     await message.answer(
-        "Напишите анонимный вопрос одним сообщением.\n\n"
-        "Получатель не увидит ваше имя или Telegram-профиль.",
+        f"{texts.QUESTION_PROMPT}\n\n{texts.QUESTION_HINT}",
         reply_markup=cancel_keyboard(),
     )
 
@@ -80,19 +80,15 @@ async def show_personal_link(
     user = await UserRepository(session).upsert_from_telegram(message.from_user)
     link = await personal_link(bot, user.public_code)
     await message.answer(
-        f"Ваша персональная ссылка:\n\n{link}\n\n"
-        "Разместите её в профиле, канале или отправьте друзьям.",
+        f"{texts.PERSONAL_LINK.format(link=link)}\n\n"
+        f"{texts.PERSONAL_LINK_HINT}",
         reply_markup=main_menu_keyboard(),
     )
 
 
-@router.message(F.text.in_({"📥 Как это работает", "ℹ️ Помощь"}))
+@router.message(F.text.in_({"✨ Как это работает", "📥 Как это работает", "ℹ️ Помощь"}))
 async def show_help(message: Message) -> None:
     await message.answer(
-        "1. Скопируйте свою персональную ссылку.\n"
-        "2. Поделитесь ей с друзьями или подписчиками.\n"
-        "3. Получайте вопросы без имени отправителя.\n"
-        "4. Отвечайте кнопкой под вопросом.\n\n"
-        "Команда /cancel отменяет текущий ввод.",
+        texts.HELP,
         reply_markup=main_menu_keyboard(),
     )

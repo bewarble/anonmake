@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.reveals import reveal_checkout_keyboard
+from app.core import texts
 from app.core.config import load_settings
 from app.repositories import QuestionRepository, UserRepository
 from app.repositories.billing import BillingRepository
@@ -24,9 +25,7 @@ def sender_label(question) -> str:
     full_name = " ".join(
         part for part in (sender.first_name, sender.last_name) if part
     ).strip()
-    if full_name:
-        return f"{full_name}\nПубличный username отсутствует."
-    return "Публичный username отсутствует."
+    return full_name or "Username не указан"
 
 
 def build_client(settings) -> ImpayaClient:
@@ -50,14 +49,14 @@ async def reveal_sender(
     try:
         question_id = int((callback.data or "").split(":", 1)[1])
     except (IndexError, ValueError):
-        await callback.answer("Некорректное сообщение", show_alert=True)
+        await callback.answer(texts.INVALID_LINK, show_alert=True)
         return
 
     buyer = await UserRepository(session).upsert_from_telegram(callback.from_user)
     question = await QuestionRepository(session).get_with_users(question_id)
 
     if question is None or question.recipient_id != buyer.id:
-        await callback.answer("Это сообщение вам недоступно", show_alert=True)
+        await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
         return
 
     subscription = await BillingRepository(session).subscription_for_user(buyer.id)
@@ -65,28 +64,20 @@ async def reveal_sender(
         await callback.answer()
         if callback.message:
             await callback.message.answer(
-                f"👤 Отправитель сообщения:\n\n{sender_label(question)}"
+                texts.VIP_SENDER.format(sender=sender_label(question))
             )
         return
 
     settings = load_settings()
     if not settings.billing_enabled:
-        await callback.answer("Оплата временно недоступна", show_alert=True)
+        await callback.answer(texts.VIP_PAYMENT_UNAVAILABLE, show_alert=True)
         return
-    if not settings.impaya_api_token.strip():
-        await callback.answer("Токен Impaya не настроен", show_alert=True)
-        return
-    if not settings.impaya_payment_form_url_template.strip():
-        await callback.answer(
-            "URL платёжной формы Impaya не настроен",
-            show_alert=True,
-        )
-        return
-    if not settings.public_base_url.strip():
-        await callback.answer(
-            "Публичный адрес сервиса не настроен",
-            show_alert=True,
-        )
+    if (
+        not settings.impaya_api_token.strip()
+        or not settings.impaya_payment_form_url_template.strip()
+        or not settings.public_base_url.strip()
+    ):
+        await callback.answer(texts.VIP_CONFIGURATION_ERROR, show_alert=True)
         return
 
     checkout = await RevealRepository(session).get_or_create(
@@ -115,10 +106,7 @@ async def reveal_sender(
     await callback.answer()
     if callback.message:
         await callback.message.answer(
-            "👑 VIP открывает раскрытие отправителей всех старых и новых "
-            "сообщений по кнопке «Узнать кто это».\n\n"
-            "Пробный доступ — 1 ₽. Условия подписки указаны в оферте.\n\n"
-            "После оплаты бот активирует VIP и сам пришлёт отправителя.",
+            texts.VIP_OFFER,
             reply_markup=reveal_checkout_keyboard(
                 payment_url=payment_url,
                 offer_url=settings.offer_url,
