@@ -1,18 +1,30 @@
+from __future__ import annotations
+
 from collections.abc import AsyncIterator
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
 
-from app.database.base import Base
+from app.core.config import load_settings
 
-DATABASE_PATH = Path("data/anonmake.db")
-DATABASE_URL = f"sqlite+aiosqlite:///{DATABASE_PATH.as_posix()}"
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+settings = load_settings()
+DATABASE_URL = settings.database_url
+DATABASE_PATH: Path | None = None
+
+if DATABASE_URL.startswith("sqlite+aiosqlite:///"):
+    DATABASE_PATH = Path(DATABASE_URL.removeprefix("sqlite+aiosqlite:///"))
+
+engine: AsyncEngine = create_async_engine(
+    DATABASE_URL,
+    echo=settings.sql_echo,
+    pool_pre_ping=True,
+)
 SessionFactory = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -21,13 +33,9 @@ SessionFactory = async_sessionmaker(
 
 
 async def init_database() -> None:
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    # Register every model before create_all().
-    import app.models  # noqa: F401
-
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+    """Prepare local storage. Schema changes are managed by Alembic."""
+    if DATABASE_PATH is not None:
+        DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:

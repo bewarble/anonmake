@@ -1,0 +1,12 @@
+.git
+.env
+.venv
+__pycache__
+*.py[cod]
+*.db
+*.db-shm
+*.db-wal
+*.zip
+.stage-backups
+.pytest_cache
+.ruff_cache

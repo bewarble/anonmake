@@ -13,13 +13,13 @@ from app.database.session import close_database, init_database
 
 
 async def main() -> None:
+    settings = load_settings()
     logging.basicConfig(
-        level=logging.INFO,
+        level=getattr(logging, settings.log_level.upper(), logging.INFO),
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
 
-    settings = load_settings()
-    bot = Bot(token=settings.bot_token)
+    bot = Bot(token=settings.require_bot_token())
     dispatcher = Dispatcher(storage=MemoryStorage())
 
     database_middleware = DatabaseMiddleware()

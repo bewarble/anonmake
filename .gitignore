@@ -249,3 +249,6 @@ data/*.db-wal
 # Local release state
 .stage-backups/
 *.stage-*.bak
+
+.stage4-install/
+postgres_data/
