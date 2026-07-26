@@ -1,3 +1,4 @@
+from app.repositories.marketing import MarketingRepository
 from app.repositories.admin_control import AdminControlRepository
 from app.repositories.admin_users import AdminUsersRepository
 from app.repositories.delivery_admin import DeliveryAdminRepository

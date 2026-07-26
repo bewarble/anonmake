@@ -42,6 +42,16 @@ def admin_menu() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    text="📣 Источники",
+                    callback_data="adminm:sources",
+                ),
+                InlineKeyboardButton(
+                    text="📢 Рассылки",
+                    callback_data="adminm:broadcasts",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
                     text="🔎 Найти",
                     callback_data="admin:find",
                 ),

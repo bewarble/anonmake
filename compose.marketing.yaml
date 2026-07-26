@@ -1,0 +1,21 @@
+services:
+  broadcast-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-anonmake}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-anonmake}
+      REDIS_URL: redis://redis:6379/0
+      BROADCAST_BATCH_SIZE: ${BROADCAST_BATCH_SIZE:-500}
+      BROADCAST_POLL_INTERVAL_SECONDS: ${BROADCAST_POLL_INTERVAL_SECONDS:-3}
+    command: ["python", "-m", "app.broadcast_worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - anonmake
+    stop_grace_period: 30s
