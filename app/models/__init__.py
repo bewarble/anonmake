@@ -1,3 +1,4 @@
+from app.models.admin import AdminAuditLog
 from app.models.reveal import RevealCheckout
 from app.models.billing import PaymentAttempt, PaymentMethod, Subscription
 from app.models.answer import Answer

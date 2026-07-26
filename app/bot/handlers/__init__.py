@@ -1,3 +1,4 @@
+from app.bot.handlers.admin import router as admin_router
 from aiogram import Router
 
 from app.bot.handlers.answers import router as answers_router
@@ -10,6 +11,7 @@ def build_router() -> Router:
     router = Router(name="root")
     router.include_router(start_router)
     router.include_router(questions_router)
+    router.include_router(admin_router)
     router.include_router(reveals_router)
     router.include_router(answers_router)
     return router

@@ -7,6 +7,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    admin_ids: str = Field(default="", alias="ADMIN_IDS")
+
+    @property
+    def admin_ids_set(self) -> set[int]:
+        result: set[int] = set()
+        for value in self.admin_ids.split(','):
+            value = value.strip()
+            if value.isdigit():
+                result.add(int(value))
+        return result
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
     json_logs: bool = Field(default=True, alias="JSON_LOGS")
     abuse_guard_enabled: bool = Field(default=True, alias="ABUSE_GUARD_ENABLED")

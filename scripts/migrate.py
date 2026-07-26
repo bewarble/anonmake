@@ -9,9 +9,7 @@ from sqlalchemy import inspect, text
 from app.database.session import engine
 
 CORE_TABLES = {"users", "questions", "answers"}
-BILLING_TABLES = {"payment_methods", "subscriptions", "payment_attempts"}
-CORE_REVISION = "20260726_0001"
-HEAD_REVISION = "20260726_0002"
+INITIAL_REVISION = "20260726_0001"
 
 
 async def inspect_database() -> tuple[set[str], str | None]:
@@ -31,8 +29,8 @@ async def inspect_database() -> tuple[set[str], str | None]:
 
 
 async def run_alembic(function, config: Config, revision: str) -> None:
-    # Alembic's async env creates its own event loop, so execute its synchronous
-    # command API in a worker thread instead of nesting asyncio.run().
+    # Alembic's asynchronous env starts its own event loop. The synchronous
+    # command API therefore runs in a worker thread.
     await asyncio.to_thread(function, config, revision)
 
 
@@ -40,36 +38,33 @@ async def main() -> None:
     config = Config("alembic.ini")
     tables, revision = await inspect_database()
 
-    has_core = CORE_TABLES.issubset(tables)
-    has_billing = BILLING_TABLES.issubset(tables)
-
+    # Empty database: apply every migration normally.
     if not tables or tables == {"alembic_version"}:
         await run_alembic(command.upgrade, config, "head")
         print("Database upgraded to Alembic head.")
         return
 
-    if has_core and not has_billing:
-        # Existing MVP database, or a database incorrectly stamped at 0002 by
-        # Stage 5.0. The physical schema is still revision 0001.
-        if revision != CORE_REVISION:
-            await run_alembic(command.stamp, config, CORE_REVISION)
-            print(f"Core schema stamped at {CORE_REVISION}.")
+    # Legacy Stage 3 database created before Alembic tracking existed.
+    if CORE_TABLES.issubset(tables) and "alembic_version" not in tables:
+        await run_alembic(command.stamp, config, INITIAL_REVISION)
+        print(f"Legacy core schema stamped at {INITIAL_REVISION}.")
         await run_alembic(command.upgrade, config, "head")
-        print(f"Database upgraded from {CORE_REVISION} to {HEAD_REVISION}.")
+        print("Database upgraded to Alembic head.")
         return
 
-    if has_core and has_billing:
-        if revision != HEAD_REVISION:
-            await run_alembic(command.stamp, config, HEAD_REVISION)
-            print(f"Complete billing schema stamped at {HEAD_REVISION}.")
-        else:
-            print("Database is already at Alembic head.")
+    # Normal case for all current and future revisions. Never hard-code the
+    # current head and never stamp a tracked database backwards.
+    if "alembic_version" in tables:
+        await run_alembic(command.upgrade, config, "head")
+        print(
+            "Database upgraded to Alembic head"
+            + (f" from {revision}." if revision else ".")
+        )
         return
 
-    missing_core = sorted(CORE_TABLES - tables)
     raise RuntimeError(
-        "Unrecognized partial database schema. "
-        f"Missing core tables: {missing_core}. Existing tables: {sorted(tables)}"
+        "Unrecognized database schema. "
+        f"Existing tables: {sorted(tables)}"
     )
 
 

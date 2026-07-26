@@ -1,3 +1,4 @@
+from app.repositories.admin import AdminRepository
 from app.repositories.reveals import RevealRepository
 from app.repositories.billing import BillingRepository
 from app.repositories.answers import AnswerRepository
