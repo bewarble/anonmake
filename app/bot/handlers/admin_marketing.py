@@ -9,6 +9,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.source_admin import cancel_source_keyboard, source_card_keyboard
+from app.bot.keyboards.admin_stage25 import referral_back_keyboard
 from app.bot.keyboards.marketing import (
     audience_keyboard,
     broadcast_confirm_keyboard,
@@ -128,7 +129,7 @@ async def source_spend(
         f"Название: {escape(source.name)}\n"
         f"Рекламная ссылка:\n<code>{escape(link)}</code>",
         parse_mode="HTML",
-        reply_markup=sources_menu(),
+        reply_markup=referral_back_keyboard(),
     )
 
 

@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     sql_echo: bool = Field(default=False, alias="SQL_ECHO")
 
     billing_enabled: bool = Field(default=False, alias="BILLING_ENABLED")
+    trial_attempt_kinds: str = Field(
+        default="trial,initial,binding",
+        alias="TRIAL_ATTEMPT_KINDS",
+    )
     impaya_api_url: str = Field(
         default="https://ag-stage.impaya.ru",
         alias="IMPAYA_API_URL",
