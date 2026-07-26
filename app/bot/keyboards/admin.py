@@ -22,9 +22,13 @@ def admin_menu() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="🔎 Найти пользователя",
+                    text="👥 Пользователи",
+                    callback_data="admin:users:0",
+                ),
+                InlineKeyboardButton(
+                    text="🔎 Найти",
                     callback_data="admin:find",
-                )
+                ),
             ],
             [
                 InlineKeyboardButton(

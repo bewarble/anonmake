@@ -1,3 +1,4 @@
+from app.bot.handlers.admin_users import router as admin_users_router
 from app.bot.handlers.errors import router as errors_router
 from app.bot.handlers.admin_analytics import router as admin_analytics_router
 from app.bot.handlers.admin_delivery import router as admin_delivery_router
@@ -16,6 +17,7 @@ def build_router() -> Router:
     router.include_router(errors_router)
 
     router.include_router(admin_router)
+    router.include_router(admin_users_router)
     router.include_router(admin_analytics_router)
     router.include_router(admin_delivery_router)
     router.include_router(admin_system_router)
