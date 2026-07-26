@@ -1,3 +1,4 @@
+from app.repositories.delivery_admin import DeliveryAdminRepository
 from app.repositories.delivery import DeliveryRepository
 from app.repositories.admin import AdminRepository
 from app.repositories.reveals import RevealRepository

@@ -22,6 +22,12 @@ def admin_menu() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    text="📨 Доставка",
+                    callback_data="admin:delivery",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="🧾 Журнал",
                     callback_data="admin:audit",
                 ),
