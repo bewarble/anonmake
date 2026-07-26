@@ -252,3 +252,6 @@ data/*.db-wal
 
 .stage4-install/
 postgres_data/
+
+# Local installer backups
+.stage6-install/
