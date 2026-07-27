@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import cancel_keyboard, main_menu_for
 from app.bot.keyboards.personal_link import personal_link_share_keyboard
+from app.bot.ui import USER_HELP, USER_PERSONAL_LINK
 from app.bot.states import AskQuestion
 from app.core import texts
 from app.repositories import UserRepository
@@ -72,7 +73,7 @@ async def command_start(
     )
 
 
-@router.message(F.text == "🔗 Моя ссылка")
+@router.message(F.text == USER_PERSONAL_LINK)
 async def show_personal_link(
     message: Message,
     session: AsyncSession,
@@ -90,7 +91,7 @@ async def show_personal_link(
     )
 
 
-@router.message(F.text.in_({"✨ Как это работает", "📥 Как это работает", "ℹ️ Помощь"}))
+@router.message(F.text.in_({USER_HELP, "✨ Как это работает", "📥 Как это работает", "ℹ️ Помощь"}))
 async def show_help(message: Message) -> None:
     await message.answer(
         texts.HELP,

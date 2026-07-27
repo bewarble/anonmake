@@ -1,16 +1,18 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.bot.ui import ACTION_CANCEL, QUESTION_ANSWER, QUESTION_REVEAL
+
 
 def answer_question_keyboard(question_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✍️ Ответить",
+                    text=QUESTION_ANSWER,
                     callback_data=f"answer:{question_id}",
                 ),
                 InlineKeyboardButton(
-                    text="👤 Узнать кто это",
+                    text=QUESTION_REVEAL,
                     callback_data=f"reveal:{question_id}",
                 ),
             ]
@@ -21,6 +23,6 @@ def answer_question_keyboard(question_id: int) -> InlineKeyboardMarkup:
 def cancel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Отмена", callback_data="cancel")]
+            [InlineKeyboardButton(text=ACTION_CANCEL, callback_data="cancel")]
         ]
     )

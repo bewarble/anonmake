@@ -16,7 +16,7 @@ from app.bot.keyboards.marketing import (
     broadcast_text_cancel_keyboard,
 )
 from app.bot.states.marketing import BroadcastCreate, SourceCreate
-from app.core import texts
+from app.core import texts, admin_texts
 from app.core.config import load_settings
 from app.repositories.admin import AdminRepository
 from app.repositories.marketing import MarketingRepository
@@ -34,13 +34,13 @@ async def source_create_start(
     state: FSMContext,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     await state.set_state(SourceCreate.waiting_name)
     if callback.message:
         await callback.message.answer(
-            "Название источника:",
+            admin_texts.SOURCE_NAME_PROMPT,
             reply_markup=cancel_source_keyboard(),
         )
     await callback.answer()
@@ -54,15 +54,15 @@ async def source_name(message: Message, state: FSMContext) -> None:
 
     name = " ".join((message.text or "").strip().split())
     if not name:
-        await message.answer("Укажите название")
+        await message.answer(admin_texts.SOURCE_NAME_EMPTY)
         return
     if len(name) > 120:
-        await message.answer("Название должно быть не длиннее 120 символов")
+        await message.answer(admin_texts.SOURCE_NAME_LONG)
         return
     await state.update_data(name=name)
     await state.set_state(SourceCreate.waiting_url)
     await message.answer(
-        "Ссылка на источник рекламы:",
+        admin_texts.SOURCE_URL_PROMPT,
         reply_markup=cancel_source_keyboard(),
     )
 
@@ -76,15 +76,15 @@ async def source_url(message: Message, state: FSMContext) -> None:
     value = (message.text or "").strip()
     parsed = urlparse(value)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        await message.answer("Укажите корректную http/https ссылку")
+        await message.answer(admin_texts.SOURCE_URL_INVALID)
         return
     if len(value) > 1000:
-        await message.answer("Ссылка должна быть не длиннее 1000 символов")
+        await message.answer(admin_texts.SOURCE_URL_LONG)
         return
     await state.update_data(source_url=value)
     await state.set_state(SourceCreate.waiting_spend)
     await message.answer(
-        "Сумма закупа в рублях, например 15000:",
+        admin_texts.SOURCE_SPEND_PROMPT,
         reply_markup=cancel_source_keyboard(),
     )
 
@@ -104,13 +104,13 @@ async def source_spend(
     try:
         rubles = Decimal(raw)
     except InvalidOperation:
-        await message.answer("Введите сумму числом")
+        await message.answer(admin_texts.SOURCE_SPEND_INVALID)
         return
     if not rubles.is_finite() or rubles < 0:
-        await message.answer("Укажите корректную неотрицательную сумму")
+        await message.answer(admin_texts.SOURCE_SPEND_INVALID)
         return
     if rubles > Decimal("1000000000"):
-        await message.answer("Сумма слишком большая")
+        await message.answer(admin_texts.SOURCE_SPEND_LARGE)
         return
 
     data = await state.get_data()
@@ -118,7 +118,7 @@ async def source_spend(
     source_url_value = data.get("source_url")
     if not isinstance(name, str) or not isinstance(source_url_value, str):
         await state.clear()
-        await message.answer("Сессия создания источника истекла")
+        await message.answer(admin_texts.SESSION_EXPIRED)
         return
     source = await MarketingRepository(session).create_source(
         name=name,
@@ -138,7 +138,7 @@ async def source_spend(
     me = await bot.get_me()
     link = f"https://t.me/{me.username}?start=src_{source.code}"
     await message.answer(
-        "✅ Источник создан\n\n"
+        f"{admin_texts.SOURCE_CREATED}\n\n"
         f"Название: {escape(source.name)}\n"
         f"Рекламная ссылка:\n<code>{escape(link)}</code>",
         parse_mode="HTML",
@@ -154,10 +154,10 @@ async def broadcast_text(message: Message, state: FSMContext) -> None:
 
     text = (message.text or "").strip()
     if not text:
-        await message.answer("Текст не может быть пустым")
+        await message.answer(admin_texts.BROADCAST_TEXT_EMPTY)
         return
     if len(text) > 4000:
-        await message.answer("Максимум 4000 символов")
+        await message.answer(admin_texts.BROADCAST_TEXT_LONG)
         return
 
     await state.update_data(text=text)
@@ -172,7 +172,7 @@ async def broadcast_text(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data == "adminm:broadcast:preview")
 async def broadcast_preview_button(callback: CallbackQuery) -> None:
     await callback.answer(
-        "Это предпросмотр. В рассылке кнопка будет рабочей.",
+        admin_texts.BROADCAST_PREVIEW_NOTE,
         show_alert=True,
     )
 
@@ -184,7 +184,7 @@ async def broadcast_confirm(
     session: AsyncSession,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     data = await state.get_data()
@@ -197,7 +197,7 @@ async def broadcast_confirm(
         or not isinstance(text, str)
     ):
         await state.clear()
-        await callback.answer("Сессия рассылки истекла", show_alert=True)
+        await callback.answer(admin_texts.SESSION_EXPIRED, show_alert=True)
         return
 
     item = await MarketingRepository(session).create_broadcast(
@@ -217,7 +217,7 @@ async def broadcast_confirm(
 
     if callback.message:
         await callback.message.edit_text(
-            f"✅ Рассылка #{item.id} поставлена в очередь"
+            admin_texts.BROADCAST_QUEUED.format(item_id=item.id)
         )
     await callback.answer()
 
@@ -228,10 +228,10 @@ async def broadcast_cancel(
     state: FSMContext,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     await state.clear()
     if callback.message:
-        await callback.message.edit_text("Рассылка отменена")
+        await callback.message.edit_text(admin_texts.BROADCAST_CANCELLED)
     await callback.answer()

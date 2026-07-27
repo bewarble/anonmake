@@ -6,15 +6,13 @@ def cancel_subscription_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✅ Отключить автопродление",
+                    text="Отключить",
                     callback_data="subscription:cancel:confirm",
-                )
-            ],
-            [
+                ),
                 InlineKeyboardButton(
-                    text="✖️ Оставить подписку",
+                    text="Оставить",
                     callback_data="subscription:cancel:keep",
-                )
-            ],
+                ),
+            ]
         ]
     )

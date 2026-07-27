@@ -8,6 +8,6 @@
 <label><span>Название</span><input name="name" value="{{ values.name if values else '' }}" required></label>
 <label><span>Ссылка на размещение</span><input type="url" name="source_url" value="{{ values.source_url if values else '' }}" required></label>
 <label><span>Закуп, ₽</span><input name="spend_rubles" inputmode="decimal" value="{{ values.spend_rubles if values else '0' }}"></label>
-<div class="form-actions"><button class="primary">Создать</button><a href="/admin/business/sources">Отмена</a></div>
+<div class="form-actions"><button type="submit" class="primary">Создать</button><a href="/admin/business/sources">Отмена</a></div>
 </form></article></section>
 {% endblock %}

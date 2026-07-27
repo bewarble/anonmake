@@ -52,7 +52,7 @@
             <strong>{{ event.summary or event.event_type }}</strong>
             <span class="crm-event-type">{{ event.event_type }}</span>
           </div>
-          <time>{{ event.occurred_at.strftime('%d.%m.%Y %H:%M') }}</time>
+          <time>{{ event.occurred_at|date_time }}</time>
         </article>
       {% else %}
         <p class="empty">Событий пока нет</p>
@@ -73,7 +73,7 @@
       <div><dt>Username</dt><dd>{{ '@' + details.user.username if details.user.username else '—' }}</dd></div>
       <div><dt>Telegram ID</dt><dd>{{ details.user.telegram_id }}</dd></div>
       <div><dt>Источник</dt><dd>{{ details.source.name if details.source else 'Органика' }}</dd></div>
-      <div><dt>Регистрация</dt><dd>{{ details.user.created_at.strftime('%d.%m.%Y %H:%M') }}</dd></div>
+      <div><dt>Регистрация</dt><dd>{{ details.user.created_at|date_time }}</dd></div>
     </dl>
   </aside>
 </section>
@@ -126,7 +126,7 @@
   <article class="panel">
     <div class="panel-title-row">
       <div>
-        <span class="panel-kicker">Payment method</span>
+        <span class="panel-kicker">Способ оплаты</span>
         <h2>Карта и привязка</h2>
       </div>
     </div>
@@ -179,12 +179,12 @@
             </a>
           </dd>
         </div>
-        <div><dt>Тип</dt><dd>{{ details.last_successful_payment.attempt_kind }}</dd></div>
+        <div><dt>Тип</dt><dd>{{ details.last_successful_payment.attempt_kind|payment_kind }}</dd></div>
         <div><dt>Сумма</dt><dd>{{ money(details.last_successful_payment.amount_kopecks) }} ₽</dd></div>
         <div>
           <dt>Дата</dt>
           <dd>
-            {{ (details.last_successful_payment.completed_at or details.last_successful_payment.created_at).strftime('%d.%m.%Y %H:%M') }}
+            {{ (details.last_successful_payment.completed_at or details.last_successful_payment.created_at)|date_time }}
           </dd>
         </div>
       </dl>
@@ -211,7 +211,7 @@
             </a>
           </dd>
         </div>
-        <div><dt>Статус</dt><dd>{{ details.last_failed_payment.status }}</dd></div>
+        <div><dt>Статус</dt><dd>{{ details.last_failed_payment.status|status_label }}</dd></div>
         <div><dt>Код</dt><dd>{{ details.last_failed_payment.error_code or '—' }}</dd></div>
         <div><dt>Описание</dt><dd>{{ details.last_failed_payment.error_message or '—' }}</dd></div>
       </dl>
@@ -224,7 +224,7 @@
 <section class="panel admin-control-panel">
   <div class="panel-title-row">
     <div>
-      <span class="panel-kicker">Support actions</span>
+      <span class="panel-kicker">Действия поддержки</span>
       <h2>Управление подпиской</h2>
       <p>Все действия требуют отдельного подтверждения и записываются в журнал.</p>
     </div>
@@ -255,7 +255,7 @@
 <section class="panel">
   <div class="panel-title-row">
     <div>
-      <span class="panel-kicker">Billing history</span>
+      <span class="panel-kicker">История платежей</span>
       <h2>Последние платежи</h2>
     </div>
     <a class="button-primary" href="/admin/payments?q={{ details.user.telegram_id }}">Все платежи</a>
@@ -269,9 +269,9 @@
           <td><a href="/admin/payments/{{ attempt.id }}">#{{ attempt.id }}</a></td>
           <td>{{ attempt.attempt_kind }}</td>
           <td>{{ money(attempt.amount_kopecks) }} ₽</td>
-          <td><span class="badge {{ attempt.status }}">{{ attempt.status }}</span></td>
+          <td><span class="badge {{ attempt.status|status_label }}">{{ attempt.status|status_label }}</span></td>
           <td>{{ attempt.error_code or '—' }}</td>
-          <td>{{ attempt.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td>{{ attempt.created_at|date_time }}</td>
         </tr>
       {% else %}
         <tr><td colspan="6" class="empty">Платежей нет</td></tr>

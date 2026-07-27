@@ -1,53 +1,40 @@
 {% extends "base.html" %}
+{% from "ui_macros.html" import badge, empty, page_intro %}
 {% block content %}
+{{ page_intro('💳', 'Платежи', 'Все попытки оплаты и продления доступа.', total) }}
 <section class="panel">
-  <div class="panel-header">
-    <div><h2>Платежи</h2><p>Всего попыток: {{ total }}</p></div>
-  </div>
-
-  <form class="filters" method="get" action="/admin/payments">
-    <input name="q" value="{{ q }}" placeholder="Telegram ID, username, operation, transaction, binding">
-    <select name="status_filter">
+  <form class="filters unified-filters" method="get" action="/admin/payments">
+    <label><span>Поиск</span><input name="q" value="{{ q }}" placeholder="ID, username, операция или карта"></label>
+    <label><span>Статус</span><select name="status_filter">
       <option value="">Все статусы</option>
       {% for value in ["success", "insufficient_funds", "pending", "failed"] %}
-        <option value="{{ value }}" {{ "selected" if status_filter == value else "" }}>{{ value }}</option>
+        <option value="{{ value }}" {{ "selected" if status_filter == value else "" }}>{{ value|status_label }}</option>
       {% endfor %}
-    </select>
-    <select name="kind">
+    </select></label>
+    <label><span>Тип операции</span><select name="kind">
       <option value="">Все типы</option>
-      {% for value in ["trial", "primary", "fallback", "test_primary", "test_fallback"] %}
-        <option value="{{ value }}" {{ "selected" if kind == value else "" }}>{{ value }}</option>
+      {% for value in ["trial", "primary", "fallback", "test_primary", "test_fallback", "admin_primary", "admin_fallback"] %}
+        <option value="{{ value }}" {{ "selected" if kind == value else "" }}>{{ value|payment_kind }}</option>
       {% endfor %}
-    </select>
-    <button type="submit">Применить</button>
-    <a class="button secondary" href="/admin/payments">Сбросить</a>
+    </select></label>
+    <div class="filter-actions"><button type="submit" class="primary">Применить</button><a class="button secondary" href="/admin/payments">Сбросить</a></div>
   </form>
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th><th>Пользователь</th><th>Тип</th><th>Сумма</th>
-          <th>Статус</th><th>Ошибка</th><th>Создан</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for attempt, subscription, user, payment_method in rows %}
-        <tr>
-          <td><a href="/admin/payments/{{ attempt.id }}">#{{ attempt.id }}</a></td>
-          <td><a href="/admin/users/{{ user.id }}">{{ '@' + user.username if user.username else user.telegram_id }}</a></td>
-          <td>{{ attempt.attempt_kind }}</td>
-          <td>{{ money(attempt.amount_kopecks) }} ₽</td>
-          <td><span class="badge {{ attempt.status }}">{{ attempt.status }}</span></td>
-          <td title="{{ attempt.error_message or '' }}">{{ attempt.error_code or '—' }}</td>
-          <td>{{ attempt.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
-        </tr>
-      {% else %}
-        <tr><td colspan="7" class="empty">Платежи не найдены</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>ID</th><th>Пользователь</th><th>Операция</th><th>Сумма</th><th>Статус</th><th>Ошибка</th><th>Создано</th></tr></thead>
+    <tbody>
+    {% for attempt, subscription, user, payment_method in rows %}
+      <tr>
+        <td><a href="/admin/payments/{{ attempt.id }}">#{{ attempt.id }}</a></td>
+        <td><a href="/admin/crm/users/{{ user.id }}">{{ user|user_name }}</a></td>
+        <td>{{ attempt.attempt_kind|payment_kind }}</td>
+        <td>{{ attempt.amount_kopecks|money }} ₽</td>
+        <td>{{ badge(attempt.status) }}</td>
+        <td title="{{ attempt.error_message or '' }}">{{ attempt.error_code or '—' }}</td>
+        <td>{{ attempt.created_at|date_time }}</td>
+      </tr>
+    {% else %}<tr><td colspan="7">{{ empty('Платежи не найдены', 'Измените фильтры или поисковый запрос.') }}</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
   {% include "pagination.html" %}
 </section>
 {% endblock %}

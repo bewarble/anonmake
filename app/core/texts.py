@@ -1,79 +1,91 @@
-"""Compact user-facing copy for AnonMake."""
+"""AnonMake product language.
 
+User-facing copy follows three rules:
+1. Short and clear.
+2. No billing internals, renewal amounts, technical codes or dates.
+3. The public offer is always described as: 1 ₽ — 1 day of access.
+"""
+
+# Global
+READY = "✅ Готово."
+CANCELLED = "ℹ️ Действие отменено."
+TEMPORARY_ERROR = "❌ Что-то пошло не так.\n\nПопробуйте ещё раз."
+TEXT_ONLY = "ℹ️ Отправьте текстовое сообщение."
+
+# Start and personal link
 WELCOME = (
     "💌 Анонимные сообщения\n\n"
-    "Получайте честные сообщения без имени отправителя.\n"
-    "Поделитесь своей ссылкой — остальное сделает бот."
+    "Получайте сообщения без имени отправителя.\n"
+    "Поделитесь своей ссылкой — и всё готово."
 )
-
 PERSONAL_LINK = "🔗 Ваша ссылка\n\n{link}"
-PERSONAL_LINK_HINT = "Добавьте её в профиль, канал или сторис."
-LINK_COPIED_HINT = "Нажмите на ссылку выше, чтобы скопировать её."
+PERSONAL_LINK_HINT = "Поделитесь ссылкой в профиле, канале или сторис."
+LINK_COPIED_HINT = "Нажмите на ссылку, чтобы скопировать её."
 
 HELP = (
-    "✨ Как это работает\n\n"
-    "1. Получите личную ссылку\n"
-    "2. Поделитесь ею\n"
-    "3. Получайте анонимные сообщения\n"
-    "4. Отвечайте прямо в боте"
+    "✨ Как всё работает\n\n"
+    "1. Поделитесь своей ссылкой\n"
+    "2. Получайте анонимные сообщения\n"
+    "3. Отвечайте прямо в боте"
 )
 
-INVALID_LINK = "Эта ссылка больше не действует"
-SELF_MESSAGE = "Себе написать не получится 🙂"
+INVALID_LINK = "⚠️ Эта ссылка больше не работает."
+SELF_MESSAGE = "🙂 Себе написать не получится."
 
-QUESTION_PROMPT = "✍️ Напишите сообщение"
-QUESTION_HINT = "Имя отправителя не будет показано."
-QUESTION_SENT = (
-    "✅ Сообщение отправлено\n\n"
-    "Если пользователь ответит, мы сразу пришлём уведомление."
-)
-QUESTION_EMPTY = "Напишите текст сообщения"
-QUESTION_TOO_LONG = "Слишком длинное сообщение — максимум {limit} символов"
-QUESTION_SESSION_EXPIRED = "Ссылка устарела. Откройте её ещё раз"
-QUESTION_RECIPIENT_MISSING = "Получатель сейчас недоступен"
-QUESTION_DELIVERY_FAILED = (
-    "Не удалось доставить сообщение. Попробуйте ещё раз немного позже"
-)
-QUESTION_TOO_FAST = "Слишком быстро 🙂 Подождите пару секунд"
-QUESTION_DUPLICATE = "Такое сообщение уже отправлено"
-
+# Questions
+QUESTION_PROMPT = "✍️ Напишите сообщение."
+QUESTION_HINT = "Отправитель останется анонимным."
+QUESTION_SENT = "✅ Сообщение отправлено."
+QUESTION_EMPTY = "ℹ️ Напишите текст сообщения."
+QUESTION_TOO_LONG = "⚠️ Сообщение слишком длинное.\n\nМаксимум: {limit} символов."
+QUESTION_SESSION_EXPIRED = "⚠️ Ссылка устарела.\n\nОткройте её ещё раз."
+QUESTION_RECIPIENT_MISSING = "⚠️ Получатель сейчас недоступен."
+QUESTION_DELIVERY_FAILED = "❌ Не удалось отправить сообщение.\n\nПопробуйте позже."
+QUESTION_TOO_FAST = "⚠️ Слишком быстро.\n\nПодождите пару секунд."
+QUESTION_DUPLICATE = "ℹ️ Такое сообщение уже отправлено."
 NEW_QUESTION = "💌 Новое сообщение\n\n{text}"
 
-ANSWER_PROMPT = "✍️ Напишите ответ"
-ANSWER_SENT = (
-    "✅ Ответ отправлен\n\n"
-    "Мы уже доставляем его отправителю."
-)
-ANSWER_EMPTY = "Напишите текст ответа"
-ANSWER_TOO_LONG = "Слишком длинный ответ — максимум {limit} символов"
-ANSWER_SESSION_EXPIRED = "Время ответа истекло"
-ANSWER_NOT_FOUND = "Сообщение не найдено"
-ANSWER_ALREADY_SENT = "На это сообщение уже ответили"
-ANSWER_DELIVERY_FAILED = (
-    "Ответ сохранён. Мы повторим доставку автоматически."
-)
+# Answers
+ANSWER_PROMPT = "✍️ Напишите ответ."
+ANSWER_SENT = "✅ Ответ отправлен."
+ANSWER_EMPTY = "ℹ️ Напишите текст ответа."
+ANSWER_TOO_LONG = "⚠️ Ответ слишком длинный.\n\nМаксимум: {limit} символов."
+ANSWER_SESSION_EXPIRED = "⚠️ Время ответа истекло."
+ANSWER_NOT_FOUND = "⚠️ Сообщение не найдено."
+ANSWER_ALREADY_SENT = "ℹ️ Вы уже ответили на это сообщение."
+ANSWER_DELIVERY_FAILED = "ℹ️ Ответ сохранён.\n\nМы доставим его автоматически."
 ANSWER_RECEIVED = "💬 Вам ответили\n\n{answer}"
 
-CANCELLED = "Отменено"
-TEXT_ONLY = "Отправьте текстовое сообщение"
+# Access and payment
+ACCESS_OFFER = (
+    "⭐ Доступ\n\n"
+    "Узнавайте отправителей старых и новых сообщений.\n\n"
+    "1 ₽ — 1 день доступа."
+)
+ACCESS_ACTIVE = "✅ Доступ открыт."
+ACCESS_ACTIVE_WITH_SENDER = "✅ Доступ открыт.\n\n👤 Отправитель: {sender}"
+ACCESS_PAYMENT_PROCESSING = "⏳ Оплата обрабатывается.\n\nОбычно это занимает несколько секунд."
+ACCESS_PAYMENT_FAILED = "❌ Оплата не завершена.\n\nПопробуйте ещё раз."
+ACCESS_PAYMENT_UNAVAILABLE = "⚠️ Оплата временно недоступна."
+ACCESS_CONFIGURATION_ERROR = "⚠️ Оплата пока недоступна."
+ACCESS_SENDER = "👤 Отправитель: {sender}"
 
-VIP_OFFER = (
-    "👤 Узнать отправителя\n\n"
-    "Доступ откроет отправителей всех старых и новых сообщений "
-    "по кнопке «Узнать кто это».\n\n"
-    "Первый день — 1 ₽"
-)
-VIP_PAYMENT_UNAVAILABLE = "Оплата временно недоступна"
-VIP_CONFIGURATION_ERROR = "Оплата пока не настроена"
-VIP_SENDER = "👤 Отправитель: {sender}"
-VIP_ACTIVATED = "✅ Доступ активирован"
-VIP_ACTIVATED_WITH_SENDER = (
-    "✅ Доступ активирован\n\n"
-    "👤 Отправитель: {sender}"
-)
-VIP_PAYMENT_PROCESSING = (
-    "Платёж обрабатывается. Результат придёт в Telegram."
-)
-VIP_PAYMENT_FAILED = "Оплата не завершена"
+# Compatibility aliases for existing handlers.
+VIP_OFFER = ACCESS_OFFER
+VIP_PAYMENT_UNAVAILABLE = ACCESS_PAYMENT_UNAVAILABLE
+VIP_CONFIGURATION_ERROR = ACCESS_CONFIGURATION_ERROR
+VIP_SENDER = ACCESS_SENDER
+VIP_ACTIVATED = ACCESS_ACTIVE
+VIP_ACTIVATED_WITH_SENDER = ACCESS_ACTIVE_WITH_SENDER
+VIP_PAYMENT_PROCESSING = ACCESS_PAYMENT_PROCESSING
+VIP_PAYMENT_FAILED = ACCESS_PAYMENT_FAILED
 
-TEMPORARY_ERROR = "Что-то пошло не так. Попробуйте ещё раз"
+# Subscription cancellation
+NO_ACTIVE_ACCESS = "ℹ️ Активного доступа нет."
+AUTO_RENEW_ALREADY_OFF = "ℹ️ Автопродление уже отключено."
+AUTO_RENEW_CONFIRM = (
+    "⚙️ Отключить автопродление?\n\n"
+    "Доступ останется активным."
+)
+AUTO_RENEW_OFF = "✅ Автопродление отключено.\n\nДоступ останется активным."
+AUTO_RENEW_KEEP = "✅ Автопродление оставлено включённым."

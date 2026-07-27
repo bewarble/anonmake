@@ -10,7 +10,7 @@
       <div><dt>Пользователь</dt><dd><a href="/admin/users/{{ user.id }}">{{ '@' + user.username if user.username else user.telegram_id }}</a></dd></div>
       <div><dt>Тип</dt><dd>{{ attempt.attempt_kind }}</dd></div>
       <div><dt>Сумма</dt><dd>{{ money(attempt.amount_kopecks) }} ₽</dd></div>
-      <div><dt>Статус</dt><dd>{{ attempt.status }}</dd></div>
+      <div><dt>Статус</dt><dd>{{ attempt.status|status_label }}</dd></div>
       <div><dt>Operation ID</dt><dd><code>{{ attempt.customer_operation_id }}</code></dd></div>
       <div><dt>Transaction ID</dt><dd><code>{{ attempt.transaction_id or '—' }}</code></dd></div>
       <div><dt>Ошибка</dt><dd>{{ attempt.error_code or '—' }}</dd></div>
@@ -23,7 +23,7 @@
     <div class="panel-header"><h2>Подписка и карта</h2></div>
     <dl class="details">
       <div><dt>Subscription ID</dt><dd>{{ subscription.id }}</dd></div>
-      <div><dt>Статус подписки</dt><dd>{{ subscription.status }}</dd></div>
+      <div><dt>Статус подписки</dt><dd>{{ subscription.status|status_label }}</dd></div>
       <div><dt>Доступ до</dt><dd>{{ subscription.access_until or '—' }}</dd></div>
       <div><dt>Следующее списание</dt><dd>{{ subscription.next_charge_at or '—' }}</dd></div>
       <div><dt>Binding ID</dt><dd><code>{{ payment_method.binding_id if payment_method else '—' }}</code></dd></div>
@@ -34,6 +34,6 @@
 </section>
 <section class="panel">
   <div class="panel-header"><h2>Ответ Impaya</h2></div>
-  <pre class="code-block">{{ attempt.raw_response or 'Нет данных' }}</pre>
+  <pre class="code-block">{{ attempt.raw_response or 'Данных пока нет' }}</pre>
 </section>
 {% endblock %}

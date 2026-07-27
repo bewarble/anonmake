@@ -6,7 +6,8 @@ COMPOSE = docker compose \
 
 .PHONY: docker-config docker-build docker-up docker-down docker-restart \
 	docker-status docker-logs docker-logs-all docker-migrate docker-check \
-	docker-check-dependencies docker-shell docker-reset-db
+	docker-check-dependencies docker-shell docker-reset-db stabilize-check \
+	stabilize-apply release-check release-check-runtime
 
 docker-config:
 	$(COMPOSE) config --quiet
@@ -48,3 +49,16 @@ docker-shell:
 # Destructive: removes PostgreSQL, Redis and backup volumes.
 docker-reset-db:
 	$(COMPOSE) down -v
+
+
+stabilize-check:
+	python3 -m scripts.stabilize_project
+
+stabilize-apply:
+	python3 -m scripts.stabilize_project --apply
+
+release-check:
+	python3 -m scripts.release_check
+
+release-check-runtime:
+	$(COMPOSE) exec -T web python -m scripts.release_check --runtime-only

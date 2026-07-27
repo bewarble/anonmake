@@ -17,9 +17,9 @@
           <td><strong>{{ row.first_name }}</strong><small>{{ '@' + row.username if row.username else 'без username' }}</small></td>
           <td>{{ row.vip_until.strftime('%d.%m.%Y %H:%M') if row.vip_until else '—' }}</td>
           <td>{{ row.source_name or 'Органика' }}</td>
-          <td>{{ row.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td>{{ row.created_at|date_time }}</td>
         </tr>
-      {% else %}<tr><td colspan="6" class="empty">Ничего не найдено</td></tr>{% endfor %}
+      {% else %}<tr><td colspan="6" class="empty">Данные не найдены</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>

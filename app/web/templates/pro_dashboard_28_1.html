@@ -2,7 +2,7 @@
 {% block content %}
 <section class="pro-hero compact-hero">
   <div>
-    <div class="pro-chip">Growth OS · Live</div>
+    <div class="pro-chip">Панель управления · Live</div>
     <h2>Управление продуктом по цифрам</h2>
     <p>Монетизация, воронка, рекламные источники и техническое состояние.</p>
   </div>
@@ -15,7 +15,7 @@
 <section class="metric-grid">
   <article class="metric-card"><span>Пользователи</span><strong>{{ base.users_total }}</strong><small>+{{ base.users_today }} за сутки</small></article>
   <article class="metric-card"><span>Живые</span><strong>{{ base.users_total - base.users_dead }}</strong><small>{{ base.users_dead }} мёртвых</small></article>
-  <article class="metric-card"><span>Активный VIP</span><strong>{{ base.active_vip }}</strong><small>{{ base.active_cards }} рекуррентных карт</small></article>
+  <article class="metric-card"><span>С доступом</span><strong>{{ base.active_vip }}</strong><small>{{ base.active_cards }} рекуррентных карт</small></article>
   <article class="metric-card"><span>Выручка сегодня</span><strong>{{ money(base.revenue_today_kopecks) }} ₽</strong><small>{{ money(base.revenue_total_kopecks) }} ₽ всего</small></article>
 </section>
 

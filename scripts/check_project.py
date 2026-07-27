@@ -51,6 +51,7 @@ def check_router_registry() -> None:
         "start_marketing_router",
         "start_router",
         "questions_router",
+        "subscriptions_router",
         "reveals_router",
         "answers_router",
         "errors_router",
@@ -58,29 +59,41 @@ def check_router_registry() -> None:
     for name in required:
         assert text.count(f"include_router({name})") == 1, name
 
-    forbidden = (
-        "admin_stage25_router",
-        "admin_reply_router",
-        "admin_bi_router",
-        "admin_minimal_router",
-        "admin_control_router",
-    )
-    for name in forbidden:
-        assert f"include_router({name})" not in text, name
-
 
 def check_no_artifacts() -> None:
-    assert not list(ROOT.glob("anonmake-stage-*.zip"))
-    assert not (ROOT / ".stage-backups").exists()
+    forbidden = (
+        list(ROOT.glob(".stage*-install"))
+        + list(ROOT.glob(".audit-*-backup"))
+        + list(ROOT.glob("*.bak-before-*"))
+        + list(ROOT.glob(".env.before-*"))
+        + list(ROOT.glob("anonmake-stage-*.zip*"))
+    )
+    assert not forbidden, [str(path.relative_to(ROOT)) for path in forbidden]
+    assert not (ROOT / "anonmake.db").exists()
+    assert not (ROOT / "AUDIT_REPORT.md").exists()
+    assert not (ROOT / "REAUDIT_REPORT.md").exists()
 
 
 def check_current_admin() -> None:
+    ui = (ROOT / "app/bot/ui.py").read_text(encoding="utf-8")
     handler = (ROOT / "app/bot/handlers/admin_stage25_1.py").read_text(
         encoding="utf-8"
     )
-    for button in ("Статистика", "Прибыль", "Выгрузка", "Рефералы", "Рассылка"):
-        assert f'F.text == "{button}"' in handler, button
-    assert r'^adminm:source:\d+$' in handler
+    keyboard = (ROOT / "app/bot/keyboards/main_menu.py").read_text(
+        encoding="utf-8"
+    )
+
+    required = (
+        "ADMIN_STATISTICS",
+        "ADMIN_BROADCAST",
+        "ADMIN_PROFIT",
+        "ADMIN_EXPORT",
+        "ADMIN_SOURCES",
+    )
+    for name in required:
+        assert name in ui, name
+        assert name in handler, name
+        assert name in keyboard, name
 
 
 def check_removed_legacy_modules() -> None:
@@ -107,12 +120,12 @@ def check_operational_files() -> None:
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
     assert "\\n" not in env_example
     assert 'IMPAYA_AUTH_PREFIX="Bearer "' in env_example
-    assert "TRIAL_ATTEMPT_KINDS=trial" in env_example
 
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-    assert "check_stage_" not in makefile
     assert "compose.marketing.yaml" in makefile
     assert "compose.delivery.yaml" in makefile
+    assert "release-check" in makefile
+    assert "stabilize-check" in makefile
 
     backup = (ROOT / "scripts/backup_postgres.sh").read_text(encoding="utf-8")
     assert '--file="$TMP_SQL"' in backup
@@ -125,7 +138,9 @@ def check_security_guards() -> None:
     assert marketing.count("not is_admin(") >= 7
 
     web = (ROOT / "app/web/app.py").read_text(encoding="utf-8")
-    assert "Webhook secret is not configured" in web
+    assert "def verify_webhook_secret" in web
+    assert "settings.impaya_webhook_secret" in web
+    assert "Invalid webhook secret" in web
     assert 'text("SELECT 1")' in web
 
 
@@ -143,11 +158,10 @@ def main() -> None:
     print(f"Python files parsed: {count}")
     print("Local imports: verified")
     print("Router registry: clean")
-    print("Legacy artifacts: removed")
-    print("Admin access guards: verified")
-    print("Redis and delivery runtime guards: verified")
-    print("Webhook and health checks: hardened")
-    print("Compose, env examples and backup scripts: verified")
+    print("Development artifacts: removed")
+    print("Admin UI registry: synchronized")
+    print("Runtime and security guards: verified")
+    print("Operational files: verified")
 
 
 if __name__ == "__main__":

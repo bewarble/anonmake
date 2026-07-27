@@ -2,7 +2,7 @@
 {% block content %}
 <section class="page-toolbar">
   <div><h2>{{ row.source.name }}</h2><p>Детальная экономика источника.</p></div>
-  <button class="danger-button" data-confirm-open>Удалить</button>
+  <button type="button" class="danger-button" data-confirm-open>Удалить</button>
 </section>
 
 <section class="referral-card">
@@ -27,9 +27,9 @@
 <label><span>Ссылка на размещение</span><input type="url" name="source_url" value="{{ row.source.source_url }}" required></label>
 <label><span>Закуп, ₽</span><input name="spend_rubles" value="{{ money(row.source.spend_kopecks) }}"></label>
 <label class="check-row"><input type="checkbox" name="is_active" {{ 'checked' if row.source.is_active else '' }}><span>Источник активен</span></label>
-<div class="form-actions"><button class="primary">Сохранить</button></div>
+<div class="form-actions"><button type="submit" class="primary">Сохранить</button></div>
 </form>
 </section>
 
-<div class="confirm-modal" data-confirm-modal hidden><div><h3>Удалить источник?</h3><p>Это действие нельзя отменить.</p><form method="post" action="/admin/business/sources/{{ row.source.id }}/delete"><input type="hidden" name="csrf" value="{{ csrf_delete }}"><button class="danger-button">Удалить</button><button type="button" data-confirm-close>Отмена</button></form></div></div>
+<div class="confirm-modal" data-confirm-modal hidden><div><h3>Удалить источник?</h3><p>Это действие нельзя отменить.</p><form method="post" action="/admin/business/sources/{{ row.source.id }}/delete"><input type="hidden" name="csrf" value="{{ csrf_delete }}"><button type="submit" class="danger-button">Удалить</button><button type="button" data-confirm-close>Отмена</button></form></div></div>
 {% endblock %}

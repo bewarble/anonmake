@@ -12,6 +12,7 @@ from app.core.config import load_settings
 from app.database.session import SessionFactory
 from app.web.admin_auth import AdminAuth, COOKIE_NAME
 from app.web.admin_repository import WebAdminRepository
+from app.web import admin_ui
 
 
 settings = load_settings()
@@ -21,9 +22,30 @@ templates = Jinja2Templates(
     directory=str(Path(__file__).resolve().parent / "templates")
 )
 
+templates.env.filters.update(
+    money=admin_ui.money,
+    date_time=admin_ui.date_time,
+    date_only=admin_ui.date_only,
+    status_label=admin_ui.status_label,
+    status_tone=admin_ui.status_tone,
+    payment_kind=admin_ui.payment_kind,
+    delivery_kind=admin_ui.delivery_kind,
+    audit_action=admin_ui.audit_action,
+    user_name=admin_ui.user_name,
+    yes_no=admin_ui.yes_no,
+)
+templates.env.globals.update(
+    status_label=admin_ui.status_label,
+    status_tone=admin_ui.status_tone,
+    payment_kind=admin_ui.payment_kind,
+    delivery_kind=admin_ui.delivery_kind,
+    audit_action=admin_ui.audit_action,
+    user_name=admin_ui.user_name,
+    yes_no=admin_ui.yes_no,
+)
 
-def money(kopecks: int) -> str:
-    return f"{kopecks / 100:,.2f}".replace(",", " ").replace(".", ",")
+
+money = admin_ui.money
 
 
 def page_context(

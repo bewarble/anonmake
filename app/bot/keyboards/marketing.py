@@ -1,12 +1,19 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.bot.ui import (
+    ACTION_CANCEL,
+    BROADCAST_START,
+    QUESTION_ANSWER,
+    QUESTION_REVEAL,
+)
+
 
 def broadcast_text_cancel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✖️ Отмена",
+                    text=ACTION_CANCEL,
                     callback_data="adminm:broadcast:cancel",
                 )
             ]
@@ -19,21 +26,21 @@ def broadcast_preview_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✍️ Ответить",
+                    text=QUESTION_ANSWER,
                     callback_data="adminm:broadcast:preview",
                 ),
                 InlineKeyboardButton(
-                    text="👤 Узнать кто это",
+                    text=QUESTION_REVEAL,
                     callback_data="adminm:broadcast:preview",
                 ),
             ],
             [
                 InlineKeyboardButton(
-                    text="✅ Запустить",
+                    text=BROADCAST_START,
                     callback_data="adminm:broadcast:confirm",
                 ),
                 InlineKeyboardButton(
-                    text="✖️ Отмена",
+                    text=ACTION_CANCEL,
                     callback_data="adminm:broadcast:cancel",
                 ),
             ],

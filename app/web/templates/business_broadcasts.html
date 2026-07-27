@@ -7,7 +7,7 @@
   </div>
 </section>
 
-{% if created %}<div class="flash success">Рассылка поставлена в очередь.</div>{% endif %}
+{% if created %}<div class="flash success">✅ Рассылка добавлена в очередь.</div>{% endif %}
 {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
 
 <section class="dashboard-grid broadcast-layout">
@@ -26,8 +26,8 @@
         <span>Аудитория</span>
         <select name="audience">
           <option value="all">Все пользователи</option>
-          <option value="vip" {{ 'selected' if values and values.audience == 'vip' else '' }}>С активным VIP</option>
-          <option value="non_vip" {{ 'selected' if values and values.audience == 'non_vip' else '' }}>Без активного VIP</option>
+          <option value="vip" {{ 'selected' if values and values.audience == 'vip' else '' }}>С доступом</option>
+          <option value="non_vip" {{ 'selected' if values and values.audience == 'non_vip' else '' }}>Без доступа</option>
         </select>
       </label>
 
@@ -41,11 +41,11 @@
         <div>
           💌 Вам пришло анонимное сообщение<br><br>
           <em>{{ values.text if values and values.text else 'Текст появится здесь' }}</em>
-          <footer>✍️ Ответить · 👤 Узнать кто это</footer>
+          <footer>✍️ Ответить · 👤 Узнать отправителя</footer>
         </div>
       </div>
 
-      <button class="primary">Запустить рассылку</button>
+      <button type="submit" class="primary">Запустить рассылку</button>
     </form>
   </article>
 
@@ -65,18 +65,18 @@
             <div>
               <strong>Кампания #{{ row.id }}</strong>
               <span class="campaign-audience">
-                {% if row.audience == 'vip' %}VIP-пользователи
-                {% elif row.audience == 'non_vip' %}Без VIP
+                {% if row.audience == 'vip' %}Доступ-пользователи
+                {% elif row.audience == 'non_vip' %}Без доступа
                 {% else %}Все пользователи{% endif %}
               </span>
             </div>
 
-            <span class="campaign-status status-{{ row.status }}">
+            <span class="campaign-status status-{{ row.status|status_label }}">
               {% if row.status == 'queued' %}В очереди
               {% elif row.status == 'processing' %}Отправляется
               {% elif row.status == 'completed' %}Завершена
               {% elif row.status == 'failed' %}Ошибка
-              {% else %}{{ row.status }}{% endif %}
+              {% else %}{{ row.status|status_label }}{% endif %}
             </span>
           </div>
 

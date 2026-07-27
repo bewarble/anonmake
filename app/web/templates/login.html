@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Вход · AnonMake</title>
-  <link rel="stylesheet" href="/admin/static/admin.css">
+  <link rel="stylesheet" href="/admin/static/admin.css?v=33">
+  <link rel="stylesheet" href="/admin/static/admin_stage33.css?v=33.0">
 </head>
 <body class="login-page">
   <main class="login-card">
@@ -12,8 +13,8 @@
       <span class="brand-mark">A</span>
       <span>AnonMake</span>
     </div>
-    <h1>Вход в админку</h1>
-    <p>Используйте отдельные учётные данные веб-панели.</p>
+    <h1>Вход в панель</h1>
+    <p>Введите данные администратора.</p>
     {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
     <form method="post" action="/admin/login">
       <input type="hidden" name="next" value="{{ next }}">

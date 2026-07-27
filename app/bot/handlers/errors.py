@@ -25,7 +25,7 @@ async def handle_error(event: ErrorEvent) -> bool:
         try:
             await message.answer(texts.TEMPORARY_ERROR)
         except Exception:
-            logger.exception("Could not send fallback error message")
+            logger.exception("Could not send повторная попытка error message")
         return True
 
     callback = getattr(update, "callback_query", None)

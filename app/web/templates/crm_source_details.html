@@ -13,7 +13,7 @@
     <div><dt>Название</dt><dd>{{ details.source.name }}</dd></div>
     <div><dt>Исходная ссылка</dt><dd>{{ details.source.source_url }}</dd></div>
     <div><dt>Статус</dt><dd>{{ 'Активен' if details.source.is_active else 'Архив' }}</dd></div>
-    <div><dt>CPA VIP</dt><dd>{{ money(details.vip_cpa_kopecks) + ' ₽' if details.vip_cpa_kopecks is not none else '—' }}</dd></div>
+    <div><dt>CPA доступа</dt><dd>{{ money(details.vip_cpa_kopecks) + ' ₽' if details.vip_cpa_kopecks is not none else '—' }}</dd></div>
   </dl>
 </section>
 {% endblock %}

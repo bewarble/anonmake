@@ -1,0 +1,42 @@
+"""Shared Telegram UI labels.
+
+Keyboard builders and handlers must import labels from this module instead of
+duplicating visible text. This keeps emoji and wording changes safe.
+"""
+
+# User menu
+USER_PERSONAL_LINK = "🔗 Моя ссылка"
+USER_HELP = "✨ Как всё работает"
+
+# Admin menu
+ADMIN_STATISTICS = "📊 Статистика"
+ADMIN_BROADCAST = "📣 Рассылка"
+ADMIN_PROFIT = "💰 Прибыль"
+ADMIN_EXPORT = "📦 Выгрузка"
+ADMIN_SOURCES = "🔗 Источники"
+
+# Common actions
+ACTION_CANCEL = "Отмена"
+ACTION_BACK = "← Назад"
+ACTION_BACK_TO_LIST = "← К списку"
+ACTION_CONFIRM = "✅ Подтвердить"
+ACTION_CREATE = "➕ Создать"
+ACTION_DELETE = "🗑 Удалить"
+
+# Question actions
+QUESTION_ANSWER = "✍️ Ответить"
+QUESTION_REVEAL = "👤 Узнать отправителя"
+
+# Admin broadcast
+BROADCAST_ALL = "👥 Все пользователи"
+BROADCAST_WITH_ACCESS = "⭐ С доступом"
+BROADCAST_WITHOUT_ACCESS = "Без доступа"
+BROADCAST_START = "✅ Запустить"
+
+# Export
+EXPORT_ALL = "👥 Все пользователи"
+EXPORT_ALIVE = "✅ Только активные"
+
+# Source management
+SOURCE_CREATE = "➕ Создать источник"
+SOURCE_DELETE_CONFIRM = "🗑 Удалить"

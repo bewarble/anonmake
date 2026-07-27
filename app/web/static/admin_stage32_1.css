@@ -1,0 +1,144 @@
+/* Stage 32.1 — interaction and component reliability */
+[hidden] { display: none !important; }
+
+.command-overlay[hidden],
+.confirm-modal[hidden] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+.command-overlay:not([hidden]),
+.confirm-modal:not([hidden]) {
+  pointer-events: auto;
+}
+
+.sidebar-backdrop {
+  pointer-events: none;
+}
+.sidebar-backdrop.open {
+  pointer-events: auto;
+}
+
+.pro-content,
+.pro-header,
+.panel,
+.metric-card,
+.pro-hero,
+.table-wrap {
+  position: relative;
+}
+
+.pro-content { z-index: 1; }
+.pro-header { z-index: 8; }
+.panel, .metric-card, .pro-hero { z-index: 0; }
+
+/* Decorative pseudo-elements must never intercept clicks. */
+.pro-content::before,
+.pro-content::after,
+.pro-header::before,
+.pro-header::after,
+.panel::before,
+.panel::after,
+.metric-card::before,
+.metric-card::after,
+.pro-hero::before,
+.pro-hero::after,
+.admin-action::before,
+.admin-action::after {
+  pointer-events: none !important;
+}
+
+a,
+button,
+input,
+select,
+textarea,
+label,
+[role="button"],
+.admin-action,
+.button,
+.button-primary,
+.primary,
+.secondary,
+.copy-button,
+.segmented a,
+.period-tabs a,
+.chart-tabs button {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled,
+.is-loading {
+  cursor: wait;
+  opacity: .68;
+  pointer-events: none;
+}
+
+.is-loading::after {
+  content: "";
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: admin-spin .7s linear infinite;
+}
+
+@keyframes admin-spin {
+  to { transform: rotate(360deg); }
+}
+
+.pro-nav a[aria-current="page"] {
+  color: #fff;
+  border-color: rgba(129, 140, 248, .32);
+}
+
+.command-items a[hidden] {
+  display: none !important;
+}
+
+.admin-action {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.admin-action:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(129, 140, 248, .36);
+  outline-offset: 2px;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.form-actions > a,
+.form-actions > button {
+  min-height: 42px;
+}
+
+@media (max-width: 900px) {
+  body.sidebar-open { overflow: hidden; }
+  .pro-sidebar.open { z-index: 60; }
+  .sidebar-backdrop.open { z-index: 55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

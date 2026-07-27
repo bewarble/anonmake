@@ -95,7 +95,7 @@ async def subscription_success(operation_id: str) -> HTMLResponse:
     )
     if result == "paid":
         body = (
-            "<h1>Оплата подтверждена</h1>"
+            "<h1>✅ Всё готово!</h1><p>Вернитесь в Telegram — доступ уже открыт.</p>"
             "<p>Подписка активирована. Можно вернуться в Telegram.</p>"
         )
     else:
@@ -120,7 +120,7 @@ async def subscription_fail(operation_id: str) -> HTMLResponse:
     return HTMLResponse(
         "<!doctype html><html lang='ru'><meta charset='utf-8'>"
         "<title>AnonMake</title><body>"
-        "<h1>Оплата не завершена</h1>"
+        "<h1>❌ Оплата не завершена</h1><p>Вернитесь в Telegram и попробуйте ещё раз.</p>"
         "<p>Вернитесь в Telegram и повторите попытку.</p>"
         "</body></html>"
     )

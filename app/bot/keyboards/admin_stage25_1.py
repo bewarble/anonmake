@@ -1,28 +1,39 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.bot.ui import (
+    ACTION_BACK_TO_LIST,
+    ACTION_DELETE,
+    BROADCAST_ALL,
+    BROADCAST_WITH_ACCESS,
+    BROADCAST_WITHOUT_ACCESS,
+    EXPORT_ALIVE,
+    EXPORT_ALL,
+    SOURCE_CREATE,
+)
+
 
 def broadcast_audience_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="👥 Всем",
+                    text=BROADCAST_ALL,
                     callback_data="admin25:broadcast:audience:all",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="⭐ С VIP",
+                    text=BROADCAST_WITH_ACCESS,
                     callback_data="admin25:broadcast:audience:vip",
                 ),
                 InlineKeyboardButton(
-                    text="Без VIP",
+                    text=BROADCAST_WITHOUT_ACCESS,
                     callback_data="admin25:broadcast:audience:non_vip",
                 ),
             ],
             [
                 InlineKeyboardButton(
-                    text="✖️ Отмена",
+                    text="Отмена",
                     callback_data="admin25:broadcast:cancel",
                 )
             ],
@@ -34,7 +45,7 @@ def referrals_keyboard(sources) -> InlineKeyboardMarkup:
     rows = [
         [
             InlineKeyboardButton(
-                text=f"📣 {source.name}",
+                text=f"🔗 {source.name}",
                 callback_data=f"adminm:source:{source.id}",
             )
         ]
@@ -43,7 +54,7 @@ def referrals_keyboard(sources) -> InlineKeyboardMarkup:
     rows.append(
         [
             InlineKeyboardButton(
-                text="➕ Создать ссылку",
+                text=SOURCE_CREATE,
                 callback_data="adminm:source:create",
             )
         ]
@@ -56,13 +67,13 @@ def referral_card_keyboard(source_id: int) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="← К списку",
+                    text=ACTION_BACK_TO_LIST,
                     callback_data="admin25:referrals",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="🗑 Удалить",
+                    text=ACTION_DELETE,
                     callback_data=f"source:delete:{source_id}",
                 )
             ],
@@ -75,13 +86,13 @@ def export_choice_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="👥 Все пользователи",
+                    text=EXPORT_ALL,
                     callback_data="admin25:export:all",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="✅ Только живые",
+                    text=EXPORT_ALIVE,
                     callback_data="admin25:export:alive",
                 )
             ],
@@ -94,7 +105,7 @@ def referral_back_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="← К списку",
+                    text=ACTION_BACK_TO_LIST,
                     callback_data="admin25:referrals",
                 )
             ]

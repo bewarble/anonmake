@@ -6,9 +6,9 @@
     <p>Регистрации, активность, ответы, доход и конверсия.</p>
   </div>
   <div class="segmented" data-range-switch>
-    <button data-days="7">7 дней</button>
-    <button data-days="30" class="active">30 дней</button>
-    <button data-days="90">90 дней</button>
+    <button type="button" data-days="7">7 дней</button>
+    <button type="button" data-days="30" class="active">30 дней</button>
+    <button type="button" data-days="90">90 дней</button>
   </div>
 </section>
 
@@ -30,7 +30,7 @@
     <div class="conversion-list">
       <div><span>В отправку</span><strong>{{ (funnel.question_senders / max_value * 100)|round(1) }}%</strong></div>
       <div><span>В ответ</span><strong>{{ (funnel.answerers / max_value * 100)|round(1) }}%</strong></div>
-      <div><span>В VIP</span><strong>{{ (funnel.vip_users / max_value * 100)|round(2) }}%</strong></div>
+      <div><span>В доступ</span><strong>{{ (funnel.vip_users / max_value * 100)|round(2) }}%</strong></div>
       <div><span>В рекуррентную карту</span><strong>{{ (funnel.active_cards / max_value * 100)|round(2) }}%</strong></div>
     </div>
   </article>
@@ -42,7 +42,7 @@
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Источник</th><th>Закуп</th><th>Пользователи</th><th>VIP</th><th>CPA</th><th>CPA VIP</th></tr></thead>
+      <thead><tr><th>Источник</th><th>Закуп</th><th>Пользователи</th><th>Доступ</th><th>CPA</th><th>CPA доступа</th></tr></thead>
       <tbody>
       {% for row in sources %}
         <tr>
@@ -54,7 +54,7 @@
           <td>{{ money(row.vip_cpa_kopecks) + ' ₽' if row.vip_cpa_kopecks is not none else '—' }}</td>
         </tr>
       {% else %}
-        <tr><td colspan="6" class="empty">Нет данных</td></tr>
+        <tr><td colspan="6" class="empty">Данных пока нет</td></tr>
       {% endfor %}
       </tbody>
     </table>

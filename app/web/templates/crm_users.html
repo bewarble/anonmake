@@ -13,8 +13,8 @@
     <input name="q" value="{{ q }}" placeholder="ID, Telegram ID, username или имя">
     <select name="vip">
       <option value="all" {{ 'selected' if vip == 'all' else '' }}>Любая подписка</option>
-      <option value="active" {{ 'selected' if vip == 'active' else '' }}>Активный VIP</option>
-      <option value="inactive" {{ 'selected' if vip == 'inactive' else '' }}>Без VIP</option>
+      <option value="active" {{ 'selected' if vip == 'active' else '' }}>С доступом</option>
+      <option value="inactive" {{ 'selected' if vip == 'inactive' else '' }}>Без доступа</option>
     </select>
     <select name="health">
       <option value="all" {{ 'selected' if health == 'all' else '' }}>Любой статус</option>
@@ -43,7 +43,7 @@
           <td><span class="badge {{ 'failed' if row.is_dead else 'active' }}">{{ 'Мёртвый' if row.is_dead else 'Живой' }}</span></td>
           <td>{{ row.vip_until.strftime('%d.%m.%Y %H:%M') if row.vip_until else '—' }}</td>
           <td>{{ row.source_name or 'Органика' }}</td>
-          <td>{{ row.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td>{{ row.created_at|date_time }}</td>
         </tr>
       {% else %}
         <tr><td colspan="7" class="empty">По заданным фильтрам пользователей нет</td></tr>

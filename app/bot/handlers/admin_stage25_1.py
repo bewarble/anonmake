@@ -14,9 +14,17 @@ from app.bot.keyboards.admin_stage25_1 import (
     referral_card_keyboard,
     referrals_keyboard,
 )
+from app.bot.ui import (
+    ADMIN_BROADCAST,
+    ADMIN_EXPORT,
+    ADMIN_PROFIT,
+    ADMIN_SOURCES,
+    ADMIN_STATISTICS,
+)
 from app.bot.states.marketing import BroadcastCreate
 from app.bot.keyboards.marketing import broadcast_text_cancel_keyboard
 from app.core.admin_metrics import AdminMetricsRepository
+from app.core import admin_texts
 from app.core.config import load_settings
 from app.models.marketing import TrafficSource
 from app.repositories.marketing import MarketingRepository
@@ -40,7 +48,7 @@ def money(kopecks: int) -> str:
     return f"{kopecks / 100:,.2f}".replace(",", " ").replace(".", ",")
 
 
-@router.message(F.text == "Статистика")
+@router.message(F.text.in_({ADMIN_STATISTICS, "Статистика"}))
 async def statistics(message: Message, session: AsyncSession) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         return
@@ -72,7 +80,7 @@ async def statistics(message: Message, session: AsyncSession) -> None:
     )
 
 
-@router.message(F.text == "Прибыль")
+@router.message(F.text.in_({ADMIN_PROFIT, "Прибыль"}))
 async def profit(message: Message, session: AsyncSession) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         return
@@ -91,7 +99,7 @@ async def profit(message: Message, session: AsyncSession) -> None:
         return (
             f"• {title} — {money(item.revenue_kopecks)} ₽ "
             f"({money(item.partner_kopecks)} ₽)\n"
-            f"+{number(item.trials)} новых подписок"
+            f"Новых доступов: {number(item.trials)}"
         )
 
     await message.answer_photo(
@@ -109,13 +117,13 @@ async def profit(message: Message, session: AsyncSession) -> None:
     )
 
 
-@router.message(F.text == "Выгрузка")
+@router.message(F.text.in_({ADMIN_EXPORT, "Выгрузка"}))
 async def export_prompt(message: Message) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         return
 
     await message.answer(
-        "📄 Выгрузка\n\nКого выгрузить?",
+        admin_texts.EXPORT_PROMPT,
         reply_markup=export_choice_keyboard(),
     )
 
@@ -126,13 +134,13 @@ async def export_users(
     session: AsyncSession,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     mode = (callback.data or "").rsplit(":", 1)[-1]
     if mode not in {"all", "alive"}:
         await callback.answer(
-            "Некорректный режим выгрузки",
+            admin_texts.INVALID_DATA,
             show_alert=True,
         )
         return
@@ -150,9 +158,9 @@ async def export_users(
     )
 
     title = (
-        "✅ Выгрузка живых пользователей готова"
+        admin_texts.EXPORT_READY_ALIVE
         if alive_only
-        else "✅ Выгрузка всех пользователей готова"
+        else admin_texts.EXPORT_READY_ALL
     )
 
     if callback.message:
@@ -167,7 +175,7 @@ async def export_users(
     await callback.answer()
 
 
-@router.message(F.text == "Рефералы")
+@router.message(F.text.in_({ADMIN_SOURCES, "Источники"}))
 async def referrals(
     message: Message,
     session: AsyncSession,
@@ -178,9 +186,9 @@ async def referrals(
     sources = await MarketingRepository(session).sources()
     await message.answer(
         (
-            "📣 Рефералы\n\n"
+            "🔗 Источники\n\n"
             f"Источников: {number(len(sources))}\n"
-            "Выберите источник или создайте новый."
+            f"{admin_texts.SOURCES_PROMPT}"
         ),
         reply_markup=referrals_keyboard(sources),
     )
@@ -192,16 +200,16 @@ async def referrals_callback(
     session: AsyncSession,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     sources = await MarketingRepository(session).sources()
     if callback.message:
         await callback.message.edit_text(
             (
-                "📣 Рефералы\n\n"
+                "🔗 Источники\n\n"
                 f"Источников: {number(len(sources))}\n"
-                "Выберите источник или создайте новый."
+                f"{admin_texts.SOURCES_PROMPT}"
             ),
             reply_markup=referrals_keyboard(sources),
         )
@@ -215,20 +223,20 @@ async def referral_details(
     bot: Bot,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     try:
         source_id = int((callback.data or "").rsplit(":", 1)[1])
     except ValueError:
-        await callback.answer("Некорректный ID", show_alert=True)
+        await callback.answer(admin_texts.INVALID_DATA, show_alert=True)
         return
 
     source = await session.get(TrafficSource, source_id)
     stats = await MarketingRepository(session).source_stats(source_id)
 
     if source is None or stats is None:
-        await callback.answer("Источник не найден", show_alert=True)
+        await callback.answer(admin_texts.SOURCE_NOT_FOUND, show_alert=True)
         return
 
     me = await bot.get_me()
@@ -243,7 +251,7 @@ async def referral_details(
     if callback.message:
         await callback.message.edit_text(
             (
-                f"📣 {escape(source.name)}\n\n"
+                f"🔗 <b>{escape(source.name)}</b>\n\n"
                 f"Закуп: {int(stats['spend_kopecks']) / 100:.2f} ₽\n"
                 f"Переходы: {int(stats['clicks'])}\n"
                 f"Пользователи: {attributed}\n"
@@ -256,7 +264,7 @@ async def referral_details(
     await callback.answer()
 
 
-@router.message(F.text == "Рассылка")
+@router.message(F.text.in_({ADMIN_BROADCAST, "Рассылка"}))
 async def broadcast_start(
     message: Message,
     state: FSMContext,
@@ -267,7 +275,7 @@ async def broadcast_start(
     await state.clear()
     await state.set_state(BroadcastCreate.waiting_audience)
     await message.answer(
-        "📢 Рассылка\n\nКому отправить сообщение?",
+        admin_texts.BROADCAST_AUDIENCE_PROMPT,
         reply_markup=broadcast_audience_keyboard(),
     )
 
@@ -278,12 +286,12 @@ async def broadcast_audience(
     state: FSMContext,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     audience = (callback.data or "").rsplit(":", 1)[1]
     if audience not in {"all", "vip", "non_vip"}:
-        await callback.answer("Некорректная аудитория", show_alert=True)
+        await callback.answer(admin_texts.INVALID_DATA, show_alert=True)
         return
 
     await state.update_data(
@@ -294,8 +302,7 @@ async def broadcast_audience(
 
     if callback.message:
         await callback.message.answer(
-            "✍️ Отправьте текст рассылки.\n\n"
-            "Для отмены нажмите кнопку ниже или отправьте /cancel.",
+            admin_texts.BROADCAST_TEXT_PROMPT,
             reply_markup=broadcast_text_cancel_keyboard(),
         )
     await callback.answer()
@@ -311,7 +318,7 @@ async def broadcast_text_cancel_command(
         return
 
     await state.clear()
-    await message.answer("✖️ Рассылка отменена")
+    await message.answer(admin_texts.BROADCAST_CANCELLED)
 
 
 @router.callback_query(F.data == "admin25:broadcast:cancel")
@@ -320,10 +327,10 @@ async def broadcast_cancel(
     state: FSMContext,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     await state.clear()
     if callback.message:
-        await callback.message.edit_text("✖️ Рассылка отменена")
+        await callback.message.edit_text(admin_texts.BROADCAST_CANCELLED)
     await callback.answer()

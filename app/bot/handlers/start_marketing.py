@@ -9,6 +9,8 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.main_menu import main_menu_keyboard
+from app.bot.keyboards.personal_link import personal_link_share_keyboard
+from app.core import texts
 from app.core.config import load_settings
 from app.repositories import UserRepository
 from app.repositories.marketing import MarketingRepository
@@ -76,11 +78,13 @@ async def start_with_terms(
         disable_web_page_preview=True,
     )
     await message.answer(
-        "🔗 Ваша индивидуальная ссылка\n\n"
-        f"<code>{escape(personal_link)}</code>\n\n"
-        "Разместите её в профиле, канале или сторис.",
-        parse_mode="HTML",
+        texts.WELCOME,
         reply_markup=main_menu_keyboard(
             is_admin=message.from_user.id in load_settings().admin_ids_set
         ),
+    )
+    await message.answer(
+        f"{texts.PERSONAL_LINK.format(link=personal_link)}\n\n"
+        f"{texts.PERSONAL_LINK_HINT}",
+        reply_markup=personal_link_share_keyboard(personal_link),
     )

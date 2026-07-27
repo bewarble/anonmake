@@ -9,7 +9,7 @@ def reveal_checkout_keyboard(
     rows = [
         [
             InlineKeyboardButton(
-                text="Открыть за 1 ₽",
+                text="⭐ Открыть доступ за 1 ₽",
                 url=payment_url,
             )
         ]

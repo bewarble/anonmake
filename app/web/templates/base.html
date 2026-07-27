@@ -15,6 +15,9 @@
   <link rel="stylesheet" href="/admin/static/admin_stage29_4.css?v=29.4">
   <link rel="stylesheet" href="/admin/static/admin_stage30_2.css?v=30.2">
   <link rel="stylesheet" href="/admin/static/admin_stage31.css?v=31.0">
+  <link rel="stylesheet" href="/admin/static/admin_stage32.css?v=32.0">
+  <link rel="stylesheet" href="/admin/static/admin_stage32_1.css?v=32.1">
+  <link rel="stylesheet" href="/admin/static/admin_stage33.css?v=33.0">
 </head>
 <body>
   <div class="app-shell">
@@ -23,14 +26,14 @@
         <button class="sidebar-mobile-close" type="button" data-sidebar-close aria-label="Закрыть меню">×</button>
         <a class="pro-brand" href="/admin/business">
           <span class="brand-orb">A</span>
-          <div><strong>AnonMake</strong><small>Growth OS</small></div>
+          <div><strong>AnonMake</strong><small>Панель управления</small></div>
         </a>
         <button class="sidebar-collapse" type="button" data-sidebar-toggle>☰</button>
       </div>
 
       <nav class="pro-nav">
         <span class="nav-section">Обзор</span>
-        <a class="{{ 'active' if section == 'dashboard' else '' }}" href="/admin/business"><i>◫</i><span>Главная</span></a>
+        <a class="{{ 'active' if section == 'dashboard' else '' }}" href="/admin/business"><i>◫</i><span>Обзор</span></a>
         <a class="{{ 'active' if section == 'analytics' else '' }}" href="/admin/business/analytics"><i>⌁</i><span>Аналитика</span></a>
 
         <span class="nav-section">CRM</span>
@@ -46,7 +49,7 @@
       </nav>
 
       <div class="sidebar-bottom">
-        <button class="theme-switch" type="button" data-theme-toggle><span>◐</span><span>Тема</span></button>
+        <button class="theme-switch" type="button" data-theme-toggle><span>◐</span><span>Оформление</span></button>
         <form method="post" action="/admin/logout"><button type="submit"><span>↪</span><span>Выйти</span></button></form>
       </div>
     </aside>
@@ -64,12 +67,12 @@
           </button>
 
           <div>
-            <span class="header-eyebrow">AnonMake Control Center</span>
+            <span class="header-eyebrow">Панель управления AnonMake</span>
             <h1>{{ title }}</h1>
           </div>
         </div>
         <div class="header-actions">
-          <button class="header-search" type="button" data-command-open>⌕ Поиск и действия <kbd>Ctrl K</kbd></button>
+          <button class="header-search" type="button" data-command-open>🔍 Поиск и действия <kbd>Ctrl K</kbd></button>
           <a class="status-pill" href="/health"><i></i>Система работает</a>
         </div>
       </header>
@@ -83,7 +86,7 @@
       <div class="command-input"><span>⌕</span><input placeholder="Перейти в раздел..." data-command-input></div>
       <div class="command-items">
         <a href="/admin/business">Главная <kbd>G</kbd></a>
-        <a href="/admin/business">Аналитика <kbd>A</kbd></a>
+        <a href="/admin/business/analytics">Аналитика <kbd>A</kbd></a>
         <a href="/admin/business/users">Пользователи <kbd>U</kbd></a>
         <a href="/admin/business/sources">Источники <kbd>S</kbd></a>
         <a href="/admin/sources/new">Создать источник <kbd>N</kbd></a>
@@ -99,5 +102,7 @@
   <script src="/admin/static/admin_stage29.js?v=29.1" defer></script>
   <script src="/admin/static/admin_stage29_3.js?v=29.3" defer></script>
   <script src="/admin/static/admin_stage29_4.js?v=29.4" defer></script>
+  <script src="/admin/static/admin_stage32_1.js?v=32.1.1" defer></script>
+  <script src="/admin/static/admin_stage33.js?v=33.0" defer></script>
 </body>
 </html>

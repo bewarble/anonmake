@@ -1,0 +1,24 @@
+{% macro badge(value) -%}
+  <span class="badge {{ value|status_tone }}">{{ value|status_label }}</span>
+{%- endmacro %}
+
+{% macro empty(title, hint='') -%}
+  <div class="empty-state unified-empty">
+    <span class="empty-icon">○</span>
+    <strong>{{ title }}</strong>
+    {% if hint %}<p>{{ hint }}</p>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro page_intro(icon, title, description='', count=none) -%}
+  <section class="page-toolbar unified-toolbar">
+    <div class="page-title-group">
+      <span class="page-icon">{{ icon }}</span>
+      <div>
+        <h2>{{ title }}</h2>
+        {% if description %}<p>{{ description }}</p>{% endif %}
+      </div>
+    </div>
+    {% if count is not none %}<span class="result-count">{{ count }}</span>{% endif %}
+  </section>
+{%- endmacro %}

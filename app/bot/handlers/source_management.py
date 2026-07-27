@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.source_admin import source_delete_confirm_keyboard
 from app.core.config import load_settings
+from app.core import admin_texts
 from app.repositories.admin import AdminRepository
 from app.repositories.marketing_cleanup import MarketingCleanupRepository
 
@@ -25,12 +26,12 @@ async def cancel_source_create(
     state: FSMContext,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     await state.clear()
     if callback.message:
-        await callback.message.edit_text("✖️ Создание источника отменено")
+        await callback.message.edit_text(admin_texts.SOURCE_CREATE_CANCELLED)
     await callback.answer()
 
 
@@ -40,25 +41,25 @@ async def request_source_delete(
     session: AsyncSession,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     try:
         source_id = int((callback.data or "").rsplit(":", 1)[1])
     except (ValueError, IndexError):
-        await callback.answer("Некорректный ID", show_alert=True)
+        await callback.answer(admin_texts.INVALID_DATA, show_alert=True)
         return
 
     source = await MarketingCleanupRepository(session).source(source_id)
     if source is None:
-        await callback.answer("Источник не найден", show_alert=True)
+        await callback.answer(admin_texts.SOURCE_NOT_FOUND, show_alert=True)
         return
 
     if callback.message:
         await callback.message.edit_text(
-            "🗑 Удалить источник?\n\n"
-            f"{escape(source.name)}\n\n"
-            "Ссылка будет отключена, а историческая статистика сохранится.",
+            admin_texts.SOURCE_DELETE_PROMPT.format(
+                name=escape(source.name),
+            ),
             reply_markup=source_delete_confirm_keyboard(source.id),
         )
     await callback.answer()
@@ -70,13 +71,13 @@ async def confirm_source_delete(
     session: AsyncSession,
 ) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer("Недоступно", show_alert=True)
+        await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
     try:
         source_id = int((callback.data or "").rsplit(":", 1)[1])
     except (ValueError, IndexError):
-        await callback.answer("Некорректный ID", show_alert=True)
+        await callback.answer(admin_texts.INVALID_DATA, show_alert=True)
         return
 
     deleted = await MarketingCleanupRepository(session).delete_source(source_id)
@@ -91,6 +92,6 @@ async def confirm_source_delete(
 
     if callback.message:
         await callback.message.edit_text(
-            "✅ Источник отключён" if deleted else "Источник уже отключён"
+            admin_texts.SOURCE_DELETED if deleted else admin_texts.SOURCE_ALREADY_DELETED
         )
     await callback.answer()

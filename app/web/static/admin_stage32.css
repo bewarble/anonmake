@@ -1,0 +1,110 @@
+:root {
+  --ux-radius-sm: 10px;
+  --ux-radius: 16px;
+  --ux-radius-lg: 22px;
+  --ux-space-1: 6px;
+  --ux-space-2: 10px;
+  --ux-space-3: 14px;
+  --ux-space-4: 18px;
+  --ux-space-5: 24px;
+  --ux-success: #34d399;
+  --ux-warning: #fbbf24;
+  --ux-danger: #fb7185;
+  --ux-info: #818cf8;
+}
+body { letter-spacing: -.005em; }
+.pro-content { max-width: 1680px; margin-inline: auto; }
+.pro-header h1, .panel h2, .pro-hero h2 {
+  letter-spacing: -.035em;
+}
+.panel, .metric-card, .pro-hero {
+  border-radius: var(--ux-radius-lg);
+}
+.panel {
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.panel:hover { border-color: rgba(129,140,248,.22); }
+.panel-title-row {
+  margin-bottom: var(--ux-space-4);
+}
+.panel-title-row h2 {
+  font-size: 19px;
+  line-height: 1.2;
+}
+.panel-kicker, .header-eyebrow {
+  font-size: 10px;
+  letter-spacing: .14em;
+}
+button, .button, .button-primary, .secondary,
+input, select, textarea {
+  min-height: 42px;
+  border-radius: var(--ux-radius-sm);
+}
+button, .button, .button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-weight: 750;
+  transition: transform .16s ease, opacity .16s ease, box-shadow .16s ease;
+}
+button:hover, .button:hover, .button-primary:hover {
+  transform: translateY(-1px);
+}
+table { border-collapse: separate; border-spacing: 0; }
+th {
+  font-size: 11px;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+td, th { padding: 14px 13px; }
+tbody tr { transition: background .15s ease; }
+tbody tr:hover { background: rgba(129,140,248,.045); }
+.badge {
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-weight: 750;
+}
+.badge.success,
+.badge.paid,
+.badge.completed,
+.badge.delivered,
+.badge.active,
+.badge.active_1_day,
+.badge.active_3_days,
+.badge.trial_active {
+  color: var(--ux-success);
+  background: rgba(52,211,153,.11);
+}
+.badge.pending,
+.badge.payment_pending,
+.badge.insufficient_funds,
+.badge.past_due {
+  color: var(--ux-warning);
+  background: rgba(251,191,36,.11);
+}
+.badge.failed,
+.badge.expired,
+.badge.payment_method_blocked {
+  color: var(--ux-danger);
+  background: rgba(251,113,133,.11);
+}
+.empty {
+  padding: 42px 20px;
+  color: var(--muted);
+}
+.admin-notice {
+  box-shadow: 0 12px 34px rgba(0,0,0,.10);
+}
+.details-list > div, .details > div {
+  padding-block: 11px;
+}
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .pro-content { padding-inline: 14px; }
+  .panel { border-radius: var(--ux-radius); }
+  td, th { padding: 12px 10px; }
+}

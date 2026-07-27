@@ -147,7 +147,7 @@ async def payment_success(checkout_token: str) -> HTMLResponse:
 
     if result in {"notified", "already_notified"}:
         body = (
-            "<h1>Оплата подтверждена</h1>"
+            "<h1>✅ Всё готово!</h1><p>Вернитесь в Telegram — доступ уже открыт.</p>"
             "<p>VIP активирован. Результат отправлен в Telegram.</p>"
         )
     elif result == "pending":
@@ -175,7 +175,7 @@ async def payment_fail(checkout_token: str) -> HTMLResponse:
     return HTMLResponse(
         "<!doctype html><html lang='ru'><meta charset='utf-8'>"
         "<title>AnonMake</title><body>"
-        "<h1>Оплата не завершена</h1>"
+        "<h1>❌ Оплата не завершена</h1><p>Вернитесь в Telegram и попробуйте ещё раз.</p>"
         "<p>Закройте страницу и повторите попытку в Telegram.</p>"
         "</body></html>"
     )
@@ -336,16 +336,23 @@ for stage29_3_route in admin_stage29_3_module.router.routes:
 # End Stage 29.3 route registration.
 
 
+
 # Begin Stage 31 Admin Control Center registration.
 from app.web import admin_stage31 as admin_stage31_module  # noqa: E402
 
+stage31_existing = {
+    (
+        getattr(route, "path", None),
+        frozenset(getattr(route, "methods", None) or ()),
+    )
+    for route in app.router.routes
+}
 for stage31_route in admin_stage31_module.router.routes:
-    route_path = getattr(stage31_route, "path", None)
-    route_methods = getattr(stage31_route, "methods", None)
-    if not any(
-        getattr(existing, "path", None) == route_path
-        and getattr(existing, "methods", None) == route_methods
-        for existing in app.router.routes
-    ):
+    stage31_key = (
+        getattr(stage31_route, "path", None),
+        frozenset(getattr(stage31_route, "methods", None) or ()),
+    )
+    if stage31_key not in stage31_existing:
         app.router.routes.append(stage31_route)
+        stage31_existing.add(stage31_key)
 # End Stage 31 Admin Control Center registration.
