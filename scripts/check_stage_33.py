@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def check() -> None:
     required = (
         "app/web/admin_ui.py",
-        "app/web/static/admin_stage33.css",
-        "app/web/static/admin_stage33.js",
+        "app/web/static/admin-ui.css",
+        "app/web/static/admin-ui.js",
         "app/web/templates/ui_macros.html",
         "docs/WEB_ADMIN_STYLE_GUIDE.md",
     )
@@ -26,8 +26,10 @@ def check() -> None:
     assert "status_label=admin_ui.status_label" in admin
 
     base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")
-    assert "admin_stage33.css" in base
-    assert "admin_stage33.js" in base
+    assert "admin-ui.css" in base
+    assert "admin-ui.js" in base
+    assert "admin_stage33.css" not in base
+    assert "admin_stage33.js" not in base
     assert "Панель управления AnonMake" in base
 
     for name in ("payments.html", "subscriptions.html", "delivery.html", "audit.html"):
