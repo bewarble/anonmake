@@ -16,8 +16,8 @@ from app.bot.keyboards.admin_stage25_1 import (
 from app.bot.states.marketing import BroadcastCreate
 from app.core.admin_metrics import AdminMetricsRepository
 from app.core.config import load_settings
+from app.models.marketing import TrafficSource
 from app.repositories.marketing import MarketingRepository
-from app.services.admin_bi import AdminBIService
 from app.services.admin_charts_stage25 import revenue_chart, statistics_chart
 from app.services.admin_statistics_stage25 import (
     AdminStatisticsStage25Repository,
@@ -83,7 +83,7 @@ async def profit(message: Message, session: AsyncSession) -> None:
     )
 
     metrics = await AdminMetricsRepository(session).profit(trial_kinds)
-    chart_data = await AdminBIService(session).profit()
+    revenue_points = await AdminMetricsRepository(session).daily_revenue()
 
     def row(title: str, item) -> str:
         return (
@@ -94,7 +94,7 @@ async def profit(message: Message, session: AsyncSession) -> None:
 
     await message.answer_photo(
         BufferedInputFile(
-            revenue_chart(chart_data.points),
+            revenue_chart(revenue_points),
             filename="revenue.png",
         ),
         caption=(
@@ -116,6 +116,53 @@ async def export_prompt(message: Message) -> None:
         "📄 Выгрузка\n\nКого выгрузить?",
         reply_markup=export_choice_keyboard(),
     )
+
+
+@router.callback_query(F.data.startswith("admin25:export:"))
+async def export_users(
+    callback: CallbackQuery,
+    session: AsyncSession,
+) -> None:
+    if callback.from_user is None or not is_admin(callback.from_user.id):
+        await callback.answer("Недоступно", show_alert=True)
+        return
+
+    mode = (callback.data or "").rsplit(":", 1)[-1]
+    if mode not in {"all", "alive"}:
+        await callback.answer(
+            "Некорректный режим выгрузки",
+            show_alert=True,
+        )
+        return
+
+    alive_only = mode == "alive"
+
+    payload = await AdminMetricsRepository(session).export_user_ids(
+        alive_only=alive_only,
+    )
+
+    filename = (
+        "anonmake-users-alive.txt"
+        if alive_only
+        else "anonmake-users-all.txt"
+    )
+
+    title = (
+        "✅ Выгрузка живых пользователей готова"
+        if alive_only
+        else "✅ Выгрузка всех пользователей готова"
+    )
+
+    if callback.message:
+        await callback.message.answer_document(
+            BufferedInputFile(
+                payload,
+                filename=filename,
+            ),
+            caption=title,
+        )
+
+    await callback.answer()
 
 
 @router.message(F.text == "Рефералы")
@@ -172,15 +219,10 @@ async def referral_details(
     try:
         source_id = int((callback.data or "").rsplit(":", 1)[1])
     except ValueError:
+        await callback.answer("Некорректный ID", show_alert=True)
         return
 
-    source = await session.get(
-        __import__(
-            "app.models.marketing",
-            fromlist=["TrafficSource"],
-        ).TrafficSource,
-        source_id,
-    )
+    source = await session.get(TrafficSource, source_id)
     stats = await MarketingRepository(session).source_stats(source_id)
 
     if source is None or stats is None:

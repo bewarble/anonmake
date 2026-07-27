@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.billing import PaymentAttempt, PaymentMethod, Subscription
 from app.repositories.billing import BillingRepository
-from app.services.impaya import ImpayaClient, ImpayaResult
+from app.services.impaya import ImpayaClient
 
 BLOCKING_CODES = {
     "CARD_BLOCKED",
@@ -27,15 +27,21 @@ class BillingService:
         client: ImpayaClient,
         *,
         trial_amount: int = 100,
+        trial_duration: timedelta = timedelta(hours=24),
         primary_amount: int = 29900,
+        primary_duration: timedelta = timedelta(days=3),
         fallback_amount: int = 9900,
+        fallback_duration: timedelta = timedelta(days=1),
     ) -> None:
         self.session = session
         self.repo = BillingRepository(session)
         self.client = client
         self.trial_amount = trial_amount
+        self.trial_duration = trial_duration
         self.primary_amount = primary_amount
+        self.primary_duration = primary_duration
         self.fallback_amount = fallback_amount
+        self.fallback_duration = fallback_duration
 
     async def create_binding(
         self,
@@ -73,16 +79,16 @@ class BillingService:
         self, subscription: Subscription, method: PaymentMethod
     ) -> bool:
         return await self._charge(
-            subscription, method, "trial", self.trial_amount, timedelta(hours=24)
+            subscription, method, "trial", self.trial_amount, self.trial_duration
         )
 
     async def renew(self, subscription: Subscription, method: PaymentMethod) -> bool:
         if await self._charge(
-            subscription, method, "primary", self.primary_amount, timedelta(days=3)
+            subscription, method, "primary", self.primary_amount, self.primary_duration
         ):
             return True
         return await self._charge(
-            subscription, method, "fallback", self.fallback_amount, timedelta(days=1)
+            subscription, method, "fallback", self.fallback_amount, self.fallback_duration
         )
 
     async def cancel(self, subscription: Subscription) -> None:

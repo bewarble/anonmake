@@ -1,40 +1,50 @@
+COMPOSE = docker compose \
+	-f compose.yaml \
+	-f compose.backup.yaml \
+	-f compose.delivery.yaml \
+	-f compose.marketing.yaml
+
 .PHONY: docker-config docker-build docker-up docker-down docker-restart \
 	docker-status docker-logs docker-logs-all docker-migrate docker-check \
-	docker-shell docker-reset-db
+	docker-check-dependencies docker-shell docker-reset-db
 
 docker-config:
-	docker compose config --quiet
+	$(COMPOSE) config --quiet
 
 docker-build:
-	docker compose build
+	$(COMPOSE) build
 
 docker-up:
-	docker compose up -d --build
+	$(COMPOSE) up -d --build
 
 docker-down:
-	docker compose down
+	$(COMPOSE) down
 
 docker-restart:
-	docker compose restart bot web worker
+	$(COMPOSE) restart bot web worker delivery-worker broadcast-worker
 
 docker-status:
-	docker compose ps
+	$(COMPOSE) ps
 
 docker-logs:
-	docker compose logs --tail=200 -f bot
+	$(COMPOSE) logs --tail=200 -f bot
 
 docker-logs-all:
-	docker compose logs --tail=200 -f
+	$(COMPOSE) logs --tail=200 -f
 
 docker-migrate:
-	docker compose run --rm migrate
+	$(COMPOSE) run --rm migrate
 
 docker-check:
-	docker compose run --rm bot python -m scripts.check_stage_5_2
+	$(COMPOSE) run --rm bot python -m scripts.check_project
+	$(COMPOSE) run --rm bot python -m scripts.check_migration_head
+
+docker-check-dependencies:
+	$(COMPOSE) run --rm bot python -m scripts.check_dependencies
 
 docker-shell:
-	docker compose run --rm bot sh
+	$(COMPOSE) run --rm bot sh
 
-# Destructive: removes the PostgreSQL volume and all local Docker data.
+# Destructive: removes PostgreSQL, Redis and backup volumes.
 docker-reset-db:
-	docker compose down -v
+	$(COMPOSE) down -v

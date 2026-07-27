@@ -27,24 +27,28 @@ def retry_delay(attempt: int) -> int:
     return min(300, 2 ** min(attempt + 1, 8))
 
 
-async def deliver_job(bot: Bot, job, max_attempts: int) -> tuple[str, int | str]:
+async def deliver_job(
+    bot: Bot,
+    job,
+    max_attempts: int,
+) -> tuple[str, int | str, str | None]:
     try:
         message = await bot.send_message(
             chat_id=job.chat_id,
             text=job.text,
             reply_markup=deserialize_markup(job.reply_markup),
         )
-        return "delivered", message.message_id
+        return "delivered", message.message_id, None
     except TelegramRetryAfter as exc:
-        return "retry", max(1, int(exc.retry_after))
+        return "retry", max(1, int(exc.retry_after)), str(exc)
     except (TelegramNetworkError, asyncio.TimeoutError) as exc:
-        return "retry", retry_delay(job.attempts)
+        return "retry", retry_delay(job.attempts), str(exc)
     except (TelegramForbiddenError, TelegramBadRequest) as exc:
-        return "failed", str(exc)
+        return "failed", str(exc), str(exc)
     except Exception as exc:
         if job.attempts + 1 >= max_attempts:
-            return "failed", str(exc)
-        return "retry", retry_delay(job.attempts)
+            return "failed", str(exc), str(exc)
+        return "retry", retry_delay(job.attempts), str(exc)
 
 
 async def main() -> None:
@@ -89,7 +93,7 @@ async def main() -> None:
                     if job is None or job.status != "processing":
                         continue
 
-                    status, value = await deliver_job(
+                    status, value, error = await deliver_job(
                         bot,
                         job,
                         max_attempts,
@@ -104,7 +108,7 @@ async def main() -> None:
                     elif status == "retry" and job.attempts + 1 < max_attempts:
                         await repository.mark_retry(
                             job,
-                            error="Temporary Telegram delivery error",
+                            error=error or "Temporary Telegram delivery error",
                             delay_seconds=int(value),
                         )
                     else:

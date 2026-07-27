@@ -27,16 +27,15 @@ async def start_with_terms(
     if message.from_user is None:
         return
 
-    user = await UserRepository(session).upsert_from_telegram(message.from_user)
-
     args = (message.text or "").split(maxsplit=1)
     payload = args[1].strip() if len(args) > 1 else ""
 
-    # Персональная ссылка должна обрабатываться старым start-router,
-    # который запускает сценарий отправки анонимного сообщения.
+    # Personal links are handled by the question flow. Do not mutate the
+    # database before passing the update to the next router.
     if payload and not payload.startswith("src_"):
         raise SkipHandler
 
+    user = await UserRepository(session).upsert_from_telegram(message.from_user)
     source = None
     if payload.startswith("src_"):
         source = await MarketingRepository(session).source_by_code(

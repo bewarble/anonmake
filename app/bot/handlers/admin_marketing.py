@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from html import escape
 from urllib.parse import urlparse
 
@@ -36,31 +37,54 @@ async def source_create_start(
 
     await state.set_state(SourceCreate.waiting_name)
     if callback.message:
-        await callback.message.answer("Название источника:", reply_markup=cancel_source_keyboard())
+        await callback.message.answer(
+            "Название источника:",
+            reply_markup=cancel_source_keyboard(),
+        )
     await callback.answer()
 
 
 @router.message(SourceCreate.waiting_name)
 async def source_name(message: Message, state: FSMContext) -> None:
-    name = (message.text or "").strip()
+    if message.from_user is None or not is_admin(message.from_user.id):
+        await state.clear()
+        return
+
+    name = " ".join((message.text or "").strip().split())
     if not name:
         await message.answer("Укажите название")
         return
+    if len(name) > 120:
+        await message.answer("Название должно быть не длиннее 120 символов")
+        return
     await state.update_data(name=name)
     await state.set_state(SourceCreate.waiting_url)
-    await message.answer("Ссылка на источник рекламы:", reply_markup=cancel_source_keyboard())
+    await message.answer(
+        "Ссылка на источник рекламы:",
+        reply_markup=cancel_source_keyboard(),
+    )
 
 
 @router.message(SourceCreate.waiting_url)
 async def source_url(message: Message, state: FSMContext) -> None:
+    if message.from_user is None or not is_admin(message.from_user.id):
+        await state.clear()
+        return
+
     value = (message.text or "").strip()
     parsed = urlparse(value)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         await message.answer("Укажите корректную http/https ссылку")
         return
+    if len(value) > 1000:
+        await message.answer("Ссылка должна быть не длиннее 1000 символов")
+        return
     await state.update_data(source_url=value)
     await state.set_state(SourceCreate.waiting_spend)
-    await message.answer("Сумма закупа в рублях, например 15000:", reply_markup=cancel_source_keyboard())
+    await message.answer(
+        "Сумма закупа в рублях, например 15000:",
+        reply_markup=cancel_source_keyboard(),
+    )
 
 
 @router.message(SourceCreate.waiting_spend)
@@ -71,23 +95,33 @@ async def source_spend(
     bot: Bot,
 ) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
+        await state.clear()
         return
 
     raw = (message.text or "").replace(" ", "").replace(",", ".")
     try:
-        rubles = float(raw)
-    except ValueError:
+        rubles = Decimal(raw)
+    except InvalidOperation:
         await message.answer("Введите сумму числом")
         return
-    if rubles < 0:
-        await message.answer("Сумма не может быть отрицательной")
+    if not rubles.is_finite() or rubles < 0:
+        await message.answer("Укажите корректную неотрицательную сумму")
+        return
+    if rubles > Decimal("1000000000"):
+        await message.answer("Сумма слишком большая")
         return
 
     data = await state.get_data()
+    name = data.get("name")
+    source_url_value = data.get("source_url")
+    if not isinstance(name, str) or not isinstance(source_url_value, str):
+        await state.clear()
+        await message.answer("Сессия создания источника истекла")
+        return
     source = await MarketingRepository(session).create_source(
-        name=data["name"],
-        source_url=data["source_url"],
-        spend_kopecks=round(rubles * 100),
+        name=name,
+        source_url=source_url_value,
+        spend_kopecks=int((rubles * 100).quantize(Decimal("1"))),
         admin_telegram_id=message.from_user.id,
     )
     await AdminRepository(session).audit(
@@ -112,6 +146,10 @@ async def source_spend(
 
 @router.message(BroadcastCreate.waiting_text)
 async def broadcast_text(message: Message, state: FSMContext) -> None:
+    if message.from_user is None or not is_admin(message.from_user.id):
+        await state.clear()
+        return
+
     text = (message.text or "").strip()
     if not text:
         await message.answer("Текст не может быть пустым")
@@ -139,10 +177,22 @@ async def broadcast_confirm(
         return
 
     data = await state.get_data()
+    kind = data.get("kind")
+    audience = data.get("audience")
+    text = data.get("text")
+    if (
+        kind != "anonymous"
+        or audience not in {"all", "vip", "non_vip"}
+        or not isinstance(text, str)
+    ):
+        await state.clear()
+        await callback.answer("Сессия рассылки истекла", show_alert=True)
+        return
+
     item = await MarketingRepository(session).create_broadcast(
-        kind=data["kind"],
-        audience=data["audience"],
-        text=data["text"],
+        kind=kind,
+        audience=audience,
+        text=text,
         admin_telegram_id=callback.from_user.id,
     )
     await AdminRepository(session).audit(
@@ -166,6 +216,10 @@ async def broadcast_cancel(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
+    if callback.from_user is None or not is_admin(callback.from_user.id):
+        await callback.answer("Недоступно", show_alert=True)
+        return
+
     await state.clear()
     if callback.message:
         await callback.message.edit_text("Рассылка отменена")

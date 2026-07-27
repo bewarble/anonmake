@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import logging
 
 from aiogram import Bot
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import texts
+from app.core.config import load_settings
 from app.models.reveal import RevealCheckout
 from app.repositories import QuestionRepository, UserRepository
 from app.services.impaya import ImpayaClient
@@ -25,10 +26,13 @@ async def finalize_checkout_and_notify(
     *,
     payment_form_url_template: str,
 ) -> str:
+    settings = load_settings()
     paid = await RevealCheckoutService(
         session,
         client,
         payment_form_url_template=payment_form_url_template,
+        trial_amount=settings.trial_price_kopecks,
+        trial_duration=timedelta(hours=settings.trial_duration_hours),
     ).finalize(checkout, user_id=checkout.buyer_id)
 
     if not paid:

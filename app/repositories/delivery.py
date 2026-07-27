@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import or_, select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.delivery import DeliveryOutbox
@@ -22,6 +23,15 @@ class DeliveryRepository:
         text: str,
         reply_markup: dict | None = None,
     ) -> DeliveryOutbox:
+        bind = self.session.get_bind()
+        dialect = bind.dialect.name
+        if dialect == "postgresql":
+            insert = postgresql_insert
+        elif dialect == "sqlite":
+            insert = sqlite_insert
+        else:
+            raise RuntimeError(f"Unsupported delivery database dialect: {dialect}")
+
         statement = (
             insert(DeliveryOutbox)
             .values(

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.marketing import SourceAttribution, TrafficSource
+from app.models.marketing import TrafficSource
 
 
 class MarketingCleanupRepository:
@@ -14,14 +13,11 @@ class MarketingCleanupRepository:
         return await self.session.get(TrafficSource, source_id)
 
     async def delete_source(self, source_id: int) -> bool:
+        """Archive a source while preserving historical attribution."""
         source = await self.session.get(TrafficSource, source_id)
-        if source is None:
+        if source is None or not source.is_active:
             return False
 
-        await self.session.execute(
-            delete(SourceAttribution).where(
-                SourceAttribution.source_id == source_id
-            )
-        )
-        await self.session.delete(source)
+        source.is_active = False
+        await self.session.flush()
         return True

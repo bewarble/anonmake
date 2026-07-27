@@ -6,12 +6,40 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def python_files() -> list[Path]:
+    return sorted((ROOT / "app").rglob("*.py")) + sorted(
+        (ROOT / "scripts").rglob("*.py")
+    )
+
+
 def check_python_syntax() -> int:
     count = 0
-    for path in sorted((ROOT / "app").rglob("*.py")) + sorted((ROOT / "scripts").rglob("*.py")):
+    for path in python_files():
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         count += 1
     return count
+
+
+def check_local_imports() -> None:
+    modules: set[str] = set()
+    for path in python_files():
+        relative = path.relative_to(ROOT).with_suffix("")
+        module = ".".join(relative.parts)
+        modules.add(module)
+        if module.endswith(".__init__"):
+            modules.add(module.removesuffix(".__init__"))
+
+    for path in python_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            module = node.module
+            if module and module.startswith("app."):
+                assert module in modules or any(
+                    candidate.startswith(module + ".")
+                    for candidate in modules
+                ), (path, module)
 
 
 def check_router_registry() -> None:
@@ -28,7 +56,7 @@ def check_router_registry() -> None:
         "errors_router",
     )
     for name in required:
-        assert f"include_router({name})" in text, name
+        assert text.count(f"include_router({name})") == 1, name
 
     forbidden = (
         "admin_stage25_router",
@@ -43,28 +71,83 @@ def check_router_registry() -> None:
 
 def check_no_artifacts() -> None:
     assert not list(ROOT.glob("anonmake-stage-*.zip"))
+    assert not (ROOT / ".stage-backups").exists()
 
 
 def check_current_admin() -> None:
-    handler = (ROOT / "app/bot/handlers/admin_stage25_1.py").read_text(encoding="utf-8")
-    assert 'F.text == "Статистика"' in handler
-    assert 'F.text == "Прибыль"' in handler
-    assert 'F.text == "Выгрузка"' in handler
-    assert 'F.text == "Рефералы"' in handler
-    assert 'F.text == "Рассылка"' in handler
+    handler = (ROOT / "app/bot/handlers/admin_stage25_1.py").read_text(
+        encoding="utf-8"
+    )
+    for button in ("Статистика", "Прибыль", "Выгрузка", "Рефералы", "Рассылка"):
+        assert f'F.text == "{button}"' in handler, button
     assert r'^adminm:source:\d+$' in handler
+
+
+def check_removed_legacy_modules() -> None:
+    removed = (
+        "app/services/admin_bi.py",
+        "app/services/system_health.py",
+        "app/web/metrics.py",
+    )
+    for relative in removed:
+        assert not (ROOT / relative).exists(), relative
+
+
+def check_runtime_guards() -> None:
+    abuse = (ROOT / "app/services/abuse_guard.py").read_text(encoding="utf-8")
+    assert "redis.call('INCR'" in abuse
+    assert "redis.call('EXPIRE'" in abuse
+
+    delivery = (ROOT / "app/repositories/delivery.py").read_text(encoding="utf-8")
+    assert 'dialect == "postgresql"' in delivery
+    assert 'dialect == "sqlite"' in delivery
+
+
+def check_operational_files() -> None:
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+    assert "\\n" not in env_example
+    assert 'IMPAYA_AUTH_PREFIX="Bearer "' in env_example
+    assert "TRIAL_ATTEMPT_KINDS=trial" in env_example
+
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    assert "check_stage_" not in makefile
+    assert "compose.marketing.yaml" in makefile
+    assert "compose.delivery.yaml" in makefile
+
+    backup = (ROOT / "scripts/backup_postgres.sh").read_text(encoding="utf-8")
+    assert '--file="$TMP_SQL"' in backup
+
+
+def check_security_guards() -> None:
+    marketing = (ROOT / "app/bot/handlers/admin_marketing.py").read_text(
+        encoding="utf-8"
+    )
+    assert marketing.count("not is_admin(") >= 7
+
+    web = (ROOT / "app/web/app.py").read_text(encoding="utf-8")
+    assert "Webhook secret is not configured" in web
+    assert 'text("SELECT 1")' in web
 
 
 def main() -> None:
     count = check_python_syntax()
+    check_local_imports()
     check_router_registry()
     check_no_artifacts()
     check_current_admin()
+    check_removed_legacy_modules()
+    check_runtime_guards()
+    check_operational_files()
+    check_security_guards()
     print("Project check: OK")
     print(f"Python files parsed: {count}")
+    print("Local imports: verified")
     print("Router registry: clean")
     print("Legacy artifacts: removed")
-    print("Current admin surface: verified")
+    print("Admin access guards: verified")
+    print("Redis and delivery runtime guards: verified")
+    print("Webhook and health checks: hardened")
+    print("Compose, env examples and backup scripts: verified")
 
 
 if __name__ == "__main__":

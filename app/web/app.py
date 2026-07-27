@@ -11,9 +11,10 @@ from aiogram import Bot
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import text
 
 from app.core.config import load_settings
-from app.database.session import SessionFactory, close_database, init_database
+from app.database.session import SessionFactory, close_database, engine, init_database
 from app.repositories.reveals import RevealRepository
 from app.services.impaya import ImpayaClient
 from app.services.payment_notifications import finalize_checkout_and_notify
@@ -48,9 +49,15 @@ def make_impaya_client() -> ImpayaClient:
 
 
 def verify_webhook_secret(received: str | None) -> None:
-    expected = settings.impaya_webhook_secret
+    if not settings.billing_enabled:
+        raise HTTPException(status_code=503, detail="Billing is disabled")
+
+    expected = settings.impaya_webhook_secret.strip()
     if not expected:
-        return
+        raise HTTPException(
+            status_code=503,
+            detail="Webhook secret is not configured",
+        )
     if received is None or not hmac.compare_digest(received, expected):
         raise HTTPException(status_code=401, detail="Invalid webhook secret")
 
@@ -76,6 +83,15 @@ async def metrics() -> Response:
 
 @app.get("/health")
 async def health() -> dict[str, str]:
+    try:
+        async with engine.connect() as connection:
+            value = await connection.scalar(text("SELECT 1"))
+    except Exception as exc:
+        logger.exception("Database healthcheck failed")
+        raise HTTPException(status_code=503, detail="Database unavailable") from exc
+
+    if value != 1:
+        raise HTTPException(status_code=503, detail="Database unhealthy")
     return {"status": "ok"}
 
 

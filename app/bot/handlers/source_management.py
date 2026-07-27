@@ -7,10 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot.keyboards.source_admin import (
-    source_card_keyboard,
-    source_delete_confirm_keyboard,
-)
+from app.bot.keyboards.source_admin import source_delete_confirm_keyboard
 from app.core.config import load_settings
 from app.repositories.admin import AdminRepository
 from app.repositories.marketing_cleanup import MarketingCleanupRepository
@@ -61,7 +58,7 @@ async def request_source_delete(
         await callback.message.edit_text(
             "🗑 Удалить источник?\n\n"
             f"{escape(source.name)}\n\n"
-            "Статистика и атрибуция этого источника будут удалены.",
+            "Ссылка будет отключена, а историческая статистика сохранится.",
             reply_markup=source_delete_confirm_keyboard(source.id),
         )
     await callback.answer()
@@ -87,13 +84,13 @@ async def confirm_source_delete(
     if deleted:
         await AdminRepository(session).audit(
             admin_telegram_id=callback.from_user.id,
-            action="delete_traffic_source",
+            action="archive_traffic_source",
             target=str(source_id),
         )
         await session.commit()
 
     if callback.message:
         await callback.message.edit_text(
-            "✅ Источник удалён" if deleted else "Источник уже удалён"
+            "✅ Источник отключён" if deleted else "Источник уже отключён"
         )
     await callback.answer()

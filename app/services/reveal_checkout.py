@@ -26,10 +26,14 @@ class RevealCheckoutService:
         client: ImpayaClient,
         *,
         payment_form_url_template: str,
+        trial_amount: int = 100,
+        trial_duration: timedelta = timedelta(hours=24),
     ) -> None:
         self.session = session
         self.client = client
         self.payment_form_url_template = payment_form_url_template
+        self.trial_amount = trial_amount
+        self.trial_duration = trial_duration
         self.billing = BillingRepository(session)
 
     async def create(
@@ -63,7 +67,7 @@ class RevealCheckoutService:
             merchant_user_id=method.merchant_user_id,
             success_url=success_url,
             fail_url=fail_url,
-            amount=100,
+            amount=self.trial_amount,
         )
         invoice_id = result.data.get("invoice_id")
         if not result.success or not invoice_id:
@@ -90,7 +94,7 @@ class RevealCheckoutService:
                     transaction_id=result.data.get("transaction_id"),
                     billing_cycle_key=cycle_key,
                     attempt_kind="trial",
-                    amount_kopecks=100,
+                    amount_kopecks=self.trial_amount,
                     status="pending",
                 )
             )
@@ -160,7 +164,8 @@ class RevealCheckoutService:
         now = datetime.now(timezone.utc)
         subscription.status = "trial_active"
         subscription.auto_renew = True
-        subscription.access_until = now + timedelta(days=1)
+        access_base = max(subscription.access_until or now, now)
+        subscription.access_until = access_base + self.trial_duration
         subscription.next_charge_at = subscription.access_until
         subscription.last_successful_plan = "trial"
 

@@ -61,6 +61,7 @@ class MarketingRepository:
     async def sources(self, limit: int = 20) -> list[TrafficSource]:
         result = await self.session.execute(
             select(TrafficSource)
+            .where(TrafficSource.is_active.is_(True))
             .order_by(TrafficSource.id.desc())
             .limit(limit)
         )
@@ -93,6 +94,13 @@ class MarketingRepository:
         text: str,
         admin_telegram_id: int,
     ) -> Broadcast:
+        if kind != "anonymous":
+            raise ValueError("Unsupported broadcast kind")
+        if audience not in {"all", "vip", "non_vip"}:
+            raise ValueError("Unsupported broadcast audience")
+        if not text.strip() or len(text) > 4000:
+            raise ValueError("Invalid broadcast text")
+
         item = Broadcast(
             kind=kind,
             audience=audience,

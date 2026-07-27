@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.billing import PaymentAttempt, PaymentMethod
+from app.models.billing import PaymentAttempt
 from app.models.delivery import DeliveryOutbox
 from app.models.user import User
 
@@ -16,20 +16,6 @@ PERMANENT_ERRORS = (
     "%chat not found%",
     "%user is deactivated%",
 )
-
-
-@dataclass(slots=True, frozen=True)
-class StatisticsSnapshot:
-    users_total: int
-    users_alive: int
-    users_dead: int
-    today: int
-    week: int
-    month: int
-    organic_today: int
-    organic_week: int
-    organic_month: int
-    active_cards: int
 
 
 @dataclass(slots=True, frozen=True)
@@ -47,33 +33,15 @@ class ProfitSnapshot:
     all_time: ProfitPeriod
 
 
+@dataclass(slots=True, frozen=True)
+class RevenuePoint:
+    label: str
+    revenue_kopecks: int
+
+
 class AdminMetricsRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
-
-    async def statistics(self) -> StatisticsSnapshot:
-        now = datetime.now(timezone.utc)
-        day = now - timedelta(days=1)
-        week = now - timedelta(days=7)
-        month = now - timedelta(days=30)
-
-        total = int(
-            await self.session.scalar(select(func.count(User.id))) or 0
-        )
-        dead = await self._dead_users()
-
-        return StatisticsSnapshot(
-            users_total=total,
-            users_alive=max(total - dead, 0),
-            users_dead=dead,
-            today=await self._users_since(day),
-            week=await self._users_since(week),
-            month=await self._users_since(month),
-            organic_today=await self._organic_since(day),
-            organic_week=await self._organic_since(week),
-            organic_month=await self._organic_since(month),
-            active_cards=await self._active_cards(),
-        )
 
     async def profit(self, trial_kinds: tuple[str, ...]) -> ProfitSnapshot:
         now = datetime.now(timezone.utc)
@@ -83,6 +51,44 @@ class AdminMetricsRepository:
             month=await self._profit_period(now - timedelta(days=30), trial_kinds),
             all_time=await self._profit_period(None, trial_kinds),
         )
+
+    async def daily_revenue(self, *, days: int = 20) -> list[RevenuePoint]:
+        if days < 1:
+            raise ValueError("days must be positive")
+
+        now = datetime.now(timezone.utc)
+        start = (now - timedelta(days=days - 1)).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        points: list[RevenuePoint] = []
+        for offset in range(days):
+            left = start + timedelta(days=offset)
+            right = left + timedelta(days=1)
+            revenue = int(
+                await self.session.scalar(
+                    select(
+                        func.coalesce(
+                            func.sum(PaymentAttempt.amount_kopecks),
+                            0,
+                        )
+                    ).where(
+                        PaymentAttempt.created_at >= left,
+                        PaymentAttempt.created_at < right,
+                        PaymentAttempt.status.in_(SUCCESS_STATUSES),
+                    )
+                )
+                or 0
+            )
+            points.append(
+                RevenuePoint(
+                    label=left.strftime("%d.%m"),
+                    revenue_kopecks=revenue,
+                )
+            )
+        return points
 
     async def export_user_ids(self, *, alive_only: bool) -> bytes:
         query = select(User.telegram_id).order_by(User.id)
@@ -97,8 +103,10 @@ class AdminMetricsRepository:
                 .where(
                     DeliveryOutbox.status == "failed",
                     or_(
-                        *(DeliveryOutbox.last_error.ilike(pattern)
-                          for pattern in PERMANENT_ERRORS)
+                        *(
+                            DeliveryOutbox.last_error.ilike(pattern)
+                            for pattern in PERMANENT_ERRORS
+                        )
                     ),
                 )
             )
@@ -107,56 +115,6 @@ class AdminMetricsRepository:
         result = await self.session.execute(query)
         values = [str(value) for value in result.scalars()]
         return ("\n".join(values) + ("\n" if values else "")).encode("utf-8")
-
-    async def _dead_users(self) -> int:
-        value = await self.session.scalar(
-            select(func.count(func.distinct(User.id)))
-            .join(
-                DeliveryOutbox,
-                DeliveryOutbox.chat_id == User.telegram_id,
-            )
-            .where(
-                DeliveryOutbox.status == "failed",
-                or_(
-                    *(DeliveryOutbox.last_error.ilike(pattern)
-                      for pattern in PERMANENT_ERRORS)
-                ),
-            )
-        )
-        return int(value or 0)
-
-    async def _users_since(self, since: datetime) -> int:
-        value = await self.session.scalar(
-            select(func.count(User.id)).where(User.created_at >= since)
-        )
-        return int(value or 0)
-
-    async def _organic_since(self, since: datetime) -> int:
-        from app.models.marketing import SourceAttribution
-
-        value = await self.session.scalar(
-            select(func.count(User.id))
-            .outerjoin(
-                SourceAttribution,
-                SourceAttribution.user_id == User.id,
-            )
-            .where(
-                User.created_at >= since,
-                SourceAttribution.id.is_(None),
-            )
-        )
-        return int(value or 0)
-
-    async def _active_cards(self) -> int:
-        value = await self.session.scalar(
-            select(func.count(PaymentMethod.id)).where(
-                PaymentMethod.is_active.is_(True),
-                PaymentMethod.is_recurrent.is_(True),
-                PaymentMethod.binding_id.is_not(None),
-                PaymentMethod.blocked_at.is_(None),
-            )
-        )
-        return int(value or 0)
 
     async def _profit_period(
         self,
@@ -179,12 +137,15 @@ class AdminMetricsRepository:
             or 0
         )
 
+        trial_filters = list(filters)
+        if trial_kinds:
+            trial_filters.append(PaymentAttempt.attempt_kind.in_(trial_kinds))
+        else:
+            trial_filters.append(False)
+
         trials = int(
             await self.session.scalar(
-                select(func.count(PaymentAttempt.id)).where(
-                    *filters,
-                    PaymentAttempt.attempt_kind.in_(trial_kinds),
-                )
+                select(func.count(PaymentAttempt.id)).where(*trial_filters)
             )
             or 0
         )

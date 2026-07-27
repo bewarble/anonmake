@@ -14,19 +14,6 @@ def cancel_source_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def source_card_keyboard(source_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🗑 Удалить",
-                    callback_data=f"source:delete:{source_id}",
-                )
-            ]
-        ]
-    )
-
-
 def source_delete_confirm_keyboard(source_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[

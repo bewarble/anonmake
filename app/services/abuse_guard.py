@@ -90,14 +90,18 @@ class AbuseGuard:
         await self.redis.delete(f"abuse:question:duplicate:{digest}")
 
     async def _window(self, key: str, limit: int, ttl: int) -> bool:
-        # A transaction ensures the first increment and expiry are applied
-        # together, preventing immortal counters after a process interruption.
-        async with self.redis.pipeline(transaction=True) as pipe:
-            pipe.incr(key)
-            pipe.ttl(key)
-            value, current_ttl = await pipe.execute()
-
-        if current_ttl < 0:
-            await self.redis.expire(key, ttl)
-
+        # INCR and the first EXPIRE must be atomic; otherwise a process crash
+        # between the two commands can leave a permanent rate-limit key.
+        value = await self.redis.eval(
+            """
+            local current = redis.call('INCR', KEYS[1])
+            if current == 1 then
+                redis.call('EXPIRE', KEYS[1], ARGV[1])
+            end
+            return current
+            """,
+            1,
+            key,
+            ttl,
+        )
         return int(value) <= limit

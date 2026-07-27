@@ -43,10 +43,41 @@ class Settings(BaseSettings):
     billing_enabled: bool = Field(default=False, alias="BILLING_ENABLED")
     billing_worker_interval_seconds: int = Field(
         default=60,
+        ge=5,
         alias="BILLING_WORKER_INTERVAL_SECONDS",
     )
+    trial_price_kopecks: int = Field(
+        default=100,
+        ge=1,
+        alias="TRIAL_PRICE_KOPECKS",
+    )
+    trial_duration_hours: int = Field(
+        default=24,
+        ge=1,
+        alias="TRIAL_DURATION_HOURS",
+    )
+    primary_price_kopecks: int = Field(
+        default=29900,
+        ge=1,
+        alias="PRIMARY_PRICE_KOPECKS",
+    )
+    primary_duration_days: int = Field(
+        default=3,
+        ge=1,
+        alias="PRIMARY_DURATION_DAYS",
+    )
+    fallback_price_kopecks: int = Field(
+        default=9900,
+        ge=1,
+        alias="FALLBACK_PRICE_KOPECKS",
+    )
+    fallback_duration_days: int = Field(
+        default=1,
+        ge=1,
+        alias="FALLBACK_DURATION_DAYS",
+    )
     trial_attempt_kinds: str = Field(
-        default="trial,initial,binding",
+        default="trial",
         alias="TRIAL_ATTEMPT_KINDS",
     )
 

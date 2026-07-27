@@ -18,7 +18,8 @@ fi
 PGPASSWORD="$POSTGRES_PASSWORD" dropdb \
   --host=db \
   --username="${POSTGRES_USER:-anonmake}" \
-  --if-exists "${POSTGRES_DB:-anonmake}"
+  --if-exists \
+  --force "${POSTGRES_DB:-anonmake}"
 
 PGPASSWORD="$POSTGRES_PASSWORD" createdb \
   --host=db \

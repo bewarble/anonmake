@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import (
@@ -36,11 +35,6 @@ async def init_database() -> None:
     """Prepare local storage. Schema changes are managed by Alembic."""
     if DATABASE_PATH is not None:
         DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-
-async def get_session() -> AsyncIterator[AsyncSession]:
-    async with SessionFactory() as session:
-        yield session
 
 
 async def close_database() -> None:

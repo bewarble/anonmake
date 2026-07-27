@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from aiogram import Bot, F, Router
-from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -111,6 +111,8 @@ async def reveal_sender(
             payment_form_url_template=(
                 settings.impaya_payment_form_url_template
             ),
+            trial_amount=settings.trial_price_kopecks,
+            trial_duration=timedelta(hours=settings.trial_duration_hours),
         ).create(
             checkout,
             user_id=buyer.id,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import timedelta
 
 from app.core.config import load_settings
 from app.database.session import close_database, init_database
@@ -33,6 +34,12 @@ async def main() -> None:
     worker = BillingWorker(
         client,
         interval_seconds=settings.billing_worker_interval_seconds,
+        trial_amount=settings.trial_price_kopecks,
+        trial_duration=timedelta(hours=settings.trial_duration_hours),
+        primary_amount=settings.primary_price_kopecks,
+        primary_duration=timedelta(days=settings.primary_duration_days),
+        fallback_amount=settings.fallback_price_kopecks,
+        fallback_duration=timedelta(days=settings.fallback_duration_days),
     )
 
     await init_database()

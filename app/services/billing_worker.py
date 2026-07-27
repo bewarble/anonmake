@@ -13,9 +13,15 @@ logger = logging.getLogger(__name__)
 
 
 class BillingWorker:
-    def __init__(self, client: ImpayaClient, interval_seconds: int = 60) -> None:
+    def __init__(
+        self,
+        client: ImpayaClient,
+        interval_seconds: int = 60,
+        **billing_service_options,
+    ) -> None:
         self.client = client
         self.interval_seconds = interval_seconds
+        self.billing_service_options = billing_service_options
         self._stop = asyncio.Event()
 
     async def run(self) -> None:
@@ -39,8 +45,20 @@ class BillingWorker:
                 method = await repo.payment_method_for_user(subscription.user_id)
                 if not method or not method.is_active or not method.is_recurrent:
                     continue
-                service = BillingService(session, self.client)
-                await service.renew(subscription, method)
+                service = BillingService(
+                    session,
+                    self.client,
+                    **self.billing_service_options,
+                )
+                try:
+                    await service.renew(subscription, method)
+                except Exception:
+                    await session.rollback()
+                    logger.exception(
+                        "Subscription renewal failed",
+                        extra={"subscription_id": subscription.id},
+                    )
+                    break
 
     def stop(self) -> None:
         self._stop.set()

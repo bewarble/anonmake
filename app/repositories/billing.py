@@ -44,6 +44,7 @@ class BillingRepository:
             )
             .order_by(Subscription.next_charge_at)
             .limit(limit)
+            .with_for_update(skip_locked=True)
         )
         return list(result.scalars())
 

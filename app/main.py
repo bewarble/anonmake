@@ -11,6 +11,7 @@ from app.bot.middlewares.request_context import RequestContextMiddleware
 from app.core.config import load_settings
 from app.core.logging import configure_logging
 from app.database.session import close_database, init_database
+from app.services.redis_client import get_redis
 
 
 async def main() -> None:
@@ -31,6 +32,7 @@ async def main() -> None:
         await bot.delete_webhook(drop_pending_updates=False)
         await dispatcher.start_polling(bot)
     finally:
+        await get_redis(settings.redis_url).aclose()
         await close_database()
         await bot.session.close()
 

@@ -218,20 +218,14 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Project secrets
-.env
 .venv/
-__pycache__/
 *.py[cod]
 
 # Secrets
-.env
 
 # Virtual environments
-.venv/
 
 # Python cache
-__pycache__/
-*.py[cod]
 
 # Local databases
 *.db
@@ -261,7 +255,7 @@ postgres_data/
 .stage8-install/
 
 .stage9-install/
-\n.stage10-install/\n
+.stage10-install/
 .stage10-1-install/
 
 .stage11-install/
@@ -301,3 +295,5 @@ postgres_data/
 anonmake-stage-*.zip
 anonmake-stage-*.zip.sha256
 .stage*-install/
+.audit-cleanup-backup/
+.audit-reaudit-backup/
