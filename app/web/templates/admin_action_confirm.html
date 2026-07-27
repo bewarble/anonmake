@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="confirm-shell">
+  <article class="panel confirm-card">
+    <span class="panel-kicker">Подтверждение действия</span>
+    <h2>{{ action_title }}</h2>
+    <p class="confirm-warning">{{ warning }}</p>
+
+    <dl class="details-list">
+      <div><dt>Пользователь</dt><dd>{{ '@' + user.username if user.username else user.telegram_id }}</dd></div>
+      <div><dt>Подписка</dt><dd>{{ subscription.status if subscription else 'Нет подписки' }}</dd></div>
+      <div><dt>Доступ до</dt><dd>{{ subscription.access_until if subscription else '—' }}</dd></div>
+      <div><dt>Карта</dt><dd>{{ payment_method.masked_pan if payment_method and payment_method.masked_pan else '—' }}</dd></div>
+    </dl>
+
+    <form method="post" action="/admin/crm/users/{{ user.id }}/control" class="confirm-form">
+      <input type="hidden" name="action" value="{{ action }}">
+      <label>
+        Для подтверждения введите <strong>ПОДТВЕРЖДАЮ</strong>
+        <input name="confirmation" autocomplete="off" required>
+      </label>
+      <div class="confirm-actions">
+        <button class="button-primary danger-button" type="submit">{{ action_title }}</button>
+        <a class="button secondary" href="/admin/crm/users/{{ user.id }}">Отмена</a>
+      </div>
+    </form>
+  </article>
+</section>
+{% endblock %}

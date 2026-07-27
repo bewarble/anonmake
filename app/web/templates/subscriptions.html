@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <div class="panel-title-row">
+    <div><span class="panel-kicker">Billing CRM</span><h2>Подписки</h2><p>Всего: {{ total }}</p></div>
+  </div>
+
+  <form class="filters" method="get">
+    <input name="q" value="{{ q }}" placeholder="Telegram ID или username">
+    <select name="status_filter">
+      <option value="">Все статусы</option>
+      {% for value in ["trial_active","active_3_days","active_1_day","past_due","payment_pending","cancelled_active","expired","payment_method_blocked"] %}
+        <option value="{{ value }}" {{ "selected" if status_filter == value else "" }}>{{ value }}</option>
+      {% endfor %}
+    </select>
+    <select name="auto_renew">
+      <option value="">Любое автопродление</option>
+      <option value="yes" {{ "selected" if auto_renew == "yes" else "" }}>Включено</option>
+      <option value="no" {{ "selected" if auto_renew == "no" else "" }}>Выключено</option>
+    </select>
+    <button type="submit">Применить</button>
+    <a class="button secondary" href="/admin/subscriptions">Сбросить</a>
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Пользователь</th><th>Статус</th><th>Автопродление</th><th>Доступ до</th><th>Следующее списание</th><th>Карта</th></tr></thead>
+      <tbody>
+      {% for subscription, user, method in rows %}
+        <tr>
+          <td><a href="/admin/crm/users/{{ user.id }}">{{ '@' + user.username if user.username else user.telegram_id }}</a></td>
+          <td><span class="badge {{ subscription.status }}">{{ subscription.status }}</span></td>
+          <td>{{ 'Да' if subscription.auto_renew else 'Нет' }}</td>
+          <td>{{ subscription.access_until.strftime('%d.%m.%Y %H:%M') if subscription.access_until else '—' }}</td>
+          <td>{{ subscription.next_charge_at.strftime('%d.%m.%Y %H:%M') if subscription.next_charge_at else '—' }}</td>
+          <td>{{ method.masked_pan if method and method.masked_pan else '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="empty">Подписки не найдены</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "pagination.html" %}
+</section>
+{% endblock %}

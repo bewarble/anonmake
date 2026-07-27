@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/admin/static/admin_stage29_3.css?v=29.3">
   <link rel="stylesheet" href="/admin/static/admin_stage29_4.css?v=29.4">
   <link rel="stylesheet" href="/admin/static/admin_stage30_2.css?v=30.2">
+  <link rel="stylesheet" href="/admin/static/admin_stage31.css?v=31.0">
 </head>
 <body>
   <div class="app-shell">
@@ -38,6 +39,7 @@
         <a class="{{ 'active' if section == 'broadcasts' else '' }}" href="/admin/business/broadcasts"><i>✦</i><span>Рассылки</span></a>
 
         <span class="nav-section">Операции</span>
+        <a class="{{ 'active' if section == 'subscriptions' else '' }}" href="/admin/subscriptions"><i>◆</i><span>Подписки</span></a>
         <a class="{{ 'active' if section == 'payments' else '' }}" href="/admin/payments"><i>₽</i><span>Платежи</span></a>
         <a class="{{ 'active' if section == 'delivery' else '' }}" href="/admin/delivery"><i>⇢</i><span>Доставка</span></a>
         <a class="{{ 'active' if section == 'audit' else '' }}" href="/admin/audit"><i>≡</i><span>Журнал</span></a>
@@ -86,6 +88,7 @@
         <a href="/admin/business/sources">Источники <kbd>S</kbd></a>
         <a href="/admin/sources/new">Создать источник <kbd>N</kbd></a>
         <a href="/admin/business/broadcasts">Рассылки <kbd>B</kbd></a>
+        <a href="/admin/subscriptions">Подписки <kbd>V</kbd></a>
         <a href="/admin/payments">Платежи <kbd>P</kbd></a>
         <a href="/admin/delivery">Доставка <kbd>D</kbd></a>
       </div>

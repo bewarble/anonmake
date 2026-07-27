@@ -363,13 +363,21 @@ class WebAdminRepository:
             pattern = f"%{cleaned}%"
             if cleaned.isdigit():
                 numeric = int(cleaned)
-                filters.append(
-                    or_(
-                        User.telegram_id == numeric,
-                        User.id == numeric,
-                        PaymentAttempt.id == numeric,
+
+                numeric_filters = [User.telegram_id == numeric]
+
+                # Internal IDs are PostgreSQL INTEGER (int32).
+                # Telegram IDs may be much larger, so only compare them with
+                # int32 columns when the value is within range.
+                if -(2**31) <= numeric <= (2**31 - 1):
+                    numeric_filters.extend(
+                        (
+                            User.id == numeric,
+                            PaymentAttempt.id == numeric,
+                        )
                     )
-                )
+
+                filters.append(or_(*numeric_filters))
             else:
                 filters.append(
                     or_(

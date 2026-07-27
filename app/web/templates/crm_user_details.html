@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
+{% if notice %}
+<div class="admin-notice {{ notice_level }}">{{ notice }}</div>
+{% endif %}
 <section class="page-toolbar">
   <div>
     <h2>Пользователь #{{ details.user.id }}</h2>
@@ -216,5 +219,65 @@
       <p class="empty">Ошибок оплаты нет</p>
     {% endif %}
   </article>
+</section>
+
+<section class="panel admin-control-panel">
+  <div class="panel-title-row">
+    <div>
+      <span class="panel-kicker">Support actions</span>
+      <h2>Управление подпиской</h2>
+      <p>Все действия требуют отдельного подтверждения и записываются в журнал.</p>
+    </div>
+  </div>
+
+  <div class="admin-action-grid">
+    <a class="admin-action danger" href="/admin/crm/users/{{ details.user.id }}/control?action=charge_primary">
+      <strong>Списать 299 ₽</strong><span>MIT · +3 дня при успехе</span>
+    </a>
+    <a class="admin-action warning" href="/admin/crm/users/{{ details.user.id }}/control?action=charge_fallback">
+      <strong>Списать 99 ₽</strong><span>MIT · +1 день при успехе</span>
+    </a>
+    <a class="admin-action" href="/admin/crm/users/{{ details.user.id }}/control?action=enable_auto_renew">
+      <strong>Включить автопродление</strong><span>Назначить следующее списание</span>
+    </a>
+    <a class="admin-action" href="/admin/crm/users/{{ details.user.id }}/control?action=disable_auto_renew">
+      <strong>Отключить автопродление</strong><span>Сохранить оплаченный доступ</span>
+    </a>
+    <a class="admin-action" href="/admin/crm/users/{{ details.user.id }}/control?action=extend_1">
+      <strong>Продлить на 1 день</strong><span>Без списания денег</span>
+    </a>
+    <a class="admin-action" href="/admin/crm/users/{{ details.user.id }}/control?action=extend_3">
+      <strong>Продлить на 3 дня</strong><span>Без списания денег</span>
+    </a>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-title-row">
+    <div>
+      <span class="panel-kicker">Billing history</span>
+      <h2>Последние платежи</h2>
+    </div>
+    <a class="button-primary" href="/admin/payments?q={{ details.user.telegram_id }}">Все платежи</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>Тип</th><th>Сумма</th><th>Статус</th><th>Ошибка</th><th>Дата</th></tr></thead>
+      <tbody>
+      {% for attempt, subscription, user, payment_method in payment_rows %}
+        <tr>
+          <td><a href="/admin/payments/{{ attempt.id }}">#{{ attempt.id }}</a></td>
+          <td>{{ attempt.attempt_kind }}</td>
+          <td>{{ money(attempt.amount_kopecks) }} ₽</td>
+          <td><span class="badge {{ attempt.status }}">{{ attempt.status }}</span></td>
+          <td>{{ attempt.error_code or '—' }}</td>
+          <td>{{ attempt.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="empty">Платежей нет</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
 {% endblock %}

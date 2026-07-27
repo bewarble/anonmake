@@ -334,3 +334,18 @@ for stage29_3_route in admin_stage29_3_module.router.routes:
     ):
         app.router.routes.append(stage29_3_route)
 # End Stage 29.3 route registration.
+
+
+# Begin Stage 31 Admin Control Center registration.
+from app.web import admin_stage31 as admin_stage31_module  # noqa: E402
+
+for stage31_route in admin_stage31_module.router.routes:
+    route_path = getattr(stage31_route, "path", None)
+    route_methods = getattr(stage31_route, "methods", None)
+    if not any(
+        getattr(existing, "path", None) == route_path
+        and getattr(existing, "methods", None) == route_methods
+        for existing in app.router.routes
+    ):
+        app.router.routes.append(stage31_route)
+# End Stage 31 Admin Control Center registration.

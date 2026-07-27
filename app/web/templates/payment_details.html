@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
+{% if request.query_params.get("notice") %}
+<div class="admin-notice {{ request.query_params.get('notice_level', 'success') }}">{{ request.query_params.get("notice") }}</div>
+{% endif %}
 <section class="profile-grid">
   <article class="panel">
     <div class="panel-header"><h2>Операция #{{ attempt.id }}</h2></div>

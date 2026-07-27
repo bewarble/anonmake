@@ -97,12 +97,22 @@ async def crm_users(
 
 
 @router.get("/crm/users/{user_id}", response_class=HTMLResponse)
-async def crm_user_details(request: Request, user_id: int):
+async def crm_user_details(
+    request: Request,
+    user_id: int,
+    notice: str = "",
+    notice_level: str = "success",
+):
     if require_session(request) is None:
         return login_redirect(request)
     async with SessionFactory() as session:
         details = await WebAdminRepository(session).user_details(user_id)
         timeline = await WebCrmRepository(session).user_timeline(user_id)
+        payment_rows, _ = await WebAdminRepository(session).payments(
+            page=0,
+            page_size=20,
+            query=str(details.user.telegram_id) if details else "",
+        )
     if details is None:
         raise HTTPException(status_code=404, detail="User not found")
     return templates.TemplateResponse(
@@ -114,6 +124,9 @@ async def crm_user_details(request: Request, user_id: int):
             section="users",
             details=details,
             timeline=timeline,
+            payment_rows=payment_rows,
+            notice=notice,
+            notice_level=notice_level,
         ),
     )
 
