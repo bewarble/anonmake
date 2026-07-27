@@ -69,7 +69,152 @@
       <div><dt>Имя</dt><dd>{{ details.user.first_name or '—' }}</dd></div>
       <div><dt>Username</dt><dd>{{ '@' + details.user.username if details.user.username else '—' }}</dd></div>
       <div><dt>Telegram ID</dt><dd>{{ details.user.telegram_id }}</dd></div>
+      <div><dt>Источник</dt><dd>{{ details.source.name if details.source else 'Органика' }}</dd></div>
+      <div><dt>Регистрация</dt><dd>{{ details.user.created_at.strftime('%d.%m.%Y %H:%M') }}</dd></div>
     </dl>
   </aside>
+</section>
+
+<section class="dashboard-grid">
+  <article class="panel">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">Billing</span>
+        <h2>Подписка</h2>
+      </div>
+    </div>
+
+    <dl class="details-list">
+      <div>
+        <dt>Статус</dt>
+        <dd>{{ details.subscription.status if details.subscription else 'Нет подписки' }}</dd>
+      </div>
+      <div>
+        <dt>Автопродление</dt>
+        <dd>{{ 'Включено' if details.subscription and details.subscription.auto_renew else 'Выключено' }}</dd>
+      </div>
+      <div>
+        <dt>Доступ до</dt>
+        <dd>
+          {{ details.subscription.access_until.strftime('%d.%m.%Y %H:%M') if details.subscription and details.subscription.access_until else '—' }}
+        </dd>
+      </div>
+      <div>
+        <dt>Следующее списание</dt>
+        <dd>
+          {{ details.subscription.next_charge_at.strftime('%d.%m.%Y %H:%M') if details.subscription and details.subscription.next_charge_at else '—' }}
+        </dd>
+      </div>
+      <div>
+        <dt>Последний тариф</dt>
+        <dd>
+          {{ details.subscription.last_successful_plan if details.subscription and details.subscription.last_successful_plan else '—' }}
+        </dd>
+      </div>
+      <div>
+        <dt>Дата отмены</dt>
+        <dd>
+          {{ details.subscription.cancelled_at.strftime('%d.%m.%Y %H:%M') if details.subscription and details.subscription.cancelled_at else '—' }}
+        </dd>
+      </div>
+    </dl>
+  </article>
+
+  <article class="panel">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">Payment method</span>
+        <h2>Карта и привязка</h2>
+      </div>
+    </div>
+
+    <dl class="details-list">
+      <div>
+        <dt>Карта</dt>
+        <dd>{{ details.payment_method.masked_pan if details.payment_method and details.payment_method.masked_pan else '—' }}</dd>
+      </div>
+      <div>
+        <dt>Binding ID</dt>
+        <dd><code>{{ details.payment_method.binding_id if details.payment_method and details.payment_method.binding_id else '—' }}</code></dd>
+      </div>
+      <div>
+        <dt>Impaya User ID</dt>
+        <dd><code>{{ details.payment_method.impaya_user_id if details.payment_method and details.payment_method.impaya_user_id else '—' }}</code></dd>
+      </div>
+      <div>
+        <dt>Merchant User ID</dt>
+        <dd><code>{{ details.payment_method.merchant_user_id if details.payment_method else '—' }}</code></dd>
+      </div>
+      <div>
+        <dt>Активна</dt>
+        <dd>{{ 'Да' if details.payment_method and details.payment_method.is_active else 'Нет' }}</dd>
+      </div>
+      <div>
+        <dt>Рекуррентная</dt>
+        <dd>{{ 'Да' if details.payment_method and details.payment_method.is_recurrent else 'Нет' }}</dd>
+      </div>
+    </dl>
+  </article>
+</section>
+
+<section class="dashboard-grid">
+  <article class="panel">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">Последняя операция</span>
+        <h2>Успешная оплата</h2>
+      </div>
+    </div>
+
+    {% if details.last_successful_payment %}
+      <dl class="details-list">
+        <div>
+          <dt>ID</dt>
+          <dd>
+            <a href="/admin/payments/{{ details.last_successful_payment.id }}">
+              #{{ details.last_successful_payment.id }}
+            </a>
+          </dd>
+        </div>
+        <div><dt>Тип</dt><dd>{{ details.last_successful_payment.attempt_kind }}</dd></div>
+        <div><dt>Сумма</dt><dd>{{ money(details.last_successful_payment.amount_kopecks) }} ₽</dd></div>
+        <div>
+          <dt>Дата</dt>
+          <dd>
+            {{ (details.last_successful_payment.completed_at or details.last_successful_payment.created_at).strftime('%d.%m.%Y %H:%M') }}
+          </dd>
+        </div>
+      </dl>
+    {% else %}
+      <p class="empty">Успешных оплат нет</p>
+    {% endif %}
+  </article>
+
+  <article class="panel">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">Последняя операция</span>
+        <h2>Ошибка платежа</h2>
+      </div>
+    </div>
+
+    {% if details.last_failed_payment %}
+      <dl class="details-list">
+        <div>
+          <dt>ID</dt>
+          <dd>
+            <a href="/admin/payments/{{ details.last_failed_payment.id }}">
+              #{{ details.last_failed_payment.id }}
+            </a>
+          </dd>
+        </div>
+        <div><dt>Статус</dt><dd>{{ details.last_failed_payment.status }}</dd></div>
+        <div><dt>Код</dt><dd>{{ details.last_failed_payment.error_code or '—' }}</dd></div>
+        <div><dt>Описание</dt><dd>{{ details.last_failed_payment.error_message or '—' }}</dd></div>
+      </dl>
+    {% else %}
+      <p class="empty">Ошибок оплаты нет</p>
+    {% endif %}
+  </article>
 </section>
 {% endblock %}

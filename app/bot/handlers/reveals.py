@@ -27,10 +27,17 @@ def build_client(settings) -> ImpayaClient:
     return ImpayaClient(
         settings.impaya_api_url,
         settings.impaya_api_token,
-        settings.impaya_terminal_name,
+        (
+            settings.impaya_binding_terminal_name
+            or settings.impaya_terminal_name
+        ),
         auth_header=settings.impaya_auth_header,
         auth_prefix=settings.impaya_auth_prefix,
         protocol_version=settings.impaya_protocol_version,
+        recurrent_terminal_name=(
+            settings.impaya_recurrent_terminal_name
+            or settings.impaya_terminal_name
+        ),
     )
 
 

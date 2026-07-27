@@ -185,7 +185,13 @@ async def user_details(request: Request, user_id: int):
 
 
 @router.get("/payments", response_class=HTMLResponse)
-async def payments(request: Request, page: int = 0):
+async def payments(
+    request: Request,
+    page: int = 0,
+    q: str = "",
+    status_filter: str = "",
+    kind: str = "",
+):
     if require_session(request) is None:
         return login_redirect(request)
 
@@ -195,6 +201,9 @@ async def payments(request: Request, page: int = 0):
         rows, total = await WebAdminRepository(session).payments(
             page=page,
             page_size=page_size,
+            query=q,
+            status=status_filter,
+            kind=kind,
         )
 
     return templates.TemplateResponse(
@@ -208,6 +217,36 @@ async def payments(request: Request, page: int = 0):
             page=page,
             pages=max(ceil(total / page_size), 1),
             total=total,
+            q=q,
+            status_filter=status_filter,
+            kind=kind,
+        ),
+    )
+
+
+@router.get("/payments/{attempt_id}", response_class=HTMLResponse)
+async def payment_details(request: Request, attempt_id: int):
+    if require_session(request) is None:
+        return login_redirect(request)
+
+    async with SessionFactory() as session:
+        row = await WebAdminRepository(session).payment_details(attempt_id)
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Payment attempt not found")
+
+    attempt, subscription, user, payment_method = row
+    return templates.TemplateResponse(
+        request=request,
+        name="payment_details.html",
+        context=page_context(
+            request,
+            title=f"Платёж #{attempt.id}",
+            section="payments",
+            attempt=attempt,
+            subscription=subscription,
+            user=user,
+            payment_method=payment_method,
         ),
     )
 

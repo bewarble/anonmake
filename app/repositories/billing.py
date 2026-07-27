@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.billing import PaymentAttempt, PaymentMethod, Subscription
@@ -48,6 +48,66 @@ class BillingRepository:
         )
         return list(result.scalars())
 
+
+    async def due_subscription_ids(
+        self,
+        now: datetime,
+        *,
+        limit: int = 100,
+    ) -> list[int]:
+        result = await self.session.execute(
+            select(Subscription.id)
+            .where(
+                Subscription.auto_renew.is_(True),
+                Subscription.next_charge_at.is_not(None),
+                Subscription.next_charge_at <= now,
+                Subscription.status.not_in(
+                    (
+                        "cancelled",
+                        "cancelled_active",
+                        "expired",
+                        "payment_method_blocked",
+                    )
+                ),
+            )
+            .order_by(Subscription.next_charge_at, Subscription.id)
+            .limit(limit)
+        )
+        return list(result.scalars())
+
+    async def try_subscription_lock(self, subscription_id: int) -> bool:
+        bind = self.session.get_bind()
+        if bind.dialect.name != "postgresql":
+            return True
+        value = await self.session.scalar(
+            text("SELECT pg_try_advisory_lock(:key)"),
+            {"key": int(subscription_id)},
+        )
+        return bool(value)
+
+    async def release_subscription_lock(self, subscription_id: int) -> None:
+        bind = self.session.get_bind()
+        if bind.dialect.name != "postgresql":
+            return
+        await self.session.execute(
+            text("SELECT pg_advisory_unlock(:key)"),
+            {"key": int(subscription_id)},
+        )
+
+    async def expire_finished_access(self, now: datetime) -> int:
+        result = await self.session.execute(
+            update(Subscription)
+            .where(
+                Subscription.auto_renew.is_(False),
+                Subscription.access_until.is_not(None),
+                Subscription.access_until <= now,
+                Subscription.status.in_(("cancelled_active", "past_due")),
+            )
+            .values(status="expired", next_charge_at=None)
+        )
+        await self.session.commit()
+        return int(result.rowcount or 0)
+
     async def attempt(
         self, subscription_id: int, cycle: str, kind: str
     ) -> PaymentAttempt | None:
@@ -70,5 +130,25 @@ class BillingRepository:
         subscription.auto_renew = False
         subscription.next_charge_at = None
         subscription.cancelled_at = cancelled_at
+        subscription.status = (
+            "cancelled_active"
+            if subscription.access_until is not None
+            and subscription.access_until > cancelled_at
+            else "expired"
+        )
         await self.session.flush()
         return subscription
+
+    async def attempt_by_operation_id(
+        self,
+        customer_operation_id: str,
+        *,
+        for_update: bool = False,
+    ) -> PaymentAttempt | None:
+        statement = select(PaymentAttempt).where(
+            PaymentAttempt.customer_operation_id == customer_operation_id
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        result = await self.session.execute(statement)
+        return result.scalar_one_or_none()

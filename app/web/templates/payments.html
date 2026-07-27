@@ -1,21 +1,50 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="panel">
-  <div class="panel-header"><div><h2>Платежи</h2><p>Всего попыток: {{ total }}</p></div></div>
+  <div class="panel-header">
+    <div><h2>Платежи</h2><p>Всего попыток: {{ total }}</p></div>
+  </div>
+
+  <form class="filters" method="get" action="/admin/payments">
+    <input name="q" value="{{ q }}" placeholder="Telegram ID, username, operation, transaction, binding">
+    <select name="status_filter">
+      <option value="">Все статусы</option>
+      {% for value in ["success", "insufficient_funds", "pending", "failed"] %}
+        <option value="{{ value }}" {{ "selected" if status_filter == value else "" }}>{{ value }}</option>
+      {% endfor %}
+    </select>
+    <select name="kind">
+      <option value="">Все типы</option>
+      {% for value in ["trial", "primary", "fallback", "test_primary", "test_fallback"] %}
+        <option value="{{ value }}" {{ "selected" if kind == value else "" }}>{{ value }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Применить</button>
+    <a class="button secondary" href="/admin/payments">Сбросить</a>
+  </form>
+
   <div class="table-wrap">
     <table>
-      <thead><tr><th>ID</th><th>Пользователь</th><th>Тип</th><th>Сумма</th><th>Статус</th><th>Создан</th></tr></thead>
-      <tbody>
-      {% for attempt, subscription, user in rows %}
+      <thead>
         <tr>
-          <td>#{{ attempt.id }}</td>
+          <th>ID</th><th>Пользователь</th><th>Тип</th><th>Сумма</th>
+          <th>Статус</th><th>Ошибка</th><th>Создан</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for attempt, subscription, user, payment_method in rows %}
+        <tr>
+          <td><a href="/admin/payments/{{ attempt.id }}">#{{ attempt.id }}</a></td>
           <td><a href="/admin/users/{{ user.id }}">{{ '@' + user.username if user.username else user.telegram_id }}</a></td>
           <td>{{ attempt.attempt_kind }}</td>
           <td>{{ money(attempt.amount_kopecks) }} ₽</td>
           <td><span class="badge {{ attempt.status }}">{{ attempt.status }}</span></td>
+          <td title="{{ attempt.error_message or '' }}">{{ attempt.error_code or '—' }}</td>
           <td>{{ attempt.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
         </tr>
-      {% else %}<tr><td colspan="6" class="empty">Платежей пока нет</td></tr>{% endfor %}
+      {% else %}
+        <tr><td colspan="7" class="empty">Платежи не найдены</td></tr>
+      {% endfor %}
       </tbody>
     </table>
   </div>

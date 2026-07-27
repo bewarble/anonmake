@@ -26,23 +26,14 @@ async def main() -> None:
     client = ImpayaClient(
         settings.impaya_api_url,
         settings.impaya_api_token,
-        (
-            settings.impaya_binding_terminal_name
-            or settings.impaya_terminal_name
-        ),
+        settings.impaya_terminal_name,
         auth_header=settings.impaya_auth_header,
         auth_prefix=settings.impaya_auth_prefix,
         protocol_version=settings.impaya_protocol_version,
-        recurrent_terminal_name=(
-            settings.impaya_recurrent_terminal_name
-            or settings.impaya_terminal_name
-        ),
     )
     worker = BillingWorker(
         client,
         interval_seconds=settings.billing_worker_interval_seconds,
-        automatic_charges_enabled=settings.billing_automatic_charges_enabled,
-        batch_size=settings.billing_worker_batch_size,
         trial_amount=settings.trial_price_kopecks,
         trial_duration=timedelta(hours=settings.trial_duration_hours),
         primary_amount=settings.primary_price_kopecks,

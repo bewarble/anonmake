@@ -23,6 +23,7 @@ from app.database.session import (
 from app.repositories.reveals import RevealRepository
 from app.services.impaya import ImpayaClient
 from app.services.payment_notifications import finalize_checkout_and_notify
+from app.web.subscription_payments import finalize_subscription_payment
 
 
 logger = logging.getLogger(__name__)
@@ -50,10 +51,17 @@ def make_impaya_client() -> ImpayaClient:
     return ImpayaClient(
         settings.impaya_api_url,
         settings.impaya_api_token,
-        settings.impaya_terminal_name,
+        (
+            settings.impaya_binding_terminal_name
+            or settings.impaya_terminal_name
+        ),
         auth_header=settings.impaya_auth_header,
         auth_prefix=settings.impaya_auth_prefix,
         protocol_version=settings.impaya_protocol_version,
+        recurrent_terminal_name=(
+            settings.impaya_recurrent_terminal_name
+            or settings.impaya_terminal_name
+        ),
     )
 
 
@@ -62,12 +70,10 @@ def verify_webhook_secret(received: str | None) -> None:
         raise HTTPException(status_code=503, detail="Billing is disabled")
 
     expected = settings.impaya_webhook_secret.strip()
-    if not expected:
-        raise HTTPException(
-            status_code=503,
-            detail="Webhook secret is not configured",
-        )
-    if received is None or not hmac.compare_digest(received, expected):
+    if expected and (
+        received is None
+        or not hmac.compare_digest(received, expected)
+    ):
         raise HTTPException(status_code=401, detail="Invalid webhook secret")
 
 
@@ -209,7 +215,11 @@ async def impaya_webhook(
                 for_update=True,
             )
             if checkout is None:
-                return {"status": "ignored"}
+                result = await finalize_subscription_payment(
+                    str(operation_id),
+                    notify=True,
+                )
+                return {"status": result}
 
             result = await finalize_checkout_and_notify(
                 session,
@@ -224,6 +234,20 @@ async def impaya_webhook(
     finally:
         await client.close()
         await bot.session.close()
+
+# Begin Stage 30 subscription payment routes.
+from app.web import subscription_payments as subscription_payments_module  # noqa: E402
+
+for subscription_payment_route in subscription_payments_module.router.routes:
+    route_path = getattr(subscription_payment_route, "path", None)
+    route_methods = getattr(subscription_payment_route, "methods", None)
+    if not any(
+        getattr(existing, "path", None) == route_path
+        and getattr(existing, "methods", None) == route_methods
+        for existing in app.router.routes
+    ):
+        app.router.routes.append(subscription_payment_route)
+# End Stage 30 subscription payment routes.
 
 # Register the admin router after all modules and routes are initialized.
 

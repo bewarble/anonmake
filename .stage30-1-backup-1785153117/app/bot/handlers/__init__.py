@@ -1,13 +1,10 @@
 from aiogram import Router
 
-from app.core.config import load_settings
-
 from app.bot.handlers.admin_marketing import router as admin_marketing_router
 from app.bot.handlers.admin_stage25_1 import router as admin_router
 from app.bot.handlers.answers import router as answers_router
 from app.bot.handlers.errors import router as errors_router
 from app.bot.handlers.questions import router as questions_router
-from app.bot.handlers.recurrent_test import router as recurrent_test_router
 from app.bot.handlers.payments import router as payments_router
 from app.bot.handlers.reveals import router as reveals_router
 from app.bot.handlers.source_management import router as source_management_router
@@ -27,11 +24,7 @@ def build_router() -> Router:
     router.include_router(start_marketing_router)
     router.include_router(start_router)
     router.include_router(subscriptions_router)
-
-    if load_settings().payment_test_commands_enabled:
-        router.include_router(payments_router)
-        router.include_router(recurrent_test_router)
-
+    router.include_router(payments_router)
     router.include_router(questions_router)
     router.include_router(reveals_router)
     router.include_router(answers_router)

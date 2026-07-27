@@ -1,0 +1,20 @@
+.filters {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) repeat(2, minmax(150px, 220px)) auto auto;
+  gap: 10px;
+  margin: 18px 0;
+  align-items: center;
+}
+.filters input, .filters select { width: 100%; }
+.code-block {
+  max-height: 520px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: 14px;
+  padding: 16px;
+  background: rgba(0, 0, 0, .22);
+}
+@media (max-width: 900px) {
+  .filters { grid-template-columns: 1fr; }
+}

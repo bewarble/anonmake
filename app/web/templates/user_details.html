@@ -18,10 +18,38 @@
       <div><dt>Статус</dt><dd>{{ details.subscription.status if details.subscription else 'нет' }}</dd></div>
       <div><dt>Доступ до</dt><dd>{{ details.subscription.access_until.strftime('%d.%m.%Y %H:%M') if details.subscription and details.subscription.access_until else '—' }}</dd></div>
       <div><dt>Автопродление</dt><dd>{{ 'Да' if details.subscription and details.subscription.auto_renew else 'Нет' }}</dd></div>
+      <div><dt>Следующее списание</dt><dd>{{ details.subscription.next_charge_at.strftime('%d.%m.%Y %H:%M') if details.subscription and details.subscription.next_charge_at else '—' }}</dd></div>
+      <div><dt>Последний тариф</dt><dd>{{ details.subscription.last_successful_plan if details.subscription and details.subscription.last_successful_plan else '—' }}</dd></div>
       <div><dt>Карта</dt><dd>{{ details.payment_method.masked_pan if details.payment_method and details.payment_method.masked_pan else '—' }}</dd></div>
+      <div><dt>Binding ID</dt><dd><code>{{ details.payment_method.binding_id if details.payment_method and details.payment_method.binding_id else '—' }}</code></dd></div>
+      <div><dt>Merchant User ID</dt><dd><code>{{ details.payment_method.merchant_user_id if details.payment_method else '—' }}</code></dd></div>
       <div><dt>Рекуррентная</dt><dd>{{ 'Да' if details.payment_method and details.payment_method.is_recurrent else 'Нет' }}</dd></div>
       <div><dt>Заблокирована</dt><dd>{{ 'Да' if details.payment_method and details.payment_method.blocked_at else 'Нет' }}</dd></div>
     </dl>
+  </article>
+</section>
+<section class="profile-grid">
+  <article class="panel">
+    <div class="panel-header"><h2>Последняя успешная оплата</h2></div>
+    {% if details.last_successful_payment %}
+      <dl class="details">
+        <div><dt>ID</dt><dd><a href="/admin/payments/{{ details.last_successful_payment.id }}">#{{ details.last_successful_payment.id }}</a></dd></div>
+        <div><dt>Тип</dt><dd>{{ details.last_successful_payment.attempt_kind }}</dd></div>
+        <div><dt>Сумма</dt><dd>{{ money(details.last_successful_payment.amount_kopecks) }} ₽</dd></div>
+        <div><dt>Дата</dt><dd>{{ details.last_successful_payment.completed_at or details.last_successful_payment.created_at }}</dd></div>
+      </dl>
+    {% else %}<p class="empty">Успешных оплат нет</p>{% endif %}
+  </article>
+  <article class="panel">
+    <div class="panel-header"><h2>Последняя проблема оплаты</h2></div>
+    {% if details.last_failed_payment %}
+      <dl class="details">
+        <div><dt>ID</dt><dd><a href="/admin/payments/{{ details.last_failed_payment.id }}">#{{ details.last_failed_payment.id }}</a></dd></div>
+        <div><dt>Статус</dt><dd>{{ details.last_failed_payment.status }}</dd></div>
+        <div><dt>Код</dt><dd>{{ details.last_failed_payment.error_code or '—' }}</dd></div>
+        <div><dt>Описание</dt><dd>{{ details.last_failed_payment.error_message or '—' }}</dd></div>
+      </dl>
+    {% else %}<p class="empty">Ошибок оплаты нет</p>{% endif %}
   </article>
 </section>
 <section class="metrics compact">

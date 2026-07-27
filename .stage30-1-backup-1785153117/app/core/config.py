@@ -77,9 +77,6 @@ class Settings(BaseSettings):
         ge=5,
         alias="BILLING_WORKER_INTERVAL_SECONDS",
     )
-    billing_automatic_charges_enabled: bool = Field(default=False, alias="BILLING_AUTOMATIC_CHARGES_ENABLED")
-    billing_worker_batch_size: int = Field(default=100, ge=1, le=1000, alias="BILLING_WORKER_BATCH_SIZE")
-    payment_test_commands_enabled: bool = Field(default=False, alias="PAYMENT_TEST_COMMANDS_ENABLED")
     trial_price_kopecks: int = Field(default=100, ge=1, alias="TRIAL_PRICE_KOPECKS")
     trial_duration_hours: int = Field(default=24, ge=1, alias="TRIAL_DURATION_HOURS")
     primary_price_kopecks: int = Field(default=29900, ge=1, alias="PRIMARY_PRICE_KOPECKS")
@@ -100,15 +97,6 @@ class Settings(BaseSettings):
         default="evocloud.su_3ds_test",
         alias="IMPAYA_TERMINAL_NAME",
     )
-    impaya_binding_terminal_name: str = Field(
-        default="",
-        alias="IMPAYA_BINDING_TERMINAL_NAME",
-    )
-    impaya_recurrent_terminal_name: str = Field(
-        default="",
-        alias="IMPAYA_RECURRENT_TERMINAL_NAME",
-    )
-
     impaya_payment_form_url_template: str = Field(
         default="",
         alias="IMPAYA_PAYMENT_FORM_URL_TEMPLATE",

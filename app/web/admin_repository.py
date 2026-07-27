@@ -61,6 +61,8 @@ class UserDetails:
     successful_payments: int
     revenue_kopecks: int
     reveals: int
+    last_successful_payment: PaymentAttempt | None
+    last_failed_payment: PaymentAttempt | None
 
 
 @dataclass(slots=True, frozen=True)
@@ -320,6 +322,30 @@ class WebAdminRepository:
             successful_payments=successful_payments,
             revenue_kopecks=revenue_kopecks,
             reveals=reveals,
+            last_successful_payment=await self.session.scalar(
+                select(PaymentAttempt)
+                .where(
+                    PaymentAttempt.subscription_id == (
+                        subscription.id if subscription else -1
+                    ),
+                    PaymentAttempt.status == "success",
+                )
+                .order_by(PaymentAttempt.id.desc())
+                .limit(1)
+            ),
+            last_failed_payment=await self.session.scalar(
+                select(PaymentAttempt)
+                .where(
+                    PaymentAttempt.subscription_id == (
+                        subscription.id if subscription else -1
+                    ),
+                    PaymentAttempt.status.in_(
+                        ("failed", "insufficient_funds", "pending")
+                    ),
+                )
+                .order_by(PaymentAttempt.id.desc())
+                .limit(1)
+            ),
         )
 
     async def payments(
@@ -327,20 +353,79 @@ class WebAdminRepository:
         *,
         page: int,
         page_size: int,
+        query: str = "",
+        status: str = "",
+        kind: str = "",
     ):
-        total = await self._count(PaymentAttempt)
+        filters = []
+        cleaned = query.strip().lstrip("@")
+        if cleaned:
+            pattern = f"%{cleaned}%"
+            if cleaned.isdigit():
+                numeric = int(cleaned)
+                filters.append(
+                    or_(
+                        User.telegram_id == numeric,
+                        User.id == numeric,
+                        PaymentAttempt.id == numeric,
+                    )
+                )
+            else:
+                filters.append(
+                    or_(
+                        User.username.ilike(pattern),
+                        PaymentAttempt.customer_operation_id.ilike(pattern),
+                        PaymentAttempt.transaction_id.ilike(pattern),
+                        PaymentMethod.binding_id.ilike(pattern),
+                    )
+                )
+
+        if status:
+            filters.append(PaymentAttempt.status == status)
+        if kind:
+            filters.append(PaymentAttempt.attempt_kind == kind)
+
+        total = int(
+            await self.session.scalar(
+                select(func.count(PaymentAttempt.id))
+                .join(
+                    Subscription,
+                    PaymentAttempt.subscription_id == Subscription.id,
+                )
+                .join(User, Subscription.user_id == User.id)
+                .outerjoin(PaymentMethod, PaymentMethod.user_id == User.id)
+                .where(*filters)
+            )
+            or 0
+        )
+
         result = await self.session.execute(
-            select(PaymentAttempt, Subscription, User)
+            select(PaymentAttempt, Subscription, User, PaymentMethod)
             .join(
                 Subscription,
                 PaymentAttempt.subscription_id == Subscription.id,
             )
             .join(User, Subscription.user_id == User.id)
+            .outerjoin(PaymentMethod, PaymentMethod.user_id == User.id)
+            .where(*filters)
             .order_by(PaymentAttempt.id.desc())
             .offset(page * page_size)
             .limit(page_size)
         )
         return result.all(), total
+
+    async def payment_details(self, attempt_id: int):
+        result = await self.session.execute(
+            select(PaymentAttempt, Subscription, User, PaymentMethod)
+            .join(
+                Subscription,
+                PaymentAttempt.subscription_id == Subscription.id,
+            )
+            .join(User, Subscription.user_id == User.id)
+            .outerjoin(PaymentMethod, PaymentMethod.user_id == User.id)
+            .where(PaymentAttempt.id == attempt_id)
+        )
+        return result.one_or_none()
 
     async def sources(self) -> list[SourceRow]:
         users_count = func.count(SourceAttribution.id).label("users_count")
