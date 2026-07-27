@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <div class="panel-header"><div><h2>Журнал действий</h2><p>Всего записей: {{ total }}</p></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Дата</th><th>Администратор</th><th>Действие</th><th>Объект</th><th>Детали</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>{{ row.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td>{{ row.admin_telegram_id }}</td><td>{{ row.action }}</td>
+          <td>{{ row.target or '—' }}</td><td>{{ row.details or '—' }}</td>
+        </tr>
+      {% else %}<tr><td colspan="5" class="empty">Журнал пуст</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "pagination.html" %}
+</section>
+{% endblock %}

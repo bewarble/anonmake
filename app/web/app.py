@@ -1,35 +1,44 @@
 from __future__ import annotations
 
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from fastapi.responses import Response
-
 import hmac
 import logging
+from pathlib import Path
 from typing import Any
 
 from aiogram import Bot
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
+from fastapi.staticfiles import StaticFiles
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 
 from app.core.config import load_settings
-from app.database.session import SessionFactory, close_database, engine, init_database
+from app.database.session import (
+    SessionFactory,
+    close_database,
+    engine,
+    init_database,
+)
 from app.repositories.reveals import RevealRepository
 from app.services.impaya import ImpayaClient
 from app.services.payment_notifications import finalize_checkout_and_notify
 
+
 logger = logging.getLogger(__name__)
 settings = load_settings()
-app = FastAPI(title="AnonMake payments", version="5.2")
+WEB_DIR = Path(__file__).resolve().parent
+
+app = FastAPI(title="AnonMake", version="26.1")
+app.mount(
+    "/admin/static",
+    StaticFiles(directory=str(WEB_DIR / "static")),
+    name="admin-static",
+)
 
 
 class WebhookPayload(BaseModel):
-    """Tolerant payload model.
-
-    Impaya callback fields can evolve. We only use identifiers to locate the
-    checkout, then obtain the authoritative transaction state from Impaya.
-    """
+    """Tolerant callback payload; transaction state is verified with Impaya."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -72,7 +81,6 @@ async def shutdown() -> None:
     await close_database()
 
 
-
 @app.get("/metrics", include_in_schema=False)
 async def metrics() -> Response:
     return Response(
@@ -88,7 +96,10 @@ async def health() -> dict[str, str]:
             value = await connection.scalar(text("SELECT 1"))
     except Exception as exc:
         logger.exception("Database healthcheck failed")
-        raise HTTPException(status_code=503, detail="Database unavailable") from exc
+        raise HTTPException(
+            status_code=503,
+            detail="Database unavailable",
+        ) from exc
 
     if value != 1:
         raise HTTPException(status_code=503, detail="Database unhealthy")
@@ -131,12 +142,12 @@ async def payment_success(checkout_token: str) -> HTMLResponse:
     if result in {"notified", "already_notified"}:
         body = (
             "<h1>Оплата подтверждена</h1>"
-            "<p>VIP активирован. Отправитель уже отправлен вам в Telegram.</p>"
+            "<p>VIP активирован. Результат отправлен в Telegram.</p>"
         )
     elif result == "pending":
         body = (
             "<h1>Платёж обрабатывается</h1>"
-            "<p>Бот автоматически пришлёт результат после подтверждения оплаты.</p>"
+            "<p>Бот автоматически пришлёт результат после подтверждения.</p>"
         )
     else:
         body = (
@@ -159,7 +170,7 @@ async def payment_fail(checkout_token: str) -> HTMLResponse:
         "<!doctype html><html lang='ru'><meta charset='utf-8'>"
         "<title>AnonMake</title><body>"
         "<h1>Оплата не завершена</h1>"
-        "<p>Вы можете закрыть страницу и повторить попытку в Telegram.</p>"
+        "<p>Закройте страницу и повторите попытку в Telegram.</p>"
         "</body></html>"
     )
 
@@ -198,8 +209,6 @@ async def impaya_webhook(
                 for_update=True,
             )
             if checkout is None:
-                # Unknown notifications are acknowledged so provider retries do
-                # not create an endless loop.
                 return {"status": "ignored"}
 
             result = await finalize_checkout_and_notify(
@@ -215,3 +224,15 @@ async def impaya_webhook(
     finally:
         await client.close()
         await bot.session.close()
+
+# Register the admin router after all modules and routes are initialized.
+
+
+# Import the completed admin module only after the main application
+# and payment routes have been declared.
+from app.web import admin as admin_module  # noqa: E402
+
+# APIRouter routes are copied explicitly to avoid circular-import timing.
+for admin_route in admin_module.router.routes:
+    if admin_route not in app.router.routes:
+        app.router.routes.append(admin_route)

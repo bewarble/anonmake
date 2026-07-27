@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ title }} · AnonMake</title>
+  <link rel="stylesheet" href="/admin/static/admin.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/admin">
+        <span class="brand-mark">A</span>
+        <span>AnonMake</span>
+      </a>
+      <nav>
+        <a class="{{ 'active' if section == 'dashboard' else '' }}" href="/admin">Обзор</a>
+        <a class="{{ 'active' if section == 'users' else '' }}" href="/admin/users">Пользователи</a>
+        <a class="{{ 'active' if section == 'payments' else '' }}" href="/admin/payments">Платежи</a>
+        <a class="{{ 'active' if section == 'sources' else '' }}" href="/admin/sources">Источники</a>
+        <a class="{{ 'active' if section == 'delivery' else '' }}" href="/admin/delivery">Доставка</a>
+        <a class="{{ 'active' if section == 'audit' else '' }}" href="/admin/audit">Журнал</a>
+      </nav>
+      <form method="post" action="/admin/logout">
+        <button class="logout" type="submit">Выйти</button>
+      </form>
+    </aside>
+    <main class="content">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Веб-админка</p>
+          <h1>{{ title }}</h1>
+        </div>
+      </header>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

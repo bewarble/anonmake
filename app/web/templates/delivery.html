@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <div class="panel-header"><div><h2>Очередь доставки</h2><p>Всего записей: {{ total }}</p></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>Тип</th><th>Chat ID</th><th>Статус</th><th>Попытки</th><th>Ошибка</th><th>Создано</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>#{{ row.id }}</td><td>{{ row.kind }}</td><td>{{ row.chat_id }}</td>
+          <td><span class="badge {{ row.status }}">{{ row.status }}</span></td>
+          <td>{{ row.attempts }}</td><td class="error-text">{{ row.last_error or '—' }}</td>
+          <td>{{ row.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+        </tr>
+      {% else %}<tr><td colspan="7" class="empty">Очередь пуста</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "pagination.html" %}
+</section>
+{% endblock %}

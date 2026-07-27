@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <form class="toolbar" method="get">
+    <input name="q" value="{{ q }}" placeholder="ID, Telegram ID, username или имя">
+    <button class="primary" type="submit">Найти</button>
+  </form>
+  <div class="panel-header"><div><h2>Пользователи</h2><p>Найдено: {{ total }}</p></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>Telegram</th><th>Пользователь</th><th>VIP до</th><th>Источник</th><th>Регистрация</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td><a href="/admin/users/{{ row.id }}">#{{ row.id }}</a></td>
+          <td>{{ row.telegram_id }}</td>
+          <td><strong>{{ row.first_name }}</strong><small>{{ '@' + row.username if row.username else 'без username' }}</small></td>
+          <td>{{ row.vip_until.strftime('%d.%m.%Y %H:%M') if row.vip_until else '—' }}</td>
+          <td>{{ row.source_name or 'Органика' }}</td>
+          <td>{{ row.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+        </tr>
+      {% else %}<tr><td colspan="6" class="empty">Ничего не найдено</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "pagination.html" %}
+</section>
+{% endblock %}

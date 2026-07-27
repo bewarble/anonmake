@@ -297,3 +297,5 @@ anonmake-stage-*.zip.sha256
 .stage*-install/
 .audit-cleanup-backup/
 .audit-reaudit-backup/
+
+.stage26-1-backup-*/

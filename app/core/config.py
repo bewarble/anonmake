@@ -28,6 +28,33 @@ class Settings(BaseSettings):
 
     admin_ids: str = Field(default="", alias="ADMIN_IDS")
 
+    web_admin_enabled: bool = Field(
+        default=False,
+        alias="WEB_ADMIN_ENABLED",
+    )
+    web_admin_username: str = Field(
+        default="",
+        alias="WEB_ADMIN_USERNAME",
+    )
+    web_admin_password: str = Field(
+        default="",
+        alias="WEB_ADMIN_PASSWORD",
+    )
+    web_admin_secret: str = Field(
+        default="",
+        alias="WEB_ADMIN_SECRET",
+    )
+    web_admin_session_minutes: int = Field(
+        default=480,
+        ge=5,
+        le=10080,
+        alias="WEB_ADMIN_SESSION_MINUTES",
+    )
+    web_admin_secure_cookie: bool = Field(
+        default=True,
+        alias="WEB_ADMIN_SECURE_COOKIE",
+    )
+
     abuse_guard_enabled: bool = Field(default=True, alias="ABUSE_GUARD_ENABLED")
     question_burst_limit: int = Field(default=4, alias="QUESTION_BURST_LIMIT")
     question_burst_window_seconds: int = Field(
@@ -46,40 +73,13 @@ class Settings(BaseSettings):
         ge=5,
         alias="BILLING_WORKER_INTERVAL_SECONDS",
     )
-    trial_price_kopecks: int = Field(
-        default=100,
-        ge=1,
-        alias="TRIAL_PRICE_KOPECKS",
-    )
-    trial_duration_hours: int = Field(
-        default=24,
-        ge=1,
-        alias="TRIAL_DURATION_HOURS",
-    )
-    primary_price_kopecks: int = Field(
-        default=29900,
-        ge=1,
-        alias="PRIMARY_PRICE_KOPECKS",
-    )
-    primary_duration_days: int = Field(
-        default=3,
-        ge=1,
-        alias="PRIMARY_DURATION_DAYS",
-    )
-    fallback_price_kopecks: int = Field(
-        default=9900,
-        ge=1,
-        alias="FALLBACK_PRICE_KOPECKS",
-    )
-    fallback_duration_days: int = Field(
-        default=1,
-        ge=1,
-        alias="FALLBACK_DURATION_DAYS",
-    )
-    trial_attempt_kinds: str = Field(
-        default="trial",
-        alias="TRIAL_ATTEMPT_KINDS",
-    )
+    trial_price_kopecks: int = Field(default=100, ge=1, alias="TRIAL_PRICE_KOPECKS")
+    trial_duration_hours: int = Field(default=24, ge=1, alias="TRIAL_DURATION_HOURS")
+    primary_price_kopecks: int = Field(default=29900, ge=1, alias="PRIMARY_PRICE_KOPECKS")
+    primary_duration_days: int = Field(default=3, ge=1, alias="PRIMARY_DURATION_DAYS")
+    fallback_price_kopecks: int = Field(default=9900, ge=1, alias="FALLBACK_PRICE_KOPECKS")
+    fallback_duration_days: int = Field(default=1, ge=1, alias="FALLBACK_DURATION_DAYS")
+    trial_attempt_kinds: str = Field(default="trial", alias="TRIAL_ATTEMPT_KINDS")
 
     impaya_api_url: str = Field(
         default="https://ag-stage.impaya.ru",

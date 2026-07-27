@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="metrics">
+  <article><span>Пользователи</span><strong>{{ data.users_total }}</strong><small>+{{ data.users_today }} за 24 часа</small></article>
+  <article><span>Живые</span><strong>{{ data.users_total - data.users_dead }}</strong><small>{{ data.users_dead }} мёртвых</small></article>
+  <article><span>VIP</span><strong>{{ data.active_vip }}</strong><small>{{ data.active_cards }} активных карт</small></article>
+  <article><span>Доход сегодня</span><strong>{{ money(data.revenue_today_kopecks) }} ₽</strong><small>{{ money(data.revenue_total_kopecks) }} ₽ за всё время</small></article>
+  <article><span>Сообщения</span><strong>{{ data.questions_today }}</strong><small>{{ data.answers_today }} ответов за 24 часа</small></article>
+  <article><span>Доставка</span><strong>{{ data.delivery_pending }}</strong><small>{{ data.delivery_failed }} ошибок</small></article>
+</section>
+<section class="panel">
+  <div class="panel-header"><div><h2>Оперативный статус</h2><p>Ключевые показатели проекта.</p></div></div>
+  <div class="status-grid">
+    <div><span>Активных источников</span><strong>{{ data.active_sources }}</strong></div>
+    <div><span>Очередь доставки</span><strong>{{ data.delivery_pending }}</strong></div>
+    <div><span>Ошибки доставки</span><strong>{{ data.delivery_failed }}</strong></div>
+    <div><span>Активные карты</span><strong>{{ data.active_cards }}</strong></div>
+  </div>
+</section>
+{% endblock %}

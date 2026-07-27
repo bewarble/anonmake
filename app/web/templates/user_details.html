@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="profile-grid">
+  <article class="panel">
+    <div class="panel-header"><h2>Профиль</h2></div>
+    <dl class="details">
+      <div><dt>Внутренний ID</dt><dd>{{ details.user.id }}</dd></div>
+      <div><dt>Telegram ID</dt><dd>{{ details.user.telegram_id }}</dd></div>
+      <div><dt>Username</dt><dd>{{ '@' + details.user.username if details.user.username else '—' }}</dd></div>
+      <div><dt>Имя</dt><dd>{{ details.user.first_name }} {{ details.user.last_name or '' }}</dd></div>
+      <div><dt>Источник</dt><dd>{{ details.source.name if details.source else 'Органика' }}</dd></div>
+      <div><dt>Регистрация</dt><dd>{{ details.user.created_at.strftime('%d.%m.%Y %H:%M') }}</dd></div>
+    </dl>
+  </article>
+  <article class="panel">
+    <div class="panel-header"><h2>Подписка</h2></div>
+    <dl class="details">
+      <div><dt>Статус</dt><dd>{{ details.subscription.status if details.subscription else 'нет' }}</dd></div>
+      <div><dt>Доступ до</dt><dd>{{ details.subscription.access_until.strftime('%d.%m.%Y %H:%M') if details.subscription and details.subscription.access_until else '—' }}</dd></div>
+      <div><dt>Автопродление</dt><dd>{{ 'Да' if details.subscription and details.subscription.auto_renew else 'Нет' }}</dd></div>
+      <div><dt>Карта</dt><dd>{{ details.payment_method.masked_pan if details.payment_method and details.payment_method.masked_pan else '—' }}</dd></div>
+      <div><dt>Рекуррентная</dt><dd>{{ 'Да' if details.payment_method and details.payment_method.is_recurrent else 'Нет' }}</dd></div>
+      <div><dt>Заблокирована</dt><dd>{{ 'Да' if details.payment_method and details.payment_method.blocked_at else 'Нет' }}</dd></div>
+    </dl>
+  </article>
+</section>
+<section class="metrics compact">
+  <article><span>Отправлено</span><strong>{{ details.sent_questions }}</strong></article>
+  <article><span>Получено</span><strong>{{ details.received_questions }}</strong></article>
+  <article><span>Ответов</span><strong>{{ details.answers }}</strong></article>
+  <article><span>Оплат</span><strong>{{ details.successful_payments }}</strong></article>
+  <article><span>Выручка</span><strong>{{ money(details.revenue_kopecks) }} ₽</strong></article>
+  <article><span>Раскрытий</span><strong>{{ details.reveals }}</strong></article>
+</section>
+{% endblock %}
