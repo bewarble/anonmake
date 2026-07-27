@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <div class="panel-header"><div><h2>Рассылки</h2><p>Всего кампаний: {{ total }}</p></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>Аудитория</th><th>Статус</th><th>В очереди</th><th>Текст</th><th>Создано</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr><td>#{{ row.id }}</td><td>{{ row.audience }}</td><td><span class="badge {{ row.status }}">{{ row.status }}</span></td><td>{{ row.queued_count }}</td><td class="message-preview">{{ row.text }}</td><td>{{ row.created_at.strftime('%d.%m.%Y %H:%M') }}</td></tr>
+      {% else %}<tr><td colspan="6" class="empty">Рассылок пока нет</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "pagination.html" %}
+</section>
+{% endblock %}

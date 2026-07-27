@@ -1,0 +1,12 @@
+.analytics-periods{max-width:100%;overflow-x:auto;scrollbar-width:none}.analytics-periods::-webkit-scrollbar{display:none}
+.broadcast-layout{grid-template-columns:minmax(0,1.25fr) minmax(340px,.85fr)}
+.campaigns-panel{min-width:0}.campaign-count{display:grid;place-items:center;min-width:34px;height:34px;padding:0 9px;border-radius:999px;background:var(--surface-3);color:var(--text);font-weight:800}
+.campaign-list{display:grid;gap:11px}.campaign-card{display:grid;gap:12px;padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+.campaign-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.campaign-head>div{display:grid;gap:4px}.campaign-audience{color:var(--muted);font-size:12px}
+.campaign-status{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap}.status-queued{background:rgba(139,124,255,.13);color:#b8afff}.status-processing{background:rgba(85,216,255,.12);color:var(--cyan)}.status-completed{background:rgba(82,211,167,.12);color:var(--green)}.status-failed{background:rgba(255,113,133,.12);color:var(--red)}
+.campaign-text{margin:0;color:var(--text);line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.campaign-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px}.campaign-meta div{display:grid;gap:3px;padding:9px;border-radius:9px;background:var(--surface)}.campaign-meta span{color:var(--muted);font-size:11px}.campaign-meta strong{font-size:13px}
+.campaign-progress{height:4px;border-radius:99px;background:var(--surface);overflow:hidden}.campaign-progress i{display:block;width:38%;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--purple),var(--cyan));animation:campaign-loading 1.3s ease-in-out infinite alternate}
+@keyframes campaign-loading{from{transform:translateX(-30%)}to{transform:translateX(190%)}}
+@media(max-width:900px){.broadcast-layout{grid-template-columns:1fr}}
+@media(max-width:760px){.analytics-toolbar{align-items:stretch}.analytics-periods a{min-width:96px}.campaign-head{align-items:flex-start;flex-direction:column}.campaign-meta{grid-template-columns:1fr 1fr}}

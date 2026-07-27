@@ -236,3 +236,77 @@ from app.web import admin as admin_module  # noqa: E402
 for admin_route in admin_module.router.routes:
     if admin_route not in app.router.routes:
         app.router.routes.append(admin_route)
+# Stage 27 CRM routes.
+
+
+# Register completed Stage 27 CRM routes.
+from app.web import admin_stage27 as admin_stage27_module  # noqa: E402
+
+for crm_route in admin_stage27_module.router.routes:
+    if not any(
+        getattr(existing, 'path', None) == getattr(crm_route, 'path', None)
+        and getattr(existing, 'methods', None) == getattr(crm_route, 'methods', None)
+        for existing in app.router.routes
+    ):
+        app.router.routes.append(crm_route)
+# End Stage 27 CRM routes.
+# Stage 28 professional web admin.
+
+
+# Begin Stage 28 route registration.
+from app.web import admin_stage28 as admin_stage28_module  # noqa: E402
+
+for stage28_route in admin_stage28_module.router.routes:
+    stage28_path = getattr(stage28_route, 'path', None)
+    stage28_methods = getattr(stage28_route, 'methods', None)
+
+    already_registered = any(
+        getattr(existing, 'path', None) == stage28_path
+        and getattr(existing, 'methods', None) == stage28_methods
+        for existing in app.router.routes
+    )
+
+    if not already_registered:
+        app.router.routes.append(stage28_route)
+# End Stage 28 route registration.
+
+# Begin Stage 28.1 route registration.
+from app.web import admin_stage28_1 as admin_stage28_1_module  # noqa: E402
+
+for stage28_1_route in admin_stage28_1_module.router.routes:
+    route_path = getattr(stage28_1_route, "path", None)
+    route_methods = getattr(stage28_1_route, "methods", None)
+    if not any(
+        getattr(existing, "path", None) == route_path
+        and getattr(existing, "methods", None) == route_methods
+        for existing in app.router.routes
+    ):
+        app.router.routes.append(stage28_1_route)
+# End Stage 28.1 route registration.
+
+# Begin Stage 29 route registration.
+from app.web import admin_stage29 as admin_stage29_module  # noqa: E402
+for stage29_route in admin_stage29_module.router.routes:
+    path = getattr(stage29_route, "path", None)
+    methods = getattr(stage29_route, "methods", None)
+    if not any(
+        getattr(existing, "path", None) == path
+        and getattr(existing, "methods", None) == methods
+        for existing in app.router.routes
+    ):
+        app.router.routes.append(stage29_route)
+# End Stage 29 route registration.
+
+# Begin Stage 29.3 route registration.
+from app.web import admin_stage29_3 as admin_stage29_3_module  # noqa: E402
+
+for stage29_3_route in admin_stage29_3_module.router.routes:
+    route_path = getattr(stage29_3_route, "path", None)
+    route_methods = getattr(stage29_3_route, "methods", None)
+    if not any(
+        getattr(existing, "path", None) == route_path
+        and getattr(existing, "methods", None) == route_methods
+        for existing in app.router.routes
+    ):
+        app.router.routes.append(stage29_3_route)
+# End Stage 29.3 route registration.

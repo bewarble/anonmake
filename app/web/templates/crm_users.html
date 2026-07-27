@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <div class="section-intro">
+    <div>
+      <h2>База пользователей</h2>
+      <p>Поиск и сегментация по подписке, доступности и источнику.</p>
+    </div>
+    <span class="result-count">{{ total }} пользователей</span>
+  </div>
+
+  <form class="filters" method="get" action="/admin/crm/users">
+    <input name="q" value="{{ q }}" placeholder="ID, Telegram ID, username или имя">
+    <select name="vip">
+      <option value="all" {{ 'selected' if vip == 'all' else '' }}>Любая подписка</option>
+      <option value="active" {{ 'selected' if vip == 'active' else '' }}>Активный VIP</option>
+      <option value="inactive" {{ 'selected' if vip == 'inactive' else '' }}>Без VIP</option>
+    </select>
+    <select name="health">
+      <option value="all" {{ 'selected' if health == 'all' else '' }}>Любой статус</option>
+      <option value="alive" {{ 'selected' if health == 'alive' else '' }}>Живые</option>
+      <option value="dead" {{ 'selected' if health == 'dead' else '' }}>Мёртвые</option>
+    </select>
+    <select name="source_id">
+      <option value="" {{ 'selected' if source_id is none else '' }}>Все источники</option>
+      {% for source in sources %}
+        <option value="{{ source.id }}" {{ 'selected' if source_id == source.id else '' }}>{{ source.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="primary" type="submit">Применить</button>
+    <a class="filter-reset" href="/admin/crm/users">Сбросить</a>
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>Пользователь</th><th>Telegram ID</th><th>Статус</th><th>VIP до</th><th>Источник</th><th>Регистрация</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td><a href="/admin/crm/users/{{ row.id }}">#{{ row.id }}</a></td>
+          <td><strong>{{ row.first_name }}</strong><small>{{ '@' + row.username if row.username else 'без username' }}</small></td>
+          <td>{{ row.telegram_id }}</td>
+          <td><span class="badge {{ 'failed' if row.is_dead else 'active' }}">{{ 'Мёртвый' if row.is_dead else 'Живой' }}</span></td>
+          <td>{{ row.vip_until.strftime('%d.%m.%Y %H:%M') if row.vip_until else '—' }}</td>
+          <td>{{ row.source_name or 'Органика' }}</td>
+          <td>{{ row.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty">По заданным фильтрам пользователей нет</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "pagination.html" %}
+</section>
+{% endblock %}

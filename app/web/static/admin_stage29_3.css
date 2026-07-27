@@ -1,0 +1,3 @@
+.chart-info.selected{border-color:rgba(139,124,255,.5);background:linear-gradient(135deg,var(--surface-2),rgba(139,124,255,.1))}
+.pro-nav a{transition:background .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease}
+.pro-nav a.active{transform:translateX(2px)}

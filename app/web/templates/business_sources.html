@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-toolbar"><div><h2>Источники</h2><p>Закуп, конверсия, доход и ROI.</p></div><a class="button-primary" href="/admin/business/sources/new">＋ Создать источник</a></section>
+<section class="panel"><div class="table-wrap"><table>
+<thead><tr><th>Источник</th><th>Статус</th><th>Закуп</th><th>Пользователи</th><th>VIP</th><th>Доход</th><th>CPA</th><th>ROI</th></tr></thead>
+<tbody>{% for row in rows %}<tr>
+<td><a href="/admin/business/sources/{{ row.source.id }}"><strong>{{ row.source.name }}</strong></a><small>{{ row.source.source_url }}</small></td>
+<td><span class="badge {{ 'active' if row.source.is_active else 'inactive' }}">{{ 'Активен' if row.source.is_active else 'Архив' }}</span></td>
+<td>{{ money(row.source.spend_kopecks) }} ₽</td><td>{{ row.users }}</td><td>{{ row.vip_users }}</td><td>{{ money(row.revenue_kopecks) }} ₽</td><td>{{ money(row.cpa_kopecks) + ' ₽' if row.cpa_kopecks is not none else '—' }}</td><td>{{ row.roi_percent if row.roi_percent is not none else '—' }}%</td>
+</tr>{% else %}<tr><td colspan="8"><div class="empty-state"><strong>Источников пока нет</strong><a class="button-primary" href="/admin/business/sources/new">Создать первый источник</a></div></td></tr>{% endfor %}</tbody>
+</table></div></section>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-toolbar analytics-toolbar">
+  <div>
+    <h2>Аналитика</h2>
+    <p>Динамика продукта, блокировок и монетизации.</p>
+  </div>
+
+  <nav class="period-tabs analytics-periods" aria-label="Период аналитики">
+    {% for value, label in [('1','Сегодня'),('7','7 дней'),('30','30 дней'),('90','90 дней'),('all','Всё время')] %}
+      <a class="{{ 'active' if period == value else '' }}" href="/admin/business/analytics?period={{ value }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card">
+    <span>Новые пользователи</span>
+    <strong>{{ snapshot.users.current }}</strong>
+    <small>{{ 'За всё время' if period == 'all' else 'За выбранный период' }}</small>
+  </article>
+  <article class="metric-card">
+    <span>Сообщения</span>
+    <strong>{{ snapshot.questions.current }}</strong>
+    <small>{{ snapshot.answers.current }} ответов</small>
+  </article>
+  <article class="metric-card">
+    <span>Выручка</span>
+    <strong>{{ money(snapshot.revenue_kopecks.current) }} ₽</strong>
+    <small>ARPU {{ money(snapshot.arpu_kopecks) }} ₽</small>
+  </article>
+  <article class="metric-card">
+    <span>Активные карты</span>
+    <strong>{{ snapshot.active_cards }}</strong>
+    <small>{{ snapshot.successful_rebill_rate }}% успешных ребиллов</small>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="panel-title-row">
+    <div>
+      <span class="panel-kicker">Динамика</span>
+      <h2>Показатели по дням</h2>
+      <p>
+        {% if period == 'all' %}
+          Для читаемости график показывает последние 90 дней.
+        {% elif period == '1' %}
+          Показана динамика за последние 7 дней, карточки — за сегодня.
+        {% else %}
+          Период графика: {{ chart_days }} дней.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <div class="canvas-wrap large">
+    <canvas id="analyticsBusinessChart" data-stage294-chart data-chart='{{ chart_json|tojson }}'></canvas>
+  </div>
+
+  <div class="chart-info" data-chart-info>
+    <strong>Выберите точку</strong>
+    <span>Нажмите на дату на графике.</span>
+  </div>
+
+  <div class="chart-legend">
+    <span><i class="users"></i>Новые</span>
+    <span><i class="blocked"></i>Заблокировали</span>
+    <span><i class="questions"></i>Сообщения</span>
+    <span><i class="answers"></i>Ответы</span>
+  </div>
+</section>
+
+<section class="metric-grid secondary">
+  <article class="metric-card"><span>Триалы</span><strong>{{ snapshot.trials.current }}</strong></article>
+  <article class="metric-card"><span>Ребиллы</span><strong>{{ snapshot.rebills.current }}</strong></article>
+  <article class="metric-card"><span>Активный VIP</span><strong>{{ snapshot.active_vip }}</strong></article>
+  <article class="metric-card"><span>Мёртвые</span><strong>{{ snapshot.dead_users }}</strong></article>
+</section>
+{% endblock %}

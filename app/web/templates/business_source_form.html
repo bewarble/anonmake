@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="form-layout"><article class="panel form-panel">
+<div class="panel-title-row"><div><span class="panel-kicker">Маркетинг</span><h2>Новый источник</h2><p>Создайте уникальную рекламную ссылку.</p></div></div>
+{% if error %}<div class="form-error">{{ error }}</div>{% endif %}
+<form method="post" action="{{ action }}" class="admin-form">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label><span>Название</span><input name="name" value="{{ values.name if values else '' }}" required></label>
+<label><span>Ссылка на размещение</span><input type="url" name="source_url" value="{{ values.source_url if values else '' }}" required></label>
+<label><span>Закуп, ₽</span><input name="spend_rubles" inputmode="decimal" value="{{ values.spend_rubles if values else '0' }}"></label>
+<div class="form-actions"><button class="primary">Создать</button><a href="/admin/business/sources">Отмена</a></div>
+</form></article></section>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-toolbar">
+  <div>
+    <h2>Рассылки</h2>
+    <p>Создание, аудитория и состояние кампаний.</p>
+  </div>
+</section>
+
+{% if created %}<div class="flash success">Рассылка поставлена в очередь.</div>{% endif %}
+{% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+
+<section class="dashboard-grid broadcast-layout">
+  <article class="panel panel-large">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">Новая кампания</span>
+        <h2>Анонимная рассылка</h2>
+      </div>
+    </div>
+
+    <form method="post" action="/admin/business/broadcasts" class="admin-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+
+      <label>
+        <span>Аудитория</span>
+        <select name="audience">
+          <option value="all">Все пользователи</option>
+          <option value="vip" {{ 'selected' if values and values.audience == 'vip' else '' }}>С активным VIP</option>
+          <option value="non_vip" {{ 'selected' if values and values.audience == 'non_vip' else '' }}>Без активного VIP</option>
+        </select>
+      </label>
+
+      <label>
+        <span>Текст анонимного сообщения</span>
+        <textarea name="text" rows="7" maxlength="1500" required placeholder="Введите текст рассылки">{{ values.text if values else '' }}</textarea>
+      </label>
+
+      <div class="broadcast-preview">
+        <span>Предпросмотр</span>
+        <div>
+          💌 Вам пришло анонимное сообщение<br><br>
+          <em>{{ values.text if values and values.text else 'Текст появится здесь' }}</em>
+          <footer>✍️ Ответить · 👤 Узнать кто это</footer>
+        </div>
+      </div>
+
+      <button class="primary">Запустить рассылку</button>
+    </form>
+  </article>
+
+  <article class="panel campaigns-panel">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">История</span>
+        <h2>Последние кампании</h2>
+      </div>
+      <span class="campaign-count">{{ rows|length }}</span>
+    </div>
+
+    <div class="campaign-list">
+      {% for row in rows %}
+        <article class="campaign-card">
+          <div class="campaign-head">
+            <div>
+              <strong>Кампания #{{ row.id }}</strong>
+              <span class="campaign-audience">
+                {% if row.audience == 'vip' %}VIP-пользователи
+                {% elif row.audience == 'non_vip' %}Без VIP
+                {% else %}Все пользователи{% endif %}
+              </span>
+            </div>
+
+            <span class="campaign-status status-{{ row.status }}">
+              {% if row.status == 'queued' %}В очереди
+              {% elif row.status == 'processing' %}Отправляется
+              {% elif row.status == 'completed' %}Завершена
+              {% elif row.status == 'failed' %}Ошибка
+              {% else %}{{ row.status }}{% endif %}
+            </span>
+          </div>
+
+          <p class="campaign-text">{{ row.text }}</p>
+
+          <div class="campaign-meta">
+            <div><span>Поставлено</span><strong>{{ row.queued_count }}</strong></div>
+            <div><span>Создана</span><strong>{{ row.created_at.strftime('%d.%m %H:%M') if row.created_at else '—' }}</strong></div>
+          </div>
+
+          {% if row.status == 'processing' %}
+            <div class="campaign-progress"><i></i></div>
+          {% endif %}
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Кампаний пока нет</strong>
+          <span>Созданные рассылки появятся здесь со статусом и аудиторией.</span>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

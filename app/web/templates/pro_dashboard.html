@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="pro-hero">
+  <div>
+    <div class="pro-chip">Stage 28 · Growth OS</div>
+    <h2>Управляй продуктом по цифрам</h2>
+    <p>Воронка, доход, рекуррентные карты, рекламные источники, рассылки и техническое состояние — на одном экране.</p>
+  </div>
+  <div class="hero-command">
+    <button type="button" data-command-open>⌘ Быстрые действия</button>
+  </div>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card">
+    <span>Пользователи</span>
+    <strong>{{ base.users_total }}</strong>
+    <small>+{{ base.users_today }} за сутки</small>
+  </article>
+  <article class="metric-card">
+    <span>Живые</span>
+    <strong>{{ base.users_total - base.users_dead }}</strong>
+    <small>{{ base.users_dead }} мёртвых</small>
+  </article>
+  <article class="metric-card">
+    <span>Активный VIP</span>
+    <strong>{{ base.active_vip }}</strong>
+    <small>{{ base.active_cards }} рекуррентных карт</small>
+  </article>
+  <article class="metric-card">
+    <span>Выручка сегодня</span>
+    <strong>{{ money(base.revenue_today_kopecks) }} ₽</strong>
+    <small>{{ money(base.revenue_total_kopecks) }} ₽ всего</small>
+  </article>
+</section>
+
+<section class="dashboard-grid">
+  <article class="panel panel-large">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">Продукт</span>
+        <h2>Активность за 14 дней</h2>
+      </div>
+      <a href="/admin/analytics">Подробнее →</a>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="activityChart" data-chart='{{ periods_json|tojson }}'></canvas>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">Конверсия</span>
+        <h2>Воронка</h2>
+      </div>
+    </div>
+    {% set funnel_max = [funnel.users, 1]|max %}
+    <div class="funnel">
+      <div><span>Все пользователи</span><strong>{{ funnel.users }}</strong><i style="width:100%"></i></div>
+      <div><span>Отправляли сообщения</span><strong>{{ funnel.question_senders }}</strong><i style="width:{{ (funnel.question_senders / funnel_max * 100)|round|int }}%"></i></div>
+      <div><span>Отвечали</span><strong>{{ funnel.answerers }}</strong><i style="width:{{ (funnel.answerers / funnel_max * 100)|round|int }}%"></i></div>
+      <div><span>Активный VIP</span><strong>{{ funnel.vip_users }}</strong><i style="width:{{ (funnel.vip_users / funnel_max * 100)|round|int }}%"></i></div>
+      <div><span>Активные карты</span><strong>{{ funnel.active_cards }}</strong><i style="width:{{ (funnel.active_cards / funnel_max * 100)|round|int }}%"></i></div>
+    </div>
+  </article>
+</section>
+
+<section class="dashboard-grid">
+  <article class="panel panel-large">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">Маркетинг</span>
+        <h2>Лучшие источники</h2>
+      </div>
+      <a href="/admin/sources">Все источники →</a>
+    </div>
+    <div class="source-cards">
+      {% for row in sources %}
+        <a href="/admin/crm/sources/{{ row.id }}">
+          <div>
+            <strong>{{ row.name }}</strong>
+            <small>{{ row.users }} пользователей · {{ row.vip_users }} VIP</small>
+          </div>
+          <div class="source-money">
+            <span>{{ money(row.spend_kopecks) }} ₽</span>
+            <small>CPA {{ money(row.cpa_kopecks) + ' ₽' if row.cpa_kopecks is not none else '—' }}</small>
+          </div>
+        </a>
+      {% else %}
+        <p class="empty">Источников пока нет</p>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">Система</span>
+        <h2>Операции</h2>
+      </div>
+    </div>
+    <div class="ops-list">
+      <a href="/admin/delivery"><span>В очереди доставки</span><strong>{{ operations.delivery_pending }}</strong></a>
+      <a href="/admin/delivery"><span>Ошибки доставки</span><strong class="danger">{{ operations.delivery_failed }}</strong></a>
+      <a href="/admin/broadcasts"><span>Активные рассылки</span><strong>{{ operations.broadcasts_active }}</strong></a>
+      <a href="/admin/audit"><span>CRM-события за сутки</span><strong>{{ operations.crm_events_24h }}</strong></a>
+    </div>
+  </article>
+</section>
+{% endblock %}

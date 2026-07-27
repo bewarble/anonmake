@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     )
 
     bot_token: str = Field(default="", alias="BOT_TOKEN")
+    bot_username: str = Field(default="", alias="BOT_USERNAME")
     database_url: str = Field(
         default="sqlite+aiosqlite:///data/anonmake.db",
         alias="DATABASE_URL",
@@ -27,6 +28,9 @@ class Settings(BaseSettings):
     sql_echo: bool = Field(default=False, alias="SQL_ECHO")
 
     admin_ids: str = Field(default="", alias="ADMIN_IDS")
+    broadcast_sender_telegram_id: int = Field(
+        default=0, alias="BROADCAST_SENDER_TELEGRAM_ID"
+    )
 
     web_admin_enabled: bool = Field(
         default=False,

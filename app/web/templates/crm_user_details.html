@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-toolbar">
+  <div>
+    <h2>Пользователь #{{ details.user.id }}</h2>
+    <p>Профиль, подписка, источник и история действий.</p>
+  </div>
+  <a class="button-primary" href="/admin/business/users">← К пользователям</a>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card">
+    <span>Telegram ID</span>
+    <strong>{{ details.user.telegram_id }}</strong>
+    <small>{{ '@' + details.user.username if details.user.username else 'Без username' }}</small>
+  </article>
+  <article class="metric-card">
+    <span>VIP до</span>
+    <strong>{{ details.subscription.access_until.strftime('%d.%m.%Y') if details.subscription and details.subscription.access_until else 'Нет' }}</strong>
+    <small>{{ details.subscription.status if details.subscription else 'Подписка не создана' }}</small>
+  </article>
+  <article class="metric-card">
+    <span>Источник</span>
+    <strong>{{ details.source.name if details.source else 'Органика' }}</strong>
+    <small>{{ details.source.code if details.source else 'Без атрибуции' }}</small>
+  </article>
+  <article class="metric-card">
+    <span>Регистрация</span>
+    <strong>{{ details.user.created_at.strftime('%d.%m.%Y') }}</strong>
+    <small>{{ details.user.created_at.strftime('%H:%M') }}</small>
+  </article>
+</section>
+
+<section class="dashboard-grid">
+  <article class="panel panel-large">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">CRM</span>
+        <h2>Лента событий</h2>
+        <p>Последние действия пользователя в хронологическом порядке.</p>
+      </div>
+    </div>
+
+    <div class="crm-timeline">
+      {% for event in timeline %}
+        <article class="crm-event">
+          <span class="crm-event-dot"></span>
+          <div class="crm-event-body">
+            <strong>{{ event.summary or event.event_type }}</strong>
+            <span class="crm-event-type">{{ event.event_type }}</span>
+          </div>
+          <time>{{ event.occurred_at.strftime('%d.%m.%Y %H:%M') }}</time>
+        </article>
+      {% else %}
+        <p class="empty">Событий пока нет</p>
+      {% endfor %}
+    </div>
+  </article>
+
+  <aside class="panel">
+    <div class="panel-title-row">
+      <div>
+        <span class="panel-kicker">Профиль</span>
+        <h2>Данные</h2>
+      </div>
+    </div>
+    <dl class="details-list">
+      <div><dt>Внутренний ID</dt><dd>{{ details.user.id }}</dd></div>
+      <div><dt>Имя</dt><dd>{{ details.user.first_name or '—' }}</dd></div>
+      <div><dt>Username</dt><dd>{{ '@' + details.user.username if details.user.username else '—' }}</dd></div>
+      <div><dt>Telegram ID</dt><dd>{{ details.user.telegram_id }}</dd></div>
+    </dl>
+  </aside>
+</section>
+{% endblock %}

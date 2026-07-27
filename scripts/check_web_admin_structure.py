@@ -38,8 +38,18 @@ def check() -> None:
         ast.parse((ROOT / rel).read_text(encoding="utf-8"), filename=rel)
 
     app_text = (ROOT / "app/web/app.py").read_text(encoding="utf-8")
-    assert "app.include_router(admin_router)" in app_text
+    admin_registration_ok = (
+        "app.include_router(admin_router)" in app_text
+        or "admin_module.router.routes" in app_text
+    )
+    assert admin_registration_ok
     assert '"/admin/static"' in app_text
+
+    stage27_registration_ok = (
+        "app.include_router(admin_stage27_router)" in app_text
+        or "admin_stage27_module.router.routes" in app_text
+    )
+    assert stage27_registration_ok
 
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8").lower()
     for name in ("prometheus-client", "jinja2", "python-multipart"):

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero-panel">
+  <div>
+    <span class="hero-kicker">Оперативная аналитика</span>
+    <h2>AnonMake Growth CRM</h2>
+    <p>Пользователи, монетизация, рекламные источники и доставка в одном интерфейсе.</p>
+  </div>
+  <div class="hero-actions">
+    <a class="primary-link" href="/admin/crm/users">Пользователи</a>
+    <a class="secondary-link" href="/admin/broadcasts">Рассылки</a>
+  </div>
+</section>
+
+<section class="metrics">
+  <article><span>Пользователи</span><strong>{{ data.users_total }}</strong><small>+{{ data.users_today }} за 24 часа</small></article>
+  <article><span>Живые</span><strong>{{ data.users_total - data.users_dead }}</strong><small>{{ data.users_dead }} мёртвых</small></article>
+  <article><span>Активный VIP</span><strong>{{ data.active_vip }}</strong><small>{{ data.active_cards }} активных карт</small></article>
+  <article><span>Доход сегодня</span><strong>{{ money(data.revenue_today_kopecks) }} ₽</strong><small>{{ money(data.revenue_total_kopecks) }} ₽ за всё время</small></article>
+  <article><span>Сообщения сегодня</span><strong>{{ data.questions_today }}</strong><small>{{ data.answers_today }} ответов</small></article>
+  <article><span>Очередь доставки</span><strong>{{ data.delivery_pending }}</strong><small>{{ data.delivery_failed }} ошибок</small></article>
+</section>
+
+<section class="panel">
+  <div class="panel-header"><div><h2>Динамика за 30 дней</h2><p>Регистрации, первые блокировки и доход.</p></div></div>
+  {% set max_reg = chart|map(attribute='registrations')|max if chart else 1 %}
+  {% set max_block = chart|map(attribute='blocked')|max if chart else 1 %}
+  {% set max_rev = chart|map(attribute='revenue_kopecks')|max if chart else 1 %}
+  {% set scale = [max_reg, max_block, (max_rev / 100)|round|int, 1]|max %}
+  <div class="chart">
+    {% for point in chart %}
+      <div class="chart-column" title="{{ point.label }} · пришли {{ point.registrations }} · заблокировали {{ point.blocked }} · доход {{ money(point.revenue_kopecks) }} ₽">
+        <div class="chart-bars">
+          <span class="bar registrations" style="height:{{ (point.registrations / scale * 100)|round|int }}%"></span>
+          <span class="bar blocked" style="height:{{ (point.blocked / scale * 100)|round|int }}%"></span>
+          <span class="bar revenue" style="height:{{ ((point.revenue_kopecks / 100) / scale * 100)|round|int }}%"></span>
+        </div>
+        <small>{{ point.label }}</small>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="legend">
+    <span><i class="dot registrations"></i>Регистрации</span>
+    <span><i class="dot blocked"></i>Блокировки</span>
+    <span><i class="dot revenue"></i>Доход, ₽</span>
+  </div>
+</section>
+
+<section class="quick-grid">
+  <a href="/admin/crm/users?vip=active"><strong>VIP-сегмент</strong><span>Активные подписки</span></a>
+  <a href="/admin/crm/users?health=dead"><strong>Мёртвые</strong><span>Постоянные ошибки Telegram</span></a>
+  <a href="/admin/sources"><strong>Источники</strong><span>Экономика трафика</span></a>
+  <a href="/admin/delivery"><strong>Доставка</strong><span>Очередь и ошибки</span></a>
+</section>
+{% endblock %}

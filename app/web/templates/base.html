@@ -1,39 +1,99 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ title }} · AnonMake</title>
-  <link rel="stylesheet" href="/admin/static/admin.css">
+  <link rel="stylesheet" href="/admin/static/admin.css?v=28">
+  <link rel="stylesheet" href="/admin/static/admin_stage27.css?v=28">
+  <link rel="stylesheet" href="/admin/static/admin_stage28.css?v=28.1">
+  <link rel="stylesheet" href="/admin/static/admin_stage28_1.css?v=28.1">
+  <link rel="stylesheet" href="/admin/static/admin_stage29.css?v=29">
+  <link rel="stylesheet" href="/admin/static/admin_stage29_1.css?v=29.1">
+  <link rel="stylesheet" href="/admin/static/admin_stage29_2.css?v=29.2">
+  <link rel="stylesheet" href="/admin/static/admin_stage29_3.css?v=29.3">
+  <link rel="stylesheet" href="/admin/static/admin_stage29_4.css?v=29.4">
 </head>
 <body>
-  <div class="shell">
-    <aside class="sidebar">
-      <a class="brand" href="/admin">
-        <span class="brand-mark">A</span>
-        <span>AnonMake</span>
-      </a>
-      <nav>
-        <a class="{{ 'active' if section == 'dashboard' else '' }}" href="/admin">Обзор</a>
-        <a class="{{ 'active' if section == 'users' else '' }}" href="/admin/users">Пользователи</a>
-        <a class="{{ 'active' if section == 'payments' else '' }}" href="/admin/payments">Платежи</a>
-        <a class="{{ 'active' if section == 'sources' else '' }}" href="/admin/sources">Источники</a>
-        <a class="{{ 'active' if section == 'delivery' else '' }}" href="/admin/delivery">Доставка</a>
-        <a class="{{ 'active' if section == 'audit' else '' }}" href="/admin/audit">Журнал</a>
+  <div class="app-shell">
+    <aside class="pro-sidebar" data-sidebar>
+      <div class="sidebar-top">
+        <button class="sidebar-mobile-close" type="button" data-sidebar-close aria-label="Закрыть меню">×</button>
+        <a class="pro-brand" href="/admin/business">
+          <span class="brand-orb">A</span>
+          <div><strong>AnonMake</strong><small>Growth OS</small></div>
+        </a>
+        <button class="sidebar-collapse" type="button" data-sidebar-toggle>☰</button>
+      </div>
+
+      <nav class="pro-nav">
+        <span class="nav-section">Обзор</span>
+        <a class="{{ 'active' if section == 'dashboard' else '' }}" href="/admin/business"><i>◫</i><span>Главная</span></a>
+        <a class="{{ 'active' if section == 'analytics' else '' }}" href="/admin/business/analytics"><i>⌁</i><span>Аналитика</span></a>
+
+        <span class="nav-section">CRM</span>
+        <a class="{{ 'active' if section == 'users' else '' }}" href="/admin/business/users"><i>◎</i><span>Пользователи</span></a>
+        <a class="{{ 'active' if section == 'sources' else '' }}" href="/admin/business/sources"><i>↗</i><span>Источники</span></a>
+        <a class="{{ 'active' if section == 'broadcasts' else '' }}" href="/admin/business/broadcasts"><i>✦</i><span>Рассылки</span></a>
+
+        <span class="nav-section">Операции</span>
+        <a class="{{ 'active' if section == 'payments' else '' }}" href="/admin/payments"><i>₽</i><span>Платежи</span></a>
+        <a class="{{ 'active' if section == 'delivery' else '' }}" href="/admin/delivery"><i>⇢</i><span>Доставка</span></a>
+        <a class="{{ 'active' if section == 'audit' else '' }}" href="/admin/audit"><i>≡</i><span>Журнал</span></a>
       </nav>
-      <form method="post" action="/admin/logout">
-        <button class="logout" type="submit">Выйти</button>
-      </form>
+
+      <div class="sidebar-bottom">
+        <button class="theme-switch" type="button" data-theme-toggle><span>◐</span><span>Тема</span></button>
+        <form method="post" action="/admin/logout"><button type="submit"><span>↪</span><span>Выйти</span></button></form>
+      </div>
     </aside>
-    <main class="content">
-      <header class="page-header">
-        <div>
-          <p class="eyebrow">Веб-админка</p>
-          <h1>{{ title }}</h1>
+
+    <main class="pro-content">
+      <header class="pro-header">
+        <div class="mobile-header-group">
+          <button
+            class="mobile-menu-button"
+            type="button"
+            data-sidebar-toggle
+            aria-label="Открыть меню"
+          >
+            ☰
+          </button>
+
+          <div>
+            <span class="header-eyebrow">AnonMake Control Center</span>
+            <h1>{{ title }}</h1>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="header-search" type="button" data-command-open>⌕ Поиск и действия <kbd>Ctrl K</kbd></button>
+          <a class="status-pill" href="/health"><i></i>Система работает</a>
         </div>
       </header>
+
       {% block content %}{% endblock %}
     </main>
   </div>
+
+  <div class="command-overlay" data-command-overlay hidden>
+    <div class="command-box">
+      <div class="command-input"><span>⌕</span><input placeholder="Перейти в раздел..." data-command-input></div>
+      <div class="command-items">
+        <a href="/admin/business">Главная <kbd>G</kbd></a>
+        <a href="/admin/business">Аналитика <kbd>A</kbd></a>
+        <a href="/admin/business/users">Пользователи <kbd>U</kbd></a>
+        <a href="/admin/business/sources">Источники <kbd>S</kbd></a>
+        <a href="/admin/sources/new">Создать источник <kbd>N</kbd></a>
+        <a href="/admin/business/broadcasts">Рассылки <kbd>B</kbd></a>
+        <a href="/admin/payments">Платежи <kbd>P</kbd></a>
+        <a href="/admin/delivery">Доставка <kbd>D</kbd></a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/admin/static/admin_stage28.js?v=28.1" defer></script>
+  <script src="/admin/static/admin_stage29.js?v=29.1" defer></script>
+  <script src="/admin/static/admin_stage29_3.js?v=29.3" defer></script>
+  <script src="/admin/static/admin_stage29_4.js?v=29.4" defer></script>
 </body>
 </html>

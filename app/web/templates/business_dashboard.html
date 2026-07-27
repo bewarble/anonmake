@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-toolbar business-toolbar">
+  <div><h2>Бизнес-обзор</h2><p>Ключевые показатели продукта и монетизации.</p></div>
+  <nav class="period-tabs" aria-label="Период">
+    {% for value, label in [('1','Сегодня'),('7','7 дней'),('30','30 дней'),('90','90 дней'),('all','Всё время')] %}
+      <a class="{{ 'active' if period == value else '' }}" href="/admin/business?period={{ value }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+</section>
+
+<section class="metric-grid">
+  {% for title, metric, suffix in [
+    ('Пользователи', snapshot.users, ''),
+    ('Сообщения', snapshot.questions, ''),
+    ('Ответы', snapshot.answers, ''),
+    ('Выручка', snapshot.revenue_kopecks, ' ₽')
+  ] %}
+  <article class="metric-card">
+    <span>{{ title }}</span>
+    <strong>{{ money(metric.current) if suffix else metric.current }}{{ suffix }}</strong>
+    <small class="{{ 'positive' if metric.delta_percent is not none and metric.delta_percent >= 0 else 'negative' }}">
+      {% if metric.delta_percent is none %}Нет базы сравнения{% else %}{{ '+' if metric.delta_percent >= 0 else '' }}{{ metric.delta_percent }}% к прошлому периоду{% endif %}
+    </small>
+  </article>
+  {% endfor %}
+</section>
+
+<section class="metric-grid secondary">
+  <article class="metric-card"><span>Триалы</span><strong>{{ snapshot.trials.current }}</strong><small>Покупки триальной подписки</small></article>
+  <article class="metric-card"><span>Ребиллы</span><strong>{{ snapshot.rebills.current }}</strong><small>{{ snapshot.successful_rebill_rate }}% успешных</small></article>
+  <article class="metric-card"><span>Активные карты</span><strong>{{ snapshot.active_cards }}</strong><small>{{ snapshot.active_vip }} активных VIP</small></article>
+  <article class="metric-card"><span>ARPU</span><strong>{{ money(snapshot.arpu_kopecks) }} ₽</strong><small>{{ snapshot.dead_users }} мёртвых пользователей</small></article>
+</section>
+
+<section class="panel">
+  <div class="panel-title-row">
+    <div><span class="panel-kicker">Динамика</span><h2>Продукт и доход</h2></div>
+    <div class="chart-tabs" data-chart-range>
+      <button class="{{ 'active' if chart_days == 7 else '' }}" data-days="7">7 дней</button>
+      <button class="{{ 'active' if chart_days == 30 else '' }}" data-days="30">30 дней</button>
+      <button class="{{ 'active' if chart_days == 90 else '' }}" data-days="90">90 дней</button>
+    </div>
+  </div>
+
+  <div class="canvas-wrap large">
+    <canvas id="businessChart" data-chart='{{ chart_json|tojson }}'></canvas>
+  </div>
+
+  <div class="chart-info" data-chart-info>
+    <strong>Выберите точку</strong>
+    <span>Нажмите на день на графике, чтобы увидеть показатели.</span>
+  </div>
+
+  <div class="chart-legend">
+    <span><i class="users"></i>Новые</span>
+    <span><i class="blocked"></i>Заблокировали</span>
+    <span><i class="questions"></i>Сообщения</span>
+    <span><i class="answers"></i>Ответы</span>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-title-row">
+    <div><span class="panel-kicker">Маркетинг</span><h2>Источники</h2></div>
+    <a class="button-primary" href="/admin/business/sources">Все источники →</a>
+  </div>
+  <div class="source-business-grid">
+    {% for row in sources %}
+      <a href="/admin/business/sources/{{ row.source.id }}">
+        <strong>{{ row.source.name }}</strong>
+        <span>{{ row.users }} пользователей · {{ row.vip_users }} VIP</span>
+        <dl><div><dt>Доход</dt><dd>{{ money(row.revenue_kopecks) }} ₽</dd></div><div><dt>ROI</dt><dd>{{ row.roi_percent if row.roi_percent is not none else '—' }}%</dd></div></dl>
+      </a>
+    {% else %}<div class="empty-state">Источников пока нет</div>{% endfor %}
+  </div>
+</section>
+{% endblock %}

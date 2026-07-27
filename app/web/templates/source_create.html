@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="form-layout">
+  <article class="panel form-panel">
+    <div class="panel-title-row">
+      <div><span class="panel-kicker">Маркетинг</span><h2>Создание источника</h2><p>После создания бот сформирует уникальный код атрибуции.</p></div>
+    </div>
+
+    {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
+
+    <form method="post" action="/admin/sources/new" class="admin-form">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <label><span>Название</span><input name="name" value="{{ values.name or '' }}" maxlength="120" placeholder="Telegram Ads · Июль" required><small>Понятное название рекламной закупки.</small></label>
+      <label><span>Ссылка на площадку</span><input type="url" name="source_url" value="{{ values.source_url or '' }}" placeholder="https://t.me/channel" required><small>Служебная ссылка для учёта.</small></label>
+      <label><span>Сумма закупа, ₽</span><input inputmode="decimal" name="spend_rubles" value="{{ values.spend_rubles or '' }}" placeholder="15000"><small>Можно указать 0.</small></label>
+      <div class="form-actions"><button class="primary" type="submit">Создать источник</button><a href="/admin/sources">Отмена</a></div>
+    </form>
+  </article>
+
+  <aside class="panel form-aside">
+    <span class="panel-kicker">После создания</span>
+    <h2>Будет доступно</h2>
+    <ul>
+      <li>Переходы и привлечённые пользователи</li>
+      <li>CPA и CPA VIP</li>
+      <li>Активность аудитории</li>
+      <li>Детальная карточка источника</li>
+    </ul>
+  </aside>
+</section>
+{% endblock %}

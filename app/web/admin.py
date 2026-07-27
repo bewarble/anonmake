@@ -60,18 +60,18 @@ def login_redirect(request: Request) -> RedirectResponse:
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(
     request: Request,
-    next: str = "/admin",
+    next: str = "/admin/business",
 ):
     auth.ensure_configured()
     if auth.session_from_request(request) is not None:
-        return RedirectResponse("/admin", status_code=303)
+        return RedirectResponse("/admin/business", status_code=303)
 
     return templates.TemplateResponse(
         request=request,
         name="login.html",
         context={
             "title": "Вход",
-            "next": next if next.startswith("/admin") else "/admin",
+            "next": next if next.startswith("/admin") else "/admin/business",
             "error": None,
         },
     )
@@ -82,7 +82,7 @@ async def login_submit(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
-    next: str = Form("/admin"),
+    next: str = Form("/admin/business"),
 ):
     if not auth.verify_credentials(username, password):
         return templates.TemplateResponse(
@@ -90,13 +90,13 @@ async def login_submit(
             name="login.html",
             context={
                 "title": "Вход",
-                "next": next if next.startswith("/admin") else "/admin",
+                "next": next if next.startswith("/admin") else "/admin/business",
                 "error": "Неверный логин или пароль",
             },
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
-    destination = next if next.startswith("/admin") else "/admin"
+    destination = next if next.startswith("/admin") else "/admin/business"
     response = RedirectResponse(destination, status_code=303)
     response.set_cookie(
         COOKIE_NAME,
@@ -122,21 +122,10 @@ async def logout() -> RedirectResponse:
 async def dashboard(request: Request):
     if require_session(request) is None:
         return login_redirect(request)
-
-    async with SessionFactory() as session:
-        data = await WebAdminRepository(session).dashboard()
-
-    return templates.TemplateResponse(
-        request=request,
-        name="dashboard.html",
-        context=page_context(
-            request,
-            title="Обзор",
-            section="dashboard",
-            data=data,
-        ),
+    return RedirectResponse(
+        "/admin/business",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
-
 
 @router.get("/users", response_class=HTMLResponse)
 async def users(

@@ -9,7 +9,7 @@
       {% for row in rows %}
         <tr>
           <td>#{{ row.source.id }}</td>
-          <td><strong>{{ row.source.name }}</strong><small>{{ row.source.source_url }}</small></td>
+          <td><strong><a href="/admin/crm/sources/{{ row.source.id }}">{{ row.source.name }}</a></strong><small>{{ row.source.source_url }}</small></td>
           <td><span class="badge {{ 'active' if row.source.is_active else 'inactive' }}">{{ 'Активен' if row.source.is_active else 'Архив' }}</span></td>
           <td>{{ row.source.clicks }}</td>
           <td>{{ row.users_count }}</td>
