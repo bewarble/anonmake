@@ -12,9 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.bot.keyboards.source_admin import cancel_source_keyboard
 from app.bot.keyboards.admin_stage25_1 import referral_back_keyboard
 from app.bot.keyboards.marketing import (
-    broadcast_confirm_keyboard,
+    broadcast_preview_keyboard,
+    broadcast_text_cancel_keyboard,
 )
 from app.bot.states.marketing import BroadcastCreate, SourceCreate
+from app.core import texts
 from app.core.config import load_settings
 from app.repositories.admin import AdminRepository
 from app.repositories.marketing import MarketingRepository
@@ -161,8 +163,17 @@ async def broadcast_text(message: Message, state: FSMContext) -> None:
     await state.update_data(text=text)
     await state.set_state(BroadcastCreate.waiting_confirm)
     await message.answer(
-        "Предпросмотр:\n\n" + text,
-        reply_markup=broadcast_confirm_keyboard(),
+        texts.NEW_QUESTION.format(text=text),
+        reply_markup=broadcast_preview_keyboard(),
+    )
+
+
+
+@router.callback_query(F.data == "adminm:broadcast:preview")
+async def broadcast_preview_button(callback: CallbackQuery) -> None:
+    await callback.answer(
+        "Это предпросмотр. В рассылке кнопка будет рабочей.",
+        show_alert=True,
     )
 
 

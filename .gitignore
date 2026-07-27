@@ -317,3 +317,6 @@ anonmake-stage-*.zip.sha256
 .stage29-3-backup-*/
 
 .stage29-4-backup-*/
+.stage29-5-backup-*/
+
+.stage29-6-backup-*/

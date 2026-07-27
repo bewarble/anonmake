@@ -35,21 +35,27 @@ async def start_with_terms(
     if payload and not payload.startswith("src_"):
         raise SkipHandler
 
-    user = await UserRepository(session).upsert_from_telegram(message.from_user)
+    user, is_new_user = await UserRepository(
+        session
+    ).get_or_create_from_telegram(message.from_user)
+
     source = None
-    if payload.startswith("src_"):
+    attributed = False
+    if is_new_user and payload.startswith("src_"):
         source = await MarketingRepository(session).source_by_code(
             payload.removeprefix("src_")
         )
         if source is not None:
-            await MarketingRepository(session).register_source_start(
+            attributed = await MarketingRepository(
+                session
+            ).register_source_start(
                 source=source,
                 user=user,
             )
 
     tracking = CrmTrackingService(session)
     await tracking.bot_started(user_id=user.id)
-    if source is not None:
+    if source is not None and attributed:
         await tracking.attributed_to_source(
             user_id=user.id,
             source_id=source.id,

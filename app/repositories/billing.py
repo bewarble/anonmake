@@ -59,3 +59,16 @@ class BillingRepository:
             )
         )
         return result.scalar_one_or_none()
+
+
+    async def cancel_auto_renew(
+        self,
+        subscription: Subscription,
+        *,
+        cancelled_at: datetime,
+    ) -> Subscription:
+        subscription.auto_renew = False
+        subscription.next_charge_at = None
+        subscription.cancelled_at = cancelled_at
+        await self.session.flush()
+        return subscription

@@ -52,11 +52,7 @@ ANSWER_ALREADY_SENT = "На это сообщение уже ответили"
 ANSWER_DELIVERY_FAILED = (
     "Ответ сохранён. Мы повторим доставку автоматически."
 )
-ANSWER_RECEIVED = (
-    "💬 Вам ответили\n\n"
-    "Ваше сообщение:\n{question}\n\n"
-    "Ответ:\n{answer}"
-)
+ANSWER_RECEIVED = "💬 Вам ответили\n\n{answer}"
 
 CANCELLED = "Отменено"
 TEXT_ONLY = "Отправьте текстовое сообщение"

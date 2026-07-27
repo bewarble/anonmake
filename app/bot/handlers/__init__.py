@@ -9,6 +9,7 @@ from app.bot.handlers.reveals import router as reveals_router
 from app.bot.handlers.source_management import router as source_management_router
 from app.bot.handlers.start import router as start_router
 from app.bot.handlers.start_marketing import router as start_marketing_router
+from app.bot.handlers.subscriptions import router as subscriptions_router
 
 
 def build_router() -> Router:
@@ -21,6 +22,7 @@ def build_router() -> Router:
 
     router.include_router(start_marketing_router)
     router.include_router(start_router)
+    router.include_router(subscriptions_router)
     router.include_router(questions_router)
     router.include_router(reveals_router)
     router.include_router(answers_router)

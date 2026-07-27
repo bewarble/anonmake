@@ -3,6 +3,7 @@ from __future__ import annotations
 from html import escape
 
 from aiogram import Bot, F, Router
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,7 @@ from app.bot.keyboards.admin_stage25_1 import (
     referrals_keyboard,
 )
 from app.bot.states.marketing import BroadcastCreate
+from app.bot.keyboards.marketing import broadcast_text_cancel_keyboard
 from app.core.admin_metrics import AdminMetricsRepository
 from app.core.config import load_settings
 from app.models.marketing import TrafficSource
@@ -51,22 +53,22 @@ async def statistics(message: Message, session: AsyncSession) -> None:
             filename="statistics.png",
         ),
         caption=(
-            "📊 Статистика\n\n"
+            "📊 <b>Общая статистика</b>\n\n"
+            "📁 <b>Статистика:</b>\n"
             f"• Всего — {number(data.users_total)}\n"
             f"• Живые — {number(data.users_alive)}\n"
             f"• Мёртвые — {number(data.users_dead)}\n\n"
-            "👤 Прирост\n\n"
+            "👤 <b>Прирост:</b>\n"
             f"• За сегодня — {number(data.today)}\n"
             f"• За неделю — {number(data.week)}\n"
-            f"• За месяц — {number(data.month)}\n"
-            f"• За всё время — {number(data.all_time)}\n\n"
-            "📈 Органический прирост\n\n"
+            f"• За месяц — {number(data.month)}\n\n"
+            "📈 <b>Саморост:</b>\n"
             f"• За сегодня — {number(data.organic_today)}\n"
             f"• За неделю — {number(data.organic_week)}\n"
-            f"• За месяц — {number(data.organic_month)}\n"
-            f"• За всё время — {number(data.organic_all_time)}\n\n"
+            f"• За месяц — {number(data.organic_month)}\n\n"
             f"💳 Активных карт — {number(data.active_cards)}"
         ),
+        parse_mode="HTML",
     )
 
 
@@ -88,8 +90,8 @@ async def profit(message: Message, session: AsyncSession) -> None:
     def row(title: str, item) -> str:
         return (
             f"• {title} — {money(item.revenue_kopecks)} ₽ "
-            f"({money(item.partner_kopecks)} ₽) "
-            f"+{number(item.trials)} триал"
+            f"({money(item.partner_kopecks)} ₽)\n"
+            f"+{number(item.trials)} новых подписок"
         )
 
     await message.answer_photo(
@@ -292,9 +294,24 @@ async def broadcast_audience(
 
     if callback.message:
         await callback.message.answer(
-            "✍️ Отправьте текст рассылки."
+            "✍️ Отправьте текст рассылки.\n\n"
+            "Для отмены нажмите кнопку ниже или отправьте /cancel.",
+            reply_markup=broadcast_text_cancel_keyboard(),
         )
     await callback.answer()
+
+
+
+@router.message(BroadcastCreate.waiting_text, Command("cancel"))
+async def broadcast_text_cancel_command(
+    message: Message,
+    state: FSMContext,
+) -> None:
+    if message.from_user is None or not is_admin(message.from_user.id):
+        return
+
+    await state.clear()
+    await message.answer("✖️ Рассылка отменена")
 
 
 @router.callback_query(F.data == "admin25:broadcast:cancel")

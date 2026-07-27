@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import secrets
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.marketing import Broadcast, SourceAttribution, TrafficSource
@@ -46,17 +47,34 @@ class MarketingRepository:
         *,
         source: TrafficSource,
         user: User,
-    ) -> None:
-        source.clicks += 1
+    ) -> bool:
+        """Apply immutable first-touch attribution once.
+
+        Returns True only when a new attribution was stored. The source click
+        counter is incremented only for that successful first attribution.
+        """
         existing = await self.session.scalar(
-            select(SourceAttribution).where(
+            select(SourceAttribution.id).where(
                 SourceAttribution.user_id == user.id
             )
         )
-        if existing is None:
-            self.session.add(
-                SourceAttribution(source_id=source.id, user_id=user.id)
-            )
+        if existing is not None:
+            return False
+
+        attribution = SourceAttribution(
+            source_id=source.id,
+            user_id=user.id,
+        )
+        try:
+            async with self.session.begin_nested():
+                self.session.add(attribution)
+                await self.session.flush()
+        except IntegrityError:
+            return False
+
+        source.clicks += 1
+        await self.session.flush()
+        return True
 
     async def sources(self, limit: int = 20) -> list[TrafficSource]:
         result = await self.session.execute(

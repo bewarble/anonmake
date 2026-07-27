@@ -22,7 +22,7 @@ def statistics_chart(points) -> bytes:
         [position - width / 2 for position in positions],
         joined,
         width,
-        label="Пришли",
+        label="Приход",
     )
     axis.bar(
         [position + width / 2 for position in positions],
@@ -31,7 +31,8 @@ def statistics_chart(points) -> bytes:
         label="Заблокировали",
     )
 
-    axis.set_title("Пользователи по дням")
+    axis.set_title("Приход и блокировки по дням")
+    axis.set_ylabel("Пользователи")
     axis.set_xticks(positions)
     axis.set_xticklabels(labels, rotation=45, ha="right")
     axis.legend()

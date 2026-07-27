@@ -111,10 +111,7 @@ async def receive_answer(
         kind="answer",
         dedupe_key=f"answer:{answer.id}",
         chat_id=question.sender.telegram_id,
-        text=texts.ANSWER_RECEIVED.format(
-            question=question.text,
-            answer=text,
-        ),
+        text=texts.ANSWER_RECEIVED.format(answer=text),
     )
 
     tracking = CrmTrackingService(session)
