@@ -118,7 +118,7 @@
         <dd>{{ 'Включено' if details.subscription and details.subscription.auto_renew else 'Выключено' }}</dd>
       </div>
       <div>
-        <dt>Доступ до</dt>
+        <dt>VIP статус до</dt>
         <dd>
           {{ details.subscription.access_until.strftime('%d.%m.%Y %H:%M') if details.subscription and details.subscription.access_until else '—' }}
         </dd>
@@ -262,7 +262,7 @@
       <strong>Включить автопродление</strong><span>Назначить следующее списание</span>
     </a>
     <a class="admin-action" href="/admin/crm/users/{{ details.user.id }}/control?action=disable_auto_renew">
-      <strong>Отключить автопродление</strong><span>Сохранить оплаченный доступ</span>
+      <strong>Отключить автопродление</strong><span>Сохранить оплаченный VIP статус</span>
     </a>
     <a class="admin-action" href="/admin/crm/users/{{ details.user.id }}/control?action=extend_1">
       <strong>Продлить на 1 день</strong><span>Без списания денег</span>

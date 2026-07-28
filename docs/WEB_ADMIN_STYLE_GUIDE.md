@@ -5,7 +5,7 @@
 - Interface language is Russian.
 - Technical identifiers remain visible only in detail views.
 - Raw database statuses are never used as primary labels.
-- `VIP` is not used in visible UI; use `доступ`.
+- Use `VIP подписка` for the product and `VIP статус` for the user state.
 - `Рефералы` are shown as `Источники`.
 
 ## Statuses

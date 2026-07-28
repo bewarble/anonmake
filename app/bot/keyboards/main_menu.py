@@ -17,12 +17,12 @@ def main_menu_keyboard(*, is_admin: bool = False) -> ReplyKeyboardMarkup:
             keyboard=[
                 [KeyboardButton(text=ADMIN_STATISTICS)],
                 [
-                    KeyboardButton(text=ADMIN_BROADCAST),
                     KeyboardButton(text=ADMIN_PROFIT),
+                    KeyboardButton(text=ADMIN_BROADCAST),
                 ],
                 [
-                    KeyboardButton(text=ADMIN_EXPORT),
                     KeyboardButton(text=ADMIN_SOURCES),
+                    KeyboardButton(text=ADMIN_EXPORT),
                 ],
             ],
             resize_keyboard=True,

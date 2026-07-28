@@ -4,7 +4,7 @@
   <article><span>Переходы</span><strong>{{ details.source.clicks }}</strong></article>
   <article><span>Пользователи</span><strong>{{ details.users_count }}</strong></article>
   <article><span>Активны 30 дней</span><strong>{{ details.active_users_30d }}</strong></article>
-  <article><span>VIP-пользователи</span><strong>{{ details.vip_users }}</strong></article>
+  <article><span>Пользователи с VIP статусом</span><strong>{{ details.vip_users }}</strong></article>
   <article><span>Закуп</span><strong>{{ money(details.source.spend_kopecks) }} ₽</strong></article>
   <article><span>CPA</span><strong>{{ money(details.cpa_kopecks) + ' ₽' if details.cpa_kopecks is not none else '—' }}</strong></article>
 </section>
@@ -13,7 +13,7 @@
     <div><dt>Название</dt><dd>{{ details.source.name }}</dd></div>
     <div><dt>Исходная ссылка</dt><dd>{{ details.source.source_url }}</dd></div>
     <div><dt>Статус</dt><dd>{{ 'Активен' if details.source.is_active else 'Архив' }}</dd></div>
-    <div><dt>CPA доступа</dt><dd>{{ money(details.vip_cpa_kopecks) + ' ₽' if details.vip_cpa_kopecks is not none else '—' }}</dd></div>
+    <div><dt>CPA VIP подписки</dt><dd>{{ money(details.vip_cpa_kopecks) + ' ₽' if details.vip_cpa_kopecks is not none else '—' }}</dd></div>
   </dl>
 </section>
 {% endblock %}

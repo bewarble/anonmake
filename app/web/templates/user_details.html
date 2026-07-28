@@ -16,7 +16,7 @@
     <div class="panel-header"><h2>Подписка</h2></div>
     <dl class="details">
       <div><dt>Статус</dt><dd>{{ details.subscription.status if details.subscription else 'нет' }}</dd></div>
-      <div><dt>Доступ до</dt><dd>{{ details.subscription.access_until.strftime('%d.%m.%Y %H:%M') if details.subscription and details.subscription.access_until else '—' }}</dd></div>
+      <div><dt>VIP статус до</dt><dd>{{ details.subscription.access_until.strftime('%d.%m.%Y %H:%M') if details.subscription and details.subscription.access_until else '—' }}</dd></div>
       <div><dt>Автопродление</dt><dd>{{ 'Да' if details.subscription and details.subscription.auto_renew else 'Нет' }}</dd></div>
       <div><dt>Следующее списание</dt><dd>{{ details.subscription.next_charge_at.strftime('%d.%m.%Y %H:%M') if details.subscription and details.subscription.next_charge_at else '—' }}</dd></div>
       <div><dt>Последний тариф</dt><dd>{{ details.subscription.last_successful_plan if details.subscription and details.subscription.last_successful_plan else '—' }}</dd></div>

@@ -3,7 +3,7 @@
 User-facing copy follows three rules:
 1. Short and clear.
 2. No billing internals, renewal amounts, technical codes or dates.
-3. The public offer is always described as: 1 ₽ — 1 day of access.
+3. The public offer is always described as: 1 ₽ — 1 day of VIP status.
 """
 
 # Global
@@ -29,7 +29,10 @@ INVALID_LINK = "⚠️ Эта ссылка больше не работает."
 SELF_MESSAGE = "🙂 Себе написать не получится."
 
 # Questions
-QUESTION_PROMPT = "✍️ Отправьте текст, фото, видео, файл, голосовое или стикер."
+QUESTION_PROMPT = (
+    "💌 Отправьте анонимное сообщение.\n\n"
+    "Можно отправить текст, фото, видео, голосовое, документ или стикер."
+)
 QUESTION_HINT = "Отправитель останется анонимным."
 QUESTION_SENT = "✅ Сообщение отправлено."
 QUESTION_EMPTY = "ℹ️ Напишите текст сообщения."
@@ -54,12 +57,12 @@ ANSWER_RECEIVED = "💬 Вам ответили\n\n{answer}"
 
 # Access and payment
 ACCESS_OFFER = (
-    "⭐ Доступ\n\n"
+    "👑 VIP подписка\n\n"
     "Узнавайте отправителей старых и новых сообщений.\n\n"
-    "1 ₽ — 1 день доступа."
+    "1 ₽ — 1 день VIP статуса."
 )
-ACCESS_ACTIVE = "✅ Доступ открыт."
-ACCESS_ACTIVE_WITH_SENDER = "✅ Доступ открыт.\n\n👤 Отправитель: {sender}"
+ACCESS_ACTIVE = "👑 VIP статус активирован."
+ACCESS_ACTIVE_WITH_SENDER = "👑 VIP статус активирован.\n\n👤 Отправитель: {sender}"
 ACCESS_PAYMENT_PROCESSING = "⏳ Оплата обрабатывается.\n\nОбычно это занимает несколько секунд."
 ACCESS_PAYMENT_FAILED = "❌ Оплата не завершена.\n\nПопробуйте ещё раз."
 ACCESS_PAYMENT_UNAVAILABLE = "⚠️ Оплата временно недоступна."
@@ -77,20 +80,20 @@ VIP_PAYMENT_PROCESSING = ACCESS_PAYMENT_PROCESSING
 VIP_PAYMENT_FAILED = ACCESS_PAYMENT_FAILED
 
 # Subscription cancellation
-NO_ACTIVE_ACCESS = "ℹ️ Активного доступа нет."
+NO_ACTIVE_ACCESS = "ℹ️ Активной VIP подписки нет."
 AUTO_RENEW_ALREADY_OFF = "ℹ️ Автопродление уже отключено."
 AUTO_RENEW_CONFIRM = (
     "⚙️ Отключить автопродление?\n\n"
-    "Доступ останется активным."
+    "VIP статус останется активным."
 )
-AUTO_RENEW_OFF = "✅ Автопродление отключено.\n\nДоступ останется активным."
+AUTO_RENEW_OFF = "✅ Автопродление отключено.\n\nVIP статус останется активным."
 AUTO_RENEW_KEEP = "✅ Автопродление оставлено включённым."
 
 
 REVEAL_CONSENT = (
-    "👉 Стоимость пробной подписки 1₽ за 1 день доступа.\n\n"
+    "👉 Стоимость пробной VIP подписки — 1 ₽ за 1 день VIP статуса.\n\n"
     "Выбирая любой из тарифов, вы соглашаетесь с автоматической пролонгацией 299 ₽ каждые 3 дня "
-    "по истечению оплаченного периода. Возможно частичное списание 99 ₽ за 1 день доступа.\n\n"
+    "по истечению оплаченного периода. Возможно частичное списание 99 ₽ за 1 день VIP статуса.\n\n"
     "Продолжая оплату, вы соглашаетесь с "
     '<a href="https://sms.evocloud.su/terms">условиями пользования</a>.'
 )

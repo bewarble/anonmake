@@ -5,13 +5,13 @@ INVALID_DATA = "⚠️ Некорректные данные."
 SESSION_EXPIRED = "⚠️ Сессия истекла.\n\nНачните действие заново."
 CANCELLED = "ℹ️ Действие отменено."
 
-STATISTICS_TITLE = "📊 <b>Общая статистика</b>"
-PROFIT_TITLE = "💰 <b>Прибыль</b>"
-EXPORT_TITLE = "📦 <b>Выгрузка</b>"
-SOURCES_TITLE = "🔗 <b>Источники</b>"
-BROADCAST_TITLE = "📣 <b>Рассылка</b>"
+STATISTICS_TITLE = "📊 Статистика"
+PROFIT_TITLE = "💰 Прибыль"
+EXPORT_TITLE = "📦 Выгрузка"
+SOURCES_TITLE = "🔗 Источники"
+BROADCAST_TITLE = "📣 Рассылка"
 
-EXPORT_PROMPT = "📦 <b>Выгрузка</b>\n\nВыберите аудиторию."
+EXPORT_PROMPT = "📦 Выгрузка\n\nВыберите аудиторию для выгрузки."
 EXPORT_READY_ALL = "✅ Выгрузка всех пользователей готова."
 EXPORT_READY_ALIVE = "✅ Выгрузка активных пользователей готова."
 
@@ -30,14 +30,14 @@ SOURCE_SPEND_LARGE = "⚠️ Сумма слишком большая."
 SOURCE_CREATED = "✅ Источник создан."
 SOURCE_CREATE_CANCELLED = "ℹ️ Создание источника отменено."
 SOURCE_DELETE_PROMPT = (
-    "🗑 <b>Удалить источник?</b>\n\n"
+    "🗑 Удалить источник?\n\n"
     "{name}\n\n"
     "Ссылка будет отключена, а статистика сохранится."
 )
 SOURCE_DELETED = "✅ Источник отключён."
 SOURCE_ALREADY_DELETED = "ℹ️ Источник уже отключён."
 
-BROADCAST_AUDIENCE_PROMPT = "📣 <b>Рассылка</b>\n\nВыберите аудиторию."
+BROADCAST_AUDIENCE_PROMPT = "📣 Рассылка\n\nВыберите аудиторию для рассылки."
 BROADCAST_TEXT_PROMPT = (
     "✍️ Отправьте текст рассылки.\n\n"
     "Чтобы выйти, нажмите «Отмена» или отправьте /cancel."

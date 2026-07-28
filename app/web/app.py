@@ -147,7 +147,7 @@ async def payment_success(checkout_token: str) -> HTMLResponse:
 
     if result in {"notified", "already_notified"}:
         body = (
-            "<h1>✅ Всё готово!</h1><p>Вернитесь в Telegram — доступ уже открыт.</p>"
+            "<h1>✅ Всё готово!</h1><p>Вернитесь в Telegram — VIP статус уже активирован.</p>"
             "<p>VIP активирован. Результат отправлен в Telegram.</p>"
         )
     elif result == "pending":

@@ -95,7 +95,7 @@ async def subscription_success(operation_id: str) -> HTMLResponse:
     )
     if result == "paid":
         body = (
-            "<h1>✅ Всё готово!</h1><p>Вернитесь в Telegram — доступ уже открыт.</p>"
+            "<h1>✅ Всё готово!</h1><p>Вернитесь в Telegram — VIP статус уже активирован.</p>"
             "<p>Подписка активирована. Можно вернуться в Telegram.</p>"
         )
     else:

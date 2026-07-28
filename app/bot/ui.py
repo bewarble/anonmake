@@ -15,9 +15,9 @@ ADMIN_EXPORT = "📦 Выгрузка"
 ADMIN_SOURCES = "🔗 Источники"
 
 # Common actions
-ACTION_CANCEL = "Отмена"
-ACTION_BACK = "← Назад"
-ACTION_BACK_TO_LIST = "← К списку"
+ACTION_CANCEL = "⬅️ Отмена"
+ACTION_BACK = "⬅️ Назад"
+ACTION_BACK_TO_LIST = "⬅️ К списку"
 ACTION_CONFIRM = "✅ Подтвердить"
 ACTION_CREATE = "➕ Создать"
 ACTION_DELETE = "🗑 Удалить"
@@ -28,8 +28,8 @@ QUESTION_REVEAL = "👁️ Кто это?"
 
 # Admin broadcast
 BROADCAST_ALL = "👥 Все пользователи"
-BROADCAST_WITH_ACCESS = "⭐ С доступом"
-BROADCAST_WITHOUT_ACCESS = "Без доступа"
+BROADCAST_WITH_ACCESS = "👑 С VIP статусом"
+BROADCAST_WITHOUT_ACCESS = "Без VIP статуса"
 BROADCAST_START = "✅ Запустить"
 
 # Export
@@ -40,5 +40,5 @@ EXPORT_ALIVE = "✅ Только активные"
 SOURCE_CREATE = "➕ Создать источник"
 SOURCE_DELETE_CONFIRM = "🗑 Удалить"
 
-REVEAL_CONFIRM = "✅ Подтверждаю"
-REVEAL_CLOSE = "Закрыть"
+REVEAL_CONFIRM = "✅ Согласен и продолжить"
+REVEAL_CLOSE = "⬅️ Закрыть"
