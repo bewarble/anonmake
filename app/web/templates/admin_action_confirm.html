@@ -9,7 +9,7 @@
     <dl class="details-list">
       <div><dt>Пользователь</dt><dd>{{ '@' + user.username if user.username else user.telegram_id }}</dd></div>
       <div><dt>Подписка</dt><dd>{{ subscription.status if subscription else 'Нет подписки' }}</dd></div>
-      <div><dt>Доступ до</dt><dd>{{ subscription.access_until if subscription else '—' }}</dd></div>
+      <div><dt>VIP статус до</dt><dd>{{ subscription.access_until if subscription else '—' }}</dd></div>
       <div><dt>Карта</dt><dd>{{ payment_method.masked_pan if payment_method and payment_method.masked_pan else '—' }}</dd></div>
     </dl>
 

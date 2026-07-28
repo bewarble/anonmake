@@ -5,13 +5,13 @@ from typing import Any
 
 STATUS_LABELS = {
     # Subscriptions
-    "trial_active": "Доступ активен",
-    "active_1_day": "Доступ активен",
-    "active_3_days": "Доступ активен",
+    "trial_active": "VIP статус активен",
+    "active_1_day": "VIP статус активен",
+    "active_3_days": "VIP статус активен",
     "past_due": "Ожидает оплаты",
     "payment_pending": "Обрабатывается",
     "cancelled_active": "Автопродление отключено",
-    "expired": "Доступ завершён",
+    "expired": "VIP статус завершён",
     "payment_method_blocked": "Способ оплаты недоступен",
     # Payments
     "success": "Успешно",
@@ -55,7 +55,7 @@ STATUS_TONES = {
 }
 
 PAYMENT_KIND_LABELS = {
-    "trial": "Открытие доступа",
+    "trial": "Активация VIP статуса",
     "primary": "Продление",
     "fallback": "Продление",
     "test_primary": "Тестовое продление",

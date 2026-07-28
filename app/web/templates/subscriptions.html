@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "ui_macros.html" import badge, empty, page_intro %}
 {% block content %}
-{{ page_intro('⭐', 'Подписки', 'Состояние доступа и автопродления пользователей.', total) }}
+{{ page_intro('⭐', 'Подписки', 'Состояние VIP подписки и автопродления пользователей.', total) }}
 <section class="panel">
   <form class="filters unified-filters" method="get">
     <label><span>Поиск</span><input name="q" value="{{ q }}" placeholder="Telegram ID или username"></label>
@@ -19,7 +19,7 @@
     <div class="filter-actions"><button type="submit" class="primary">Применить</button><a class="button secondary" href="/admin/subscriptions">Сбросить</a></div>
   </form>
   <div class="table-wrap"><table>
-    <thead><tr><th>Пользователь</th><th>Статус</th><th>Автопродление</th><th>Доступ до</th><th>Следующее списание</th><th>Карта</th></tr></thead>
+    <thead><tr><th>Пользователь</th><th>Статус</th><th>Автопродление</th><th>VIP статус до</th><th>Следующее списание</th><th>Карта</th></tr></thead>
     <tbody>
     {% for subscription, user, method in rows %}
       <tr>

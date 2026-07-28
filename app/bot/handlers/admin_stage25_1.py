@@ -61,16 +61,16 @@ async def statistics(message: Message, session: AsyncSession) -> None:
             filename="statistics.png",
         ),
         caption=(
-            "📊 <b>Общая статистика</b>\n\n"
-            "📁 <b>Статистика:</b>\n"
+            "📊 <b>Статистика</b>\n\n"
+            "👥 <b>Пользователи</b>\n"
             f"• Всего — {number(data.users_total)}\n"
             f"• Живые — {number(data.users_alive)}\n"
             f"• Мёртвые — {number(data.users_dead)}\n\n"
-            "👤 <b>Прирост:</b>\n"
+            "📈 <b>Прирост</b>\n"
             f"• За сегодня — {number(data.today)}\n"
             f"• За неделю — {number(data.week)}\n"
             f"• За месяц — {number(data.month)}\n\n"
-            "📈 <b>Саморост:</b>\n"
+            "🌱 <b>Органический рост</b>\n"
             f"• За сегодня — {number(data.organic_today)}\n"
             f"• За неделю — {number(data.organic_week)}\n"
             f"• За месяц — {number(data.organic_month)}\n\n"
@@ -173,6 +173,17 @@ async def export_users(
         )
 
     await callback.answer()
+
+
+@router.callback_query(F.data == "admin25:export:cancel")
+async def export_cancel(callback: CallbackQuery) -> None:
+    if callback.from_user is None or not is_admin(callback.from_user.id):
+        await callback.answer(admin_texts.DENIED, show_alert=True)
+        return
+
+    if callback.message:
+        await callback.message.delete()
+    await callback.answer(admin_texts.CANCELLED)
 
 
 @router.message(F.text.in_({ADMIN_SOURCES, "Источники"}))

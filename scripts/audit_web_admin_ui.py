@@ -7,11 +7,11 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "app/web/templates"
 
 FORBIDDEN_VISIBLE = (
-    "Любой VIP",
-    "Активный VIP",
-    "Без VIP",
-    "С активным VIP",
-    "Без активного VIP",
+    "С доступом",
+    "Без доступа",
+    "Любой доступ",
+    "Доступ активен",
+    "Доступ завершён",
     "Узнать кто это",
     "Growth OS",
     "Billing CRM",

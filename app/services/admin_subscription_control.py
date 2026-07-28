@@ -190,7 +190,7 @@ class AdminSubscriptionControl:
             details={"days": days, "access_until": subscription.access_until.isoformat()},
         )
         await self.session.commit()
-        return AdminActionResult(True, f"Доступ продлён на {days} дн.")
+        return AdminActionResult(True, f"VIP статус продлён на {days} дн.")
 
     async def _audit(
         self,

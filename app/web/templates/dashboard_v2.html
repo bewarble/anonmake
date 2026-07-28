@@ -15,7 +15,7 @@
 <section class="metrics">
   <article><span>Пользователи</span><strong>{{ data.users_total }}</strong><small>+{{ data.users_today }} за 24 часа</small></article>
   <article><span>Живые</span><strong>{{ data.users_total - data.users_dead }}</strong><small>{{ data.users_dead }} мёртвых</small></article>
-  <article><span>С доступом</span><strong>{{ data.active_vip }}</strong><small>{{ data.active_cards }} активных карт</small></article>
+  <article><span>С VIP статусом</span><strong>{{ data.active_vip }}</strong><small>{{ data.active_cards }} активных карт</small></article>
   <article><span>Доход сегодня</span><strong>{{ money(data.revenue_today_kopecks) }} ₽</strong><small>{{ money(data.revenue_total_kopecks) }} ₽ за всё время</small></article>
   <article><span>Сообщения сегодня</span><strong>{{ data.questions_today }}</strong><small>{{ data.answers_today }} ответов</small></article>
   <article><span>Очередь доставки</span><strong>{{ data.delivery_pending }}</strong><small>{{ data.delivery_failed }} ошибок</small></article>
@@ -47,7 +47,7 @@
 </section>
 
 <section class="quick-grid">
-  <a href="/admin/crm/users?vip=active"><strong>VIP-сегмент</strong><span>Активные подписки</span></a>
+  <a href="/admin/crm/users?vip=active"><strong>VIP-сегмент</strong><span>Активные VIP подписки</span></a>
   <a href="/admin/crm/users?health=dead"><strong>Мёртвые</strong><span>Постоянные ошибки Telegram</span></a>
   <a href="/admin/sources"><strong>Источники</strong><span>Экономика трафика</span></a>
   <a href="/admin/delivery"><strong>Доставка</strong><span>Очередь и ошибки</span></a>

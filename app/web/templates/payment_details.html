@@ -24,7 +24,7 @@
     <dl class="details">
       <div><dt>Subscription ID</dt><dd>{{ subscription.id }}</dd></div>
       <div><dt>Статус подписки</dt><dd>{{ subscription.status|status_label }}</dd></div>
-      <div><dt>Доступ до</dt><dd>{{ subscription.access_until or '—' }}</dd></div>
+      <div><dt>VIP статус до</dt><dd>{{ subscription.access_until or '—' }}</dd></div>
       <div><dt>Следующее списание</dt><dd>{{ subscription.next_charge_at or '—' }}</dd></div>
       <div><dt>Binding ID</dt><dd><code>{{ payment_method.binding_id if payment_method else '—' }}</code></dd></div>
       <div><dt>Impaya User ID</dt><dd><code>{{ payment_method.impaya_user_id if payment_method else '—' }}</code></dd></div>

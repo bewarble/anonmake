@@ -4,7 +4,7 @@
   <div class="section-intro">
     <div>
       <h2>База пользователей</h2>
-      <p>Поиск и сегментация по подписке, доступности и источнику.</p>
+      <p>Поиск и сегментация по VIP статусу, доступности бота и источнику.</p>
     </div>
     <span class="result-count">{{ total }} пользователей</span>
   </div>
@@ -13,8 +13,8 @@
     <input name="q" value="{{ q }}" placeholder="ID, Telegram ID, username или имя">
     <select name="vip">
       <option value="all" {{ 'selected' if vip == 'all' else '' }}>Любая подписка</option>
-      <option value="active" {{ 'selected' if vip == 'active' else '' }}>С доступом</option>
-      <option value="inactive" {{ 'selected' if vip == 'inactive' else '' }}>Без доступа</option>
+      <option value="active" {{ 'selected' if vip == 'active' else '' }}>С VIP статусом</option>
+      <option value="inactive" {{ 'selected' if vip == 'inactive' else '' }}>Без VIP статуса</option>
     </select>
     <select name="health">
       <option value="all" {{ 'selected' if health == 'all' else '' }}>Любой статус</option>

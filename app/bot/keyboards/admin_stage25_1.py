@@ -2,6 +2,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.ui import (
     ACTION_BACK_TO_LIST,
+    ACTION_CANCEL,
     ACTION_DELETE,
     BROADCAST_ALL,
     BROADCAST_WITH_ACCESS,
@@ -33,7 +34,7 @@ def broadcast_audience_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="Отмена",
+                    text=ACTION_CANCEL,
                     callback_data="admin25:broadcast:cancel",
                 )
             ],
@@ -94,6 +95,12 @@ def export_choice_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text=EXPORT_ALIVE,
                     callback_data="admin25:export:alive",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=ACTION_CANCEL,
+                    callback_data="admin25:export:cancel",
                 )
             ],
         ]

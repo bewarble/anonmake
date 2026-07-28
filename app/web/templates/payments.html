@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "ui_macros.html" import badge, empty, page_intro %}
 {% block content %}
-{{ page_intro('💳', 'Платежи', 'Все попытки оплаты и продления доступа.', total) }}
+{{ page_intro('💳', 'Платежи', 'Все попытки оплаты и продления VIP подписки.', total) }}
 <section class="panel">
   <form class="filters unified-filters" method="get" action="/admin/payments">
     <label><span>Поиск</span><input name="q" value="{{ q }}" placeholder="ID, username, операция или карта"></label>

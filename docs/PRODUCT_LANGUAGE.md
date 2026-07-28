@@ -49,13 +49,13 @@ Keep messages short. Prefer one title and one supporting sentence.
 ```
 
 ```text
-⭐ Доступ
+👑 VIP подписка
 
-1 ₽ — 1 день доступа.
+1 ₽ — 1 день VIP статуса.
 ```
 
 ```text
 ⚙️ Отключить автопродление?
 
-Доступ останется активным.
+VIP статус останется активным.
 ```

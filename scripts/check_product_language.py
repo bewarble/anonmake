@@ -35,12 +35,12 @@ FORBIDDEN = {
     ),
 }
 
-ALLOWED_OFFER = "1 ₽ — 1 день доступа"
+ALLOWED_OFFER = "1 ₽ — 1 день VIP статуса"
 
 ALLOWED_CONSENT_FRAGMENTS = (
-    "Стоимость пробной подписки 1₽ за 1 день доступа",
+    "Стоимость пробной VIP подписки — 1 ₽ за 1 день VIP статуса",
     "автоматической пролонгацией 299 ₽ каждые 3 дня",
-    "частичное списание 99 ₽ за 1 день доступа",
+    "частичное списание 99 ₽ за 1 день VIP статуса",
     "условиями пользования",
 )
 
@@ -118,7 +118,7 @@ def check() -> None:
         )
 
     print("Product language audit: OK")
-    print("Public offer: 1 ₽ / 1 day")
+    print("Public offer: 1 ₽ / 1 day of VIP status")
     print("Renewal amounts: allowed only in payment consent")
     print("Billing internals and technical errors: hidden")
     print("Access dates: hidden")

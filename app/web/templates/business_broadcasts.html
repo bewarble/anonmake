@@ -12,8 +12,8 @@
 
 <section class="metric-grid">
   <article class="metric-card"><span>Все пользователи</span><strong>{{ audience_counts.all }}</strong></article>
-  <article class="metric-card"><span>С доступом</span><strong>{{ audience_counts.vip }}</strong></article>
-  <article class="metric-card"><span>Без доступа</span><strong>{{ audience_counts.non_vip }}</strong></article>
+  <article class="metric-card"><span>С VIP статусом</span><strong>{{ audience_counts.vip }}</strong></article>
+  <article class="metric-card"><span>Без VIP статуса</span><strong>{{ audience_counts.non_vip }}</strong></article>
 </section>
 
 <section class="dashboard-grid broadcast-layout">
@@ -25,8 +25,8 @@
         <span>Аудитория</span>
         <select name="audience">
           <option value="all">Все пользователи — {{ audience_counts.all }}</option>
-          <option value="vip">С доступом — {{ audience_counts.vip }}</option>
-          <option value="non_vip">Без доступа — {{ audience_counts.non_vip }}</option>
+          <option value="vip">С VIP статусом — {{ audience_counts.vip }}</option>
+          <option value="non_vip">Без VIP статуса — {{ audience_counts.non_vip }}</option>
         </select>
       </label>
       <label>
