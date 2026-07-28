@@ -55,6 +55,31 @@ class Settings(BaseSettings):
     json_logs: bool = Field(default=True, alias="JSON_LOGS")
     sql_echo: bool = Field(default=False, alias="SQL_ECHO")
 
+    performance_enabled: bool = Field(
+        default=True,
+        alias="PERFORMANCE_ENABLED",
+    )
+    performance_profile_enabled: bool = Field(
+        default=False,
+        alias="PERF_PROFILE_ENABLED",
+    )
+    performance_slow_operation_ms: int = Field(
+        default=500,
+        ge=10,
+        alias="PERF_SLOW_OPERATION_MS",
+    )
+    performance_slow_sql_ms: int = Field(
+        default=150,
+        ge=10,
+        alias="PERF_SLOW_SQL_MS",
+    )
+    worker_idle_max_seconds: float = Field(
+        default=10.0,
+        ge=1.0,
+        le=60.0,
+        alias="WORKER_IDLE_MAX_SECONDS",
+    )
+
     admin_ids: str = Field(default="", alias="ADMIN_IDS")
     broadcast_sender_telegram_id: int = Field(
         default=0, alias="BROADCAST_SENDER_TELEGRAM_ID"

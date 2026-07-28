@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-toolbar">
+  <div>
+    <h2>Состояние платформы</h2>
+    <p>Лёгкий снимок нагрузки, очередей и основных рабочих данных.</p>
+  </div>
+  <a class="button-primary" href="/metrics">Prometheus metrics →</a>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><span>Load average, 1 мин</span><strong>{{ snapshot.load_1 }}</strong><small>5 мин: {{ snapshot.load_5 }} · 15 мин: {{ snapshot.load_15 }}</small></article>
+  <article class="metric-card"><span>Память web-процесса</span><strong>{{ snapshot.memory_mb }} МБ</strong><small>Пиковое RSS процесса</small></article>
+  <article class="metric-card"><span>Размер PostgreSQL</span><strong>{{ snapshot.database_mb }} МБ</strong><small>Текущая база данных</small></article>
+  <article class="metric-card"><span>Пользователи</span><strong>{{ snapshot.users }}</strong><small>{{ snapshot.active_vip }} активных VIP</small></article>
+</section>
+
+<section class="metric-grid secondary">
+  <article class="metric-card"><span>Очередь доставки</span><strong>{{ snapshot.delivery_pending }}</strong><small>{{ snapshot.delivery_failed }} завершились ошибкой</small></article>
+  <article class="metric-card"><span>Рассылки в работе</span><strong>{{ snapshot.broadcast_queued }}</strong><small>В очереди или выполняются</small></article>
+  <article class="metric-card"><span>Платежи pending</span><strong>{{ snapshot.pending_payments }}</strong><small>Ожидают окончательного статуса</small></article>
+  <article class="metric-card"><span>Профилирование</span><strong>Prometheus</strong><small>Подробности доступны на /metrics</small></article>
+</section>
+
+<section class="panel">
+  <div class="panel-title-row"><div><span class="panel-kicker">Диагностика</span><h2>Как читать показатели</h2></div></div>
+  <p>Высокий load average при свободном CPU может означать кратковременный всплеск процессов. Проверяйте его вместе с <code>docker stats</code>, очередью доставки и журналами ошибок.</p>
+</section>
+{% endblock %}

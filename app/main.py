@@ -6,7 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.bot.handlers import build_router
-from app.bot.middlewares import DatabaseMiddleware
+from app.bot.middlewares import DatabaseMiddleware, PerformanceMiddleware
 from app.bot.middlewares.request_context import RequestContextMiddleware
 from app.core.config import load_settings
 from app.core.logging import configure_logging
@@ -21,6 +21,7 @@ async def main() -> None:
     bot = Bot(token=settings.require_bot_token())
     dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.update.outer_middleware(RequestContextMiddleware())
+    dispatcher.update.outer_middleware(PerformanceMiddleware(settings))
 
     database_middleware = DatabaseMiddleware(settings)
     dispatcher.message.outer_middleware(database_middleware)

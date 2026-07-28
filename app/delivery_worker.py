@@ -16,6 +16,7 @@ from aiogram.exceptions import (
 
 from app.core.config import load_settings
 from app.core.logging import configure_logging
+from app.core.performance import WORKER_BATCHES, WORKER_BATCH_SIZE, WORKER_IDLE_SECONDS, next_idle_delay
 from app.database.session import SessionFactory, close_database, init_database
 from app.models.bot_instance import BotInstance
 from app.repositories.delivery import DeliveryRepository
@@ -105,6 +106,11 @@ async def main() -> None:
         or f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
     )
     interval = float(os.getenv("DELIVERY_POLL_INTERVAL_SECONDS", "1"))
+    idle_max = float(os.getenv(
+        "DELIVERY_IDLE_MAX_SECONDS",
+        str(settings.worker_idle_max_seconds),
+    ))
+    idle_delay = interval
     batch_size = int(os.getenv("DELIVERY_BATCH_SIZE", "100"))
     max_attempts = int(os.getenv("DELIVERY_MAX_ATTEMPTS", "10"))
     stale_after = int(os.getenv("DELIVERY_LOCK_STALE_SECONDS", "120"))
@@ -129,8 +135,16 @@ async def main() -> None:
                 await session.commit()
 
             if not jobs:
-                await asyncio.sleep(interval)
+                WORKER_BATCHES.labels("delivery", "empty").inc()
+                WORKER_IDLE_SECONDS.labels("delivery").set(idle_delay)
+                await asyncio.sleep(idle_delay)
+                idle_delay = next_idle_delay(idle_delay, interval, idle_max)
                 continue
+
+            WORKER_BATCHES.labels("delivery", "claimed").inc()
+            WORKER_BATCH_SIZE.labels("delivery").observe(len(jobs))
+            idle_delay = interval
+            WORKER_IDLE_SECONDS.labels("delivery").set(idle_delay)
 
             for claimed in jobs:
                 async with SessionFactory() as session:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,11 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 
 from app.core.config import load_settings
+from app.core.performance import (
+    observe_operation,
+    reset_request_sql_stats,
+    restore_request_sql_stats,
+)
 from app.database.session import (
     SessionFactory,
     close_database,
@@ -36,6 +42,34 @@ app.mount(
     StaticFiles(directory=str(WEB_DIR / "static")),
     name="admin-static",
 )
+
+
+@app.middleware("http")
+async def performance_middleware(request: Request, call_next):
+    if not settings.performance_enabled:
+        return await call_next(request)
+
+    tokens = reset_request_sql_stats()
+    started = time.perf_counter()
+    status = "ok"
+    try:
+        response = await call_next(request)
+        if response.status_code >= 500:
+            status = "error"
+        return response
+    except Exception:
+        status = "error"
+        raise
+    finally:
+        observe_operation(
+            component="web",
+            operation=request.url.path,
+            status=status,
+            started=started,
+            slow_ms=settings.performance_slow_operation_ms,
+            profile_enabled=settings.performance_profile_enabled,
+        )
+        restore_request_sql_stats(tokens)
 
 
 class WebhookPayload(BaseModel):
@@ -376,3 +410,15 @@ for complete_route in admin_complete_module.router.routes:
     if complete_key not in existing_complete_routes:
         app.router.routes.append(complete_route)
         existing_complete_routes.add(complete_key)
+
+
+# Stage 39 performance dashboard.
+from app.web import admin_performance as admin_performance_module  # noqa: E402
+
+for performance_route in admin_performance_module.router.routes:
+    if not any(
+        getattr(existing, "path", None) == getattr(performance_route, "path", None)
+        and getattr(existing, "methods", None) == getattr(performance_route, "methods", None)
+        for existing in app.router.routes
+    ):
+        app.router.routes.append(performance_route)

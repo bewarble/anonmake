@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import time
+
+from sqlalchemy import event
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -10,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.core.config import load_settings
+from app.core.performance import record_sql
 
 
 settings = load_settings()
@@ -39,3 +43,38 @@ async def init_database() -> None:
 
 async def close_database() -> None:
     await engine.dispose()
+
+
+if settings.performance_enabled:
+    @event.listens_for(engine.sync_engine, "before_cursor_execute")
+    def _before_cursor_execute(
+        conn,
+        cursor,
+        statement,
+        parameters,
+        context,
+        executemany,
+    ) -> None:
+        conn.info.setdefault("anonmake_query_started", []).append(
+            time.perf_counter()
+        )
+
+
+    @event.listens_for(engine.sync_engine, "after_cursor_execute")
+    def _after_cursor_execute(
+        conn,
+        cursor,
+        statement,
+        parameters,
+        context,
+        executemany,
+    ) -> None:
+        stack = conn.info.get("anonmake_query_started") or []
+        if not stack:
+            return
+        started = stack.pop()
+        record_sql(
+            statement,
+            time.perf_counter() - started,
+            slow_ms=settings.performance_slow_sql_ms,
+        )

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import logging
 import time
 
+from app.core.performance import WORKER_BATCHES, WORKER_BATCH_SIZE
 from app.database.session import SessionFactory
 from app.models.billing import Subscription
 from app.repositories.billing import BillingRepository
@@ -55,6 +56,8 @@ class BillingWorker:
             started = time.monotonic()
             try:
                 stats = await self.tick()
+                WORKER_BATCHES.labels("billing", "completed").inc()
+                WORKER_BATCH_SIZE.labels("billing").observe(stats.due)
                 logger.info(
                     "Billing tick completed due=%s locked=%s skipped=%s "
                     "success=%s insufficient=%s pending=%s failed=%s "
@@ -70,6 +73,7 @@ class BillingWorker:
                     int((time.monotonic() - started) * 1000),
                 )
             except Exception:
+                WORKER_BATCHES.labels("billing", "failed").inc()
                 logger.exception("Billing worker tick failed")
 
             try:

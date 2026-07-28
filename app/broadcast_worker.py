@@ -11,6 +11,7 @@ from app.bot.keyboards.questions import answer_question_keyboard
 from app.core import texts
 from app.core.config import load_settings
 from app.core.logging import configure_logging
+from app.core.performance import WORKER_BATCHES, WORKER_BATCH_SIZE, WORKER_IDLE_SECONDS, next_idle_delay
 from app.database.session import SessionFactory, close_database, init_database
 from app.models.billing import Subscription
 from app.models.question import Question
@@ -36,6 +37,7 @@ async def audience_users(session, item, batch_size: int) -> list[User]:
     now = datetime.now(timezone.utc)
     active_vip = exists(
         select(Subscription.id).where(
+            Subscription.bot_id == item.bot_id,
             Subscription.user_id == User.id,
             Subscription.access_until.is_not(None),
             Subscription.access_until > now,
@@ -101,6 +103,11 @@ async def main() -> None:
 
     interval = float(os.getenv("BROADCAST_POLL_INTERVAL_SECONDS", "3"))
     batch_size = int(os.getenv("BROADCAST_BATCH_SIZE", "500"))
+    idle_max = float(os.getenv(
+        "BROADCAST_IDLE_MAX_SECONDS",
+        str(settings.worker_idle_max_seconds),
+    ))
+    idle_delay = interval
 
     logger.info("Broadcast worker started")
 
@@ -112,8 +119,14 @@ async def main() -> None:
 
                 if item is None:
                     await session.rollback()
-                    await asyncio.sleep(interval)
+                    WORKER_BATCHES.labels("broadcast", "empty").inc()
+                    WORKER_IDLE_SECONDS.labels("broadcast").set(idle_delay)
+                    await asyncio.sleep(idle_delay)
+                    idle_delay = next_idle_delay(idle_delay, interval, idle_max)
                     continue
+
+                idle_delay = interval
+                WORKER_IDLE_SECONDS.labels("broadcast").set(idle_delay)
 
                 sender = await configured_sender(
                     session,
@@ -134,6 +147,8 @@ async def main() -> None:
                     users=users,
                     sender=sender,
                 )
+                WORKER_BATCHES.labels("broadcast", "queued").inc()
+                WORKER_BATCH_SIZE.labels("broadcast").observe(len(users))
 
                 item.cursor_user_id = users[-1].id
                 item.queued_count += len(users)
