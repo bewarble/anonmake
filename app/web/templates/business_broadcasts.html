@@ -3,99 +3,66 @@
 <section class="page-toolbar">
   <div>
     <h2>Рассылки</h2>
-    <p>Создание, аудитория и состояние кампаний.</p>
+    <p>Предпросмотр, размер аудитории и фактическая доставка кампаний.</p>
   </div>
 </section>
 
 {% if created %}<div class="flash success">✅ Рассылка добавлена в очередь.</div>{% endif %}
 {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
 
+<section class="metric-grid">
+  <article class="metric-card"><span>Все пользователи</span><strong>{{ audience_counts.all }}</strong></article>
+  <article class="metric-card"><span>С доступом</span><strong>{{ audience_counts.vip }}</strong></article>
+  <article class="metric-card"><span>Без доступа</span><strong>{{ audience_counts.non_vip }}</strong></article>
+</section>
+
 <section class="dashboard-grid broadcast-layout">
   <article class="panel panel-large">
-    <div class="panel-title-row">
-      <div>
-        <span class="panel-kicker">Новая кампания</span>
-        <h2>Анонимная рассылка</h2>
-      </div>
-    </div>
-
+    <div class="panel-title-row"><div><span class="panel-kicker">Новая кампания</span><h2>Анонимная рассылка</h2></div></div>
     <form method="post" action="/admin/business/broadcasts" class="admin-form">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-
       <label>
         <span>Аудитория</span>
         <select name="audience">
-          <option value="all">Все пользователи</option>
-          <option value="vip" {{ 'selected' if values and values.audience == 'vip' else '' }}>С доступом</option>
-          <option value="non_vip" {{ 'selected' if values and values.audience == 'non_vip' else '' }}>Без доступа</option>
+          <option value="all">Все пользователи — {{ audience_counts.all }}</option>
+          <option value="vip">С доступом — {{ audience_counts.vip }}</option>
+          <option value="non_vip">Без доступа — {{ audience_counts.non_vip }}</option>
         </select>
       </label>
-
       <label>
-        <span>Текст анонимного сообщения</span>
+        <span>Текст сообщения</span>
         <textarea name="text" rows="7" maxlength="1500" required placeholder="Введите текст рассылки">{{ values.text if values else '' }}</textarea>
       </label>
-
       <div class="broadcast-preview">
         <span>Предпросмотр</span>
-        <div>
-          💌 Вам пришло анонимное сообщение<br><br>
-          <em>{{ values.text if values and values.text else 'Текст появится здесь' }}</em>
-          <footer>✍️ Ответить · 👤 Узнать отправителя</footer>
-        </div>
+        <div>💌 Новое анонимное сообщение<br><br><em>{{ values.text if values and values.text else 'Текст появится здесь' }}</em><footer>✍️ Ответить · 👁️ Кто это?</footer></div>
       </div>
-
       <button type="submit" class="primary">Запустить рассылку</button>
     </form>
   </article>
 
   <article class="panel campaigns-panel">
-    <div class="panel-title-row">
-      <div>
-        <span class="panel-kicker">История</span>
-        <h2>Последние кампании</h2>
-      </div>
-      <span class="campaign-count">{{ rows|length }}</span>
-    </div>
-
+    <div class="panel-title-row"><div><span class="panel-kicker">История</span><h2>Последние кампании</h2></div><span class="campaign-count">{{ rows|length }}</span></div>
     <div class="campaign-list">
       {% for row in rows %}
-        <article class="campaign-card">
-          <div class="campaign-head">
-            <div>
-              <strong>Кампания #{{ row.id }}</strong>
-              <span class="campaign-audience">
-                {% if row.audience == 'vip' %}Доступ-пользователи
-                {% elif row.audience == 'non_vip' %}Без доступа
-                {% else %}Все пользователи{% endif %}
-              </span>
-            </div>
-
-            <span class="campaign-status status-{{ row.status|status_label }}">
-              {% if row.status == 'queued' %}В очереди
-              {% elif row.status == 'processing' %}Отправляется
-              {% elif row.status == 'completed' %}Завершена
-              {% elif row.status == 'failed' %}Ошибка
-              {% else %}{{ row.status|status_label }}{% endif %}
-            </span>
-          </div>
-
-          <p class="campaign-text">{{ row.text }}</p>
-
-          <div class="campaign-meta">
-            <div><span>Поставлено</span><strong>{{ row.queued_count }}</strong></div>
-            <div><span>Создана</span><strong>{{ row.created_at.strftime('%d.%m %H:%M') if row.created_at else '—' }}</strong></div>
-          </div>
-
-          {% if row.status == 'processing' %}
-            <div class="campaign-progress"><i></i></div>
-          {% endif %}
-        </article>
-      {% else %}
-        <div class="empty-state">
-          <strong>Кампаний пока нет</strong>
-          <span>Созданные рассылки появятся здесь со статусом и аудиторией.</span>
+      {% set stats = broadcast_stats.get(row.id, {}) %}
+      <article class="campaign-card">
+        <div class="campaign-head">
+          <div><strong>Кампания #{{ row.id }}</strong><span>{{ row.audience }}</span></div>
+          <span class="campaign-status">{{ row.status|status_label }}</span>
         </div>
+        <p class="campaign-text">{{ row.text }}</p>
+        <div class="campaign-meta">
+          <div><span>В очереди</span><strong>{{ row.queued_count }}</strong></div>
+          <div><span>Доставлено</span><strong>{{ stats.get('delivered', 0) }}</strong></div>
+          <div><span>Ожидает</span><strong>{{ stats.get('pending', 0) }}</strong></div>
+          <div><span>Ошибки</span><strong>{{ stats.get('failed', 0) }}</strong></div>
+          <div><span>Заблокировали</span><strong>{{ stats.get('blocked', 0) }}</strong></div>
+          <div><span>Создана</span><strong>{{ row.created_at|date_time }}</strong></div>
+        </div>
+      </article>
+      {% else %}
+      <div class="empty-state"><strong>Кампаний пока нет</strong></div>
       {% endfor %}
     </div>
   </article>

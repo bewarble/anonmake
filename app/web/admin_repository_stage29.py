@@ -77,9 +77,14 @@ class SourceRow:
     source: TrafficSource
     users: int
     vip_users: int
+    paid_users: int
+    payments: int
     revenue_kopecks: int
     cpa_kopecks: int | None
     vip_cpa_kopecks: int | None
+    payment_cpa_kopecks: int | None
+    registration_conversion_percent: float | None
+    payment_conversion_percent: float | None
     roi_percent: float | None
 
 
@@ -368,6 +373,48 @@ class Stage29Repository:
                 )
                 or 0
             )
+            paid_users = int(
+                await self.session.scalar(
+                    select(
+                        func.count(
+                            func.distinct(Subscription.user_id)
+                        )
+                    )
+                    .select_from(PaymentAttempt)
+                    .join(
+                        Subscription,
+                        Subscription.id == PaymentAttempt.subscription_id,
+                    )
+                    .join(
+                        SourceAttribution,
+                        SourceAttribution.user_id == Subscription.user_id,
+                    )
+                    .where(
+                        SourceAttribution.source_id == source.id,
+                        PaymentAttempt.status.in_(SUCCESS_STATUSES),
+                    )
+                )
+                or 0
+            )
+            payments = int(
+                await self.session.scalar(
+                    select(func.count(PaymentAttempt.id))
+                    .select_from(PaymentAttempt)
+                    .join(
+                        Subscription,
+                        Subscription.id == PaymentAttempt.subscription_id,
+                    )
+                    .join(
+                        SourceAttribution,
+                        SourceAttribution.user_id == Subscription.user_id,
+                    )
+                    .where(
+                        SourceAttribution.source_id == source.id,
+                        PaymentAttempt.status.in_(SUCCESS_STATUSES),
+                    )
+                )
+                or 0
+            )
             revenue = int(
                 await self.session.scalar(
                     select(
@@ -398,10 +445,28 @@ class Stage29Repository:
                     source=source,
                     users=users,
                     vip_users=vip_users,
+                    paid_users=paid_users,
+                    payments=payments,
                     revenue_kopecks=revenue,
-                    cpa_kopecks=round(source.spend_kopecks / users) if users else None,
+                    cpa_kopecks=(
+                        round(source.spend_kopecks / users)
+                        if users else None
+                    ),
                     vip_cpa_kopecks=(
-                        round(source.spend_kopecks / vip_users) if vip_users else None
+                        round(source.spend_kopecks / vip_users)
+                        if vip_users else None
+                    ),
+                    payment_cpa_kopecks=(
+                        round(source.spend_kopecks / paid_users)
+                        if paid_users else None
+                    ),
+                    registration_conversion_percent=(
+                        round(users / source.clicks * 100, 1)
+                        if source.clicks else None
+                    ),
+                    payment_conversion_percent=(
+                        round(paid_users / users * 100, 1)
+                        if users else None
                     ),
                     roi_percent=roi,
                 )

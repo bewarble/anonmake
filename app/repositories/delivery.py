@@ -22,6 +22,7 @@ class DeliveryRepository:
         chat_id: int,
         text: str,
         reply_markup: dict | None = None,
+        payload: dict | None = None,
     ) -> DeliveryOutbox:
         bind = self.session.get_bind()
         dialect = bind.dialect.name
@@ -40,6 +41,7 @@ class DeliveryRepository:
                 chat_id=chat_id,
                 text=text,
                 reply_markup=reply_markup,
+                payload=payload,
                 status="pending",
                 next_attempt_at=datetime.now(timezone.utc),
             )

@@ -6,22 +6,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-TEXTS_FILE = ROOT / "app/core/texts.py"
-HANDLERS_ROOT = ROOT / "app/bot/handlers"
-KEYBOARDS_ROOT = ROOT / "app/bot/keyboards"
+PUBLIC_ROOTS = (
+    ROOT / "app" / "core" / "texts.py",
+    ROOT / "app" / "bot" / "handlers",
+    ROOT / "app" / "bot" / "keyboards",
+)
 
 EXCLUDED_NAMES = {
     "recurrent_test.py",
-}
-
-USER_VISIBLE_METHODS = {
-    "answer",
-    "reply",
-    "edit_text",
-    "edit_caption",
-    "send_message",
-    "send_photo",
-    "send_document",
+    "admin.py",
+    "admin_stage25.py",
+    "admin_stage25_1.py",
 }
 
 FORBIDDEN = {
@@ -42,134 +37,79 @@ FORBIDDEN = {
 
 ALLOWED_OFFER = "1 ₽ — 1 день доступа"
 
+ALLOWED_CONSENT_FRAGMENTS = (
+    "Стоимость пробной подписки 1₽ за 1 день доступа",
+    "автоматической пролонгацией 299 ₽ каждые 3 дня",
+    "частичное списание 99 ₽ за 1 день доступа",
+    "условиями пользования",
+)
 
-def iter_python_files(root: Path):
-    if not root.exists():
-        return
 
-    for path in root.rglob("*.py"):
-        if path.name in EXCLUDED_NAMES:
+def iter_public_files():
+    for root in PUBLIC_ROOTS:
+        if root.is_file():
+            yield root
             continue
-        if path.name.startswith("admin_"):
-            continue
-        yield path
+
+        for path in root.rglob("*.py"):
+            if path.name in EXCLUDED_NAMES:
+                continue
+            if path.name.startswith("admin_"):
+                continue
+            yield path
 
 
-def check_value(
-    *,
-    path: Path,
-    line_no: int,
-    value: str,
-    violations: list[str],
-) -> None:
-    for name, pattern in FORBIDDEN.items():
-        if pattern.search(value):
-            violations.append(
-                f"{path.relative_to(ROOT)}:{line_no}: {name}"
-            )
-
-
-def check_texts_file(violations: list[str]) -> None:
-    source = TEXTS_FILE.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=str(TEXTS_FILE))
+def string_literals(path: Path):
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(path))
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            check_value(
-                path=TEXTS_FILE,
-                line_no=node.lineno,
-                value=node.value,
-                violations=violations,
-            )
+            yield node.lineno, node.value
 
 
-def method_name(call: ast.Call) -> str | None:
-    if isinstance(call.func, ast.Attribute):
-        return call.func.attr
+def is_allowed_consent_text(path: Path, value: str) -> bool:
+    if path.relative_to(ROOT).as_posix() != "app/core/texts.py":
+        return False
 
-    if isinstance(call.func, ast.Name):
-        return call.func.id
-
-    return None
-
-
-def direct_string_arguments(call: ast.Call):
-    for argument in call.args:
-        if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
-            yield argument
-
-    for keyword in call.keywords:
-        if isinstance(keyword.value, ast.Constant) and isinstance(
-            keyword.value.value,
-            str,
-        ):
-            yield keyword.value
-
-
-def check_user_visible_calls(
-    path: Path,
-    violations: list[str],
-) -> None:
-    source = path.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=str(path))
-
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-
-        if method_name(node) not in USER_VISIBLE_METHODS:
-            continue
-
-        for string_node in direct_string_arguments(node):
-            check_value(
-                path=path,
-                line_no=string_node.lineno,
-                value=string_node.value,
-                violations=violations,
-            )
-
-
-def check_keyboard_labels(
-    path: Path,
-    violations: list[str],
-) -> None:
-    source = path.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=str(path))
-
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-
-        for keyword in node.keywords:
-            if keyword.arg != "text":
-                continue
-
-            value = keyword.value
-            if isinstance(value, ast.Constant) and isinstance(value.value, str):
-                check_value(
-                    path=path,
-                    line_no=value.lineno,
-                    value=value.value,
-                    violations=violations,
-                )
+    return any(
+        fragment in value
+        for fragment in ALLOWED_CONSENT_FRAGMENTS
+    )
 
 
 def check() -> None:
     violations: list[str] = []
 
-    check_texts_file(violations)
+    for path in iter_public_files():
+        for line_no, value in string_literals(path):
+            for name, pattern in FORBIDDEN.items():
+                if not pattern.search(value):
+                    continue
 
-    for path in iter_python_files(HANDLERS_ROOT):
-        check_user_visible_calls(path, violations)
+                if (
+                    name == "renewal_amounts"
+                    and is_allowed_consent_text(path, value)
+                ):
+                    continue
 
-    for path in iter_python_files(KEYBOARDS_ROOT):
-        check_keyboard_labels(path, violations)
+                violations.append(
+                    f"{path.relative_to(ROOT)}:{line_no}: {name}"
+                )
 
-    texts = TEXTS_FILE.read_text(encoding="utf-8")
+    texts_path = ROOT / "app/core/texts.py"
+    texts = texts_path.read_text(encoding="utf-8")
+
     if ALLOWED_OFFER not in texts:
         violations.append(
             "app/core/texts.py: public offer missing"
         )
+
+    for fragment in ALLOWED_CONSENT_FRAGMENTS:
+        if fragment not in texts:
+            violations.append(
+                f"app/core/texts.py: consent fragment missing: {fragment}"
+            )
 
     if violations:
         raise AssertionError(
@@ -179,7 +119,8 @@ def check() -> None:
 
     print("Product language audit: OK")
     print("Public offer: 1 ₽ / 1 day")
-    print("Renewal amounts and billing internals: hidden")
+    print("Renewal amounts: allowed only in payment consent")
+    print("Billing internals and technical errors: hidden")
     print("Access dates: hidden")
 
 

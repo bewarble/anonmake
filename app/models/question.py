@@ -19,6 +19,11 @@ class Question(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    content_type: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="text", server_default="text"
+    )
+    media_file_id: Mapped[str | None] = mapped_column(String(512))
+    media_caption: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="delivered", index=True
     )

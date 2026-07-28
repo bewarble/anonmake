@@ -158,7 +158,7 @@ class AdminStatisticsStage25Repository:
             first_permanent_failure = (
                 select(
                     DeliveryOutbox.chat_id.label("chat_id"),
-                    func.min(DeliveryOutbox.created_at).label("blocked_at"),
+                    func.min(DeliveryOutbox.updated_at).label("blocked_at"),
                 )
                 .where(
                     DeliveryOutbox.status == "failed",

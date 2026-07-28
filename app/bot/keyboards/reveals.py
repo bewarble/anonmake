@@ -1,21 +1,39 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.bot.ui import REVEAL_CLOSE, REVEAL_CONFIRM
 
-def reveal_checkout_keyboard(
+
+def reveal_consent_keyboard(
     *,
-    payment_url: str,
-    offer_url: str,
+    question_id: int,
+    context: str,
 ) -> InlineKeyboardMarkup:
-    rows = [
-        [
-            InlineKeyboardButton(
-                text="⭐ Открыть доступ за 1 ₽",
-                url=payment_url,
-            )
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=REVEAL_CONFIRM,
+                    callback_data=f"reveal_confirm:{context}:{question_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=REVEAL_CLOSE,
+                    callback_data="reveal_close",
+                ),
+            ],
         ]
-    ]
-    if offer_url:
-        rows.append(
-            [InlineKeyboardButton(text="Условия", url=offer_url)]
-        )
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+    )
+
+
+def reveal_checkout_keyboard(*, payment_url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Перейти к оплате",
+                    url=payment_url,
+                )
+            ]
+        ]
+    )

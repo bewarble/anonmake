@@ -8,6 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def check_assets() -> None:
+    from html.parser import HTMLParser
+
     required = (
         "app/web/static/admin-ui.css",
         "app/web/static/admin-ui.js",
@@ -16,23 +18,93 @@ def check_assets() -> None:
         "docs/ADMIN_UI_ARCHITECTURE.md",
     )
     for rel in required:
-        path = ROOT / rel
-        assert path.is_file(), rel
-        if path.suffix == ".py":
-            ast.parse(path.read_text(encoding="utf-8"), filename=rel)
+        required_path = ROOT / rel
+        assert required_path.is_file(), rel
+        if required_path.suffix == ".py":
+            ast.parse(
+                required_path.read_text(encoding="utf-8"),
+                filename=rel,
+            )
 
-    base = (ROOT / "app/web/templates/base.html").read_text(encoding="utf-8")
-    login = (ROOT / "app/web/templates/login.html").read_text(encoding="utf-8")
+    class AssetParser(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__()
+            self.stylesheets: list[str] = []
+            self.scripts: list[str] = []
 
-    assert base.count("admin-ui.css") == 1
-    assert base.count("admin-ui.js") == 1
-    assert login.count("admin-ui.css") == 1
+        def handle_starttag(self, tag, attrs) -> None:
+            values = dict(attrs)
 
-    assert not re.search(r'admin_stage\d', base)
-    assert not re.search(r'admin_stage\d', login)
+            if tag.lower() == "link":
+                href = values.get("href")
+                if href:
+                    self.stylesheets.append(href)
 
-    css = (ROOT / "app/web/static/admin-ui.css").read_text(encoding="utf-8")
-    js = (ROOT / "app/web/static/admin-ui.js").read_text(encoding="utf-8")
+            if tag.lower() == "script":
+                src = values.get("src")
+                if src:
+                    self.scripts.append(src)
+
+    base = (ROOT / "app/web/templates/base.html").read_text(
+        encoding="utf-8"
+    )
+    login = (ROOT / "app/web/templates/login.html").read_text(
+        encoding="utf-8"
+    )
+
+    base_parser = AssetParser()
+    base_parser.feed(base)
+
+    login_parser = AssetParser()
+    login_parser.feed(login)
+
+    css_links = [
+        value
+        for value in base_parser.stylesheets
+        if "admin-ui.css" in value
+    ]
+    js_scripts = [
+        value
+        for value in base_parser.scripts
+        if "admin-ui.js" in value
+    ]
+    login_css_links = [
+        value
+        for value in login_parser.stylesheets
+        if "admin-ui.css" in value
+    ]
+
+    assert len(css_links) == 1, {
+        "admin_ui_css": css_links,
+        "all_stylesheets": base_parser.stylesheets,
+    }
+    assert len(js_scripts) == 1, {
+        "admin_ui_js": js_scripts,
+        "all_scripts": base_parser.scripts,
+    }
+    assert len(login_css_links) == 1, {
+        "admin_ui_css": login_css_links,
+        "all_stylesheets": login_parser.stylesheets,
+    }
+
+    all_active_assets = (
+        base_parser.stylesheets
+        + base_parser.scripts
+        + login_parser.stylesheets
+        + login_parser.scripts
+    )
+    assert not any(
+        "admin_stage" in value
+        for value in all_active_assets
+    ), all_active_assets
+
+    css = (ROOT / "app/web/static/admin-ui.css").read_text(
+        encoding="utf-8"
+    )
+    js = (ROOT / "app/web/static/admin-ui.js").read_text(
+        encoding="utf-8"
+    )
+
     assert len(css) > 40_000
     assert len(js) > 20_000
     assert "admin_stage28.css" in css
@@ -40,7 +112,6 @@ def check_assets() -> None:
     assert "admin_stage28.js" in js
     assert "admin_stage33.js" in js
     assert "Stage 35 final interaction guards" in js
-
 
 def check_templates() -> None:
     for template in (ROOT / "app/web/templates").glob("*.html"):

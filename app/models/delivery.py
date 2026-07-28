@@ -24,6 +24,7 @@ class DeliveryOutbox(Base):
     chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     reply_markup: Mapped[dict | None] = mapped_column(JSON)
+    payload: Mapped[dict | None] = mapped_column(JSON)
     status: Mapped[str] = mapped_column(
         String(24),
         nullable=False,

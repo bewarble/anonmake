@@ -32,6 +32,27 @@
     <strong>{{ details.user.created_at.strftime('%d.%m.%Y') }}</strong>
     <small>{{ details.user.created_at.strftime('%H:%M') }}</small>
   </article>
+
+  <article class="metric-card">
+    <span>Сообщения</span>
+    <strong>{{ details.sent_questions_count }} / {{ details.received_questions_count }}</strong>
+    <small>Отправлено / получено</small>
+  </article>
+  <article class="metric-card">
+    <span>Ответы</span>
+    <strong>{{ details.answers_count }}</strong>
+    <small>Всего в диалогах</small>
+  </article>
+  <article class="metric-card">
+    <span>Кто это?</span>
+    <strong>{{ details.reveal_clicks_count }}</strong>
+    <small>Действий раскрытия</small>
+  </article>
+  <article class="metric-card">
+    <span>Бот</span>
+    <strong>{{ 'Заблокирован' if details.is_bot_blocked else 'Доступен' }}</strong>
+    <small>{{ details.last_activity_at|date_time if details.last_activity_at else 'Нет событий' }}</small>
+  </article>
 </section>
 
 <section class="dashboard-grid">

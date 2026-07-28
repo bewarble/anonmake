@@ -342,3 +342,22 @@ anonmake.db
 AUDIT_REPORT.md
 REAUDIT_REPORT.md
 anonmake-stabilization-backups/
+
+# Secrets and runtime data
+.env
+.env.*
+!.env.example
+*.zip
+*.zip.sha256
+*.sql
+*.dump
+*.sqlite
+*.sqlite3
+anonmake.db
+data/
+__pycache__/
+*.pyc
+*.pyo
+.stage*-backup-*/
+.audit-*-backup/
+*.bak-before-*

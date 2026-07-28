@@ -17,11 +17,17 @@ class QuestionRepository:
         sender_id: int,
         recipient_id: int,
         text: str,
+        content_type: str = "text",
+        media_file_id: str | None = None,
+        media_caption: str | None = None,
     ) -> Question:
         question = Question(
             sender_id=sender_id,
             recipient_id=recipient_id,
             text=text,
+            content_type=content_type,
+            media_file_id=media_file_id,
+            media_caption=media_caption,
         )
         self.session.add(question)
         await self.session.flush()

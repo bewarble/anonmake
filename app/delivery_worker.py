@@ -27,17 +27,60 @@ def retry_delay(attempt: int) -> int:
     return min(300, 2 ** min(attempt + 1, 8))
 
 
+
+async def send_delivery(bot: Bot, job):
+    markup = deserialize_markup(job.reply_markup)
+    payload = job.payload or {}
+    content_type = payload.get("content_type", "text")
+    file_id = payload.get("file_id")
+    caption = payload.get("caption") or job.text
+
+    if content_type == "text" or not file_id:
+        return await bot.send_message(
+            chat_id=job.chat_id,
+            text=job.text,
+            reply_markup=markup,
+        )
+
+    common = {
+        "chat_id": job.chat_id,
+        "reply_markup": markup,
+    }
+    if content_type == "photo":
+        return await bot.send_photo(photo=file_id, caption=caption, **common)
+    if content_type == "video":
+        return await bot.send_video(video=file_id, caption=caption, **common)
+    if content_type == "document":
+        return await bot.send_document(document=file_id, caption=caption, **common)
+    if content_type == "animation":
+        return await bot.send_animation(animation=file_id, caption=caption, **common)
+    if content_type == "audio":
+        return await bot.send_audio(audio=file_id, caption=caption, **common)
+    if content_type == "voice":
+        return await bot.send_voice(voice=file_id, caption=caption, **common)
+    if content_type == "video_note":
+        return await bot.send_video_note(video_note=file_id, **common)
+    if content_type == "sticker":
+        return await bot.send_sticker(
+            chat_id=job.chat_id,
+            sticker=file_id,
+            reply_markup=markup,
+        )
+
+    return await bot.send_message(
+        chat_id=job.chat_id,
+        text=job.text,
+        reply_markup=markup,
+    )
+
+
 async def deliver_job(
     bot: Bot,
     job,
     max_attempts: int,
 ) -> tuple[str, int | str, str | None]:
     try:
-        message = await bot.send_message(
-            chat_id=job.chat_id,
-            text=job.text,
-            reply_markup=deserialize_markup(job.reply_markup),
-        )
+        message = await send_delivery(bot, job)
         return "delivered", message.message_id, None
     except TelegramRetryAfter as exc:
         return "retry", max(1, int(exc.retry_after)), str(exc)

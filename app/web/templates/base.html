@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ title }} · AnonMake</title>
-  <link rel="stylesheet" href="/admin/static/admin-ui.css?v=35.0">
+  <link rel="stylesheet" href="/admin/static/admin-ui.css?v=35.2">
 </head>
 <body>
   <div class="app-shell">
-    <aside class="pro-sidebar" data-sidebar id="admin-sidebar">
+    <aside class="pro-sidebar" data-sidebar>
       <div class="sidebar-top">
         <button class="sidebar-mobile-close" type="button" data-sidebar-close aria-label="Закрыть меню">×</button>
         <a class="pro-brand" href="/admin/business">
@@ -19,6 +19,7 @@
       </div>
 
       <nav class="pro-nav">
+      <a href="/admin/search"><span>🔍 Поиск</span></a>
         <span class="nav-section">Обзор</span>
         <a class="{{ 'active' if section == 'dashboard' else '' }}" href="/admin/business"><i>◫</i><span>Обзор</span></a>
         <a class="{{ 'active' if section == 'analytics' else '' }}" href="/admin/business/analytics"><i>⌁</i><span>Аналитика</span></a>
@@ -84,6 +85,6 @@
       </div>
     </div>
   </div>
-  <script src="/admin/static/admin-ui.js?v=35.0" defer></script>
+  <script src="/admin/static/admin-ui.js?v=35.2" defer></script>
 </body>
 </html>

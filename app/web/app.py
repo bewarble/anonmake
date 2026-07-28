@@ -356,3 +356,23 @@ for stage31_route in admin_stage31_module.router.routes:
         app.router.routes.append(stage31_route)
         stage31_existing.add(stage31_key)
 # End Stage 31 Admin Control Center registration.
+
+
+# Stage 35.2 product completeness routes.
+from app.web import admin_complete as admin_complete_module  # noqa: E402
+
+existing_complete_routes = {
+    (
+        getattr(route, "path", None),
+        frozenset(getattr(route, "methods", None) or ()),
+    )
+    for route in app.router.routes
+}
+for complete_route in admin_complete_module.router.routes:
+    complete_key = (
+        getattr(complete_route, "path", None),
+        frozenset(getattr(complete_route, "methods", None) or ()),
+    )
+    if complete_key not in existing_complete_routes:
+        app.router.routes.append(complete_route)
+        existing_complete_routes.add(complete_key)

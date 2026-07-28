@@ -8,6 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 STATIC_CHECKS = (
+    "scripts.check_full_audit",
     "scripts.check_project",
     "scripts.check_stage_34",
     "scripts.check_stage_35",

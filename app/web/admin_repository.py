@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Answer, Question, User
 from app.models.admin import AdminAuditLog
 from app.models.billing import PaymentAttempt, PaymentMethod, Subscription
+from app.models.crm import CrmEvent
 from app.models.delivery import DeliveryOutbox
 from app.models.marketing import SourceAttribution, TrafficSource
 from app.models.reveal import RevealCheckout
@@ -63,6 +64,12 @@ class UserDetails:
     reveals: int
     last_successful_payment: PaymentAttempt | None
     last_failed_payment: PaymentAttempt | None
+    sent_questions_count: int = 0
+    received_questions_count: int = 0
+    answers_count: int = 0
+    reveal_clicks_count: int = 0
+    is_bot_blocked: bool = False
+    last_activity_at: datetime | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -170,12 +177,10 @@ class WebAdminRepository:
         if cleaned:
             if cleaned.isdigit():
                 numeric = int(cleaned)
-                filters.append(
-                    or_(
-                        User.id == numeric,
-                        User.telegram_id == numeric,
-                    )
-                )
+                numeric_filters = [User.telegram_id == numeric]
+                if -(2**31) <= numeric <= (2**31 - 1):
+                    numeric_filters.append(User.id == numeric)
+                filters.append(or_(*numeric_filters))
             else:
                 pattern = f"%{cleaned}%"
                 filters.append(
@@ -311,6 +316,52 @@ class WebAdminRepository:
             RevealCheckout.status.in_(SUCCESS_PAYMENT_STATUSES),
         )
 
+        sent_questions_count = await self._count(
+            Question, Question.sender_id == user.id
+        )
+        received_questions_count = await self._count(
+            Question, Question.recipient_id == user.id
+        )
+        answers_count = int(
+            await self.session.scalar(
+                select(func.count(Answer.id))
+                .join(Question, Question.id == Answer.question_id)
+                .where(
+                    or_(
+                        Question.sender_id == user.id,
+                        Question.recipient_id == user.id,
+                    )
+                )
+            )
+            or 0
+        )
+        reveal_clicks_count = int(
+            await self.session.scalar(
+                select(func.count(CrmEvent.id)).where(
+                    CrmEvent.user_id == user.id,
+                    CrmEvent.event_type.ilike("%reveal%"),
+                )
+            )
+            or 0
+        )
+        last_delivery = await self.session.scalar(
+            select(DeliveryOutbox)
+            .where(DeliveryOutbox.chat_id == user.telegram_id)
+            .order_by(DeliveryOutbox.updated_at.desc())
+            .limit(1)
+        )
+        is_bot_blocked = bool(
+            last_delivery
+            and last_delivery.status == "failed"
+            and last_delivery.last_error
+            and "blocked" in last_delivery.last_error.lower()
+        )
+        last_activity_at = await self.session.scalar(
+            select(func.max(CrmEvent.occurred_at)).where(
+                CrmEvent.user_id == user.id
+            )
+        )
+
         return UserDetails(
             user=user,
             subscription=subscription,
@@ -333,6 +384,12 @@ class WebAdminRepository:
                 .order_by(PaymentAttempt.id.desc())
                 .limit(1)
             ),
+            sent_questions_count=sent_questions_count,
+            received_questions_count=received_questions_count,
+            answers_count=answers_count,
+            reveal_clicks_count=reveal_clicks_count,
+            is_bot_blocked=is_bot_blocked,
+            last_activity_at=last_activity_at,
             last_failed_payment=await self.session.scalar(
                 select(PaymentAttempt)
                 .where(

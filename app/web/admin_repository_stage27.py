@@ -137,7 +137,10 @@ class WebCrmRepository:
         if cleaned:
             if cleaned.isdigit():
                 numeric = int(cleaned)
-                filters.append(or_(User.id == numeric, User.telegram_id == numeric))
+                numeric_filters = [User.telegram_id == numeric]
+                if -(2**31) <= numeric <= (2**31 - 1):
+                    numeric_filters.append(User.id == numeric)
+                filters.append(or_(*numeric_filters))
             else:
                 pattern = f"%{cleaned}%"
                 filters.append(

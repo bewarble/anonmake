@@ -6,11 +6,13 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import cancel_keyboard, main_menu_for
-from app.bot.states import AnswerQuestion
+from app.bot.keyboards.questions import answer_received_keyboard
+from app.bot.states import AnswerQuestion, AskQuestion
 from app.core import texts
 from app.repositories import AnswerRepository, QuestionRepository, UserRepository
 from app.repositories.delivery import DeliveryRepository
 from app.services.crm_tracking import CrmTrackingService
+from app.services.delivery import serialize_markup
 
 router = Router(name="answers")
 MAX_ANSWER_LENGTH = 1500
@@ -52,6 +54,46 @@ async def begin_answer(
     if callback.message:
         await callback.message.answer(
             texts.ANSWER_PROMPT,
+            reply_markup=cancel_keyboard(),
+        )
+
+
+
+
+@router.callback_query(F.data.startswith("answer_back:"))
+async def begin_answer_back(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    if callback.from_user is None:
+        return
+
+    try:
+        question_id = int((callback.data or "").split(":", 1)[1])
+    except (IndexError, ValueError):
+        await callback.answer(texts.INVALID_LINK, show_alert=True)
+        return
+
+    question = await QuestionRepository(session).get_with_users(question_id)
+    current_user = await UserRepository(session).get_by_telegram_id(
+        callback.from_user.id
+    )
+
+    if (
+        question is None
+        or current_user is None
+        or question.sender_id != current_user.id
+    ):
+        await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
+        return
+
+    await state.set_state(AskQuestion.waiting_for_text)
+    await state.update_data(recipient_id=question.recipient_id)
+    await callback.answer()
+    if callback.message:
+        await callback.message.answer(
+            texts.QUESTION_PROMPT,
             reply_markup=cancel_keyboard(),
         )
 
@@ -112,6 +154,9 @@ async def receive_answer(
         dedupe_key=f"answer:{answer.id}",
         chat_id=question.sender.telegram_id,
         text=texts.ANSWER_RECEIVED.format(answer=text),
+        reply_markup=serialize_markup(
+            answer_received_keyboard(question.id)
+        ),
     )
 
     tracking = CrmTrackingService(session)

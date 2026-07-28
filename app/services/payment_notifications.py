@@ -50,7 +50,16 @@ async def finalize_checkout_and_notify(
         await session.commit()
         return "notification_failed"
 
-    identity = await resolve_current_sender(bot, question.sender)
+    if buyer.id == question.recipient_id:
+        target_user = question.sender
+    elif buyer.id == question.sender_id:
+        target_user = question.recipient
+    else:
+        checkout.notification_error = "Buyer is not a question participant"
+        await session.commit()
+        return "notification_failed"
+
+    identity = await resolve_current_sender(bot, target_user)
 
     tracking = CrmTrackingService(session)
     await tracking.payment_succeeded(

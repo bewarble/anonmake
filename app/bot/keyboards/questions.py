@@ -11,11 +11,32 @@ def answer_question_keyboard(question_id: int) -> InlineKeyboardMarkup:
                     text=QUESTION_ANSWER,
                     callback_data=f"answer:{question_id}",
                 ),
+            ],
+            [
                 InlineKeyboardButton(
                     text=QUESTION_REVEAL,
                     callback_data=f"reveal:{question_id}",
                 ),
-            ]
+            ],
+        ]
+    )
+
+
+def answer_received_keyboard(question_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=QUESTION_ANSWER,
+                    callback_data=f"answer_back:{question_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=QUESTION_REVEAL,
+                    callback_data=f"reveal_answer:{question_id}",
+                ),
+            ],
         ]
     )
 

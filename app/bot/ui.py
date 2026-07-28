@@ -6,7 +6,6 @@ duplicating visible text. This keeps emoji and wording changes safe.
 
 # User menu
 USER_PERSONAL_LINK = "🔗 Моя ссылка"
-USER_HELP = "✨ Как всё работает"
 
 # Admin menu
 ADMIN_STATISTICS = "📊 Статистика"
@@ -25,7 +24,7 @@ ACTION_DELETE = "🗑 Удалить"
 
 # Question actions
 QUESTION_ANSWER = "✍️ Ответить"
-QUESTION_REVEAL = "👤 Узнать отправителя"
+QUESTION_REVEAL = "👁️ Кто это?"
 
 # Admin broadcast
 BROADCAST_ALL = "👥 Все пользователи"
@@ -40,3 +39,6 @@ EXPORT_ALIVE = "✅ Только активные"
 # Source management
 SOURCE_CREATE = "➕ Создать источник"
 SOURCE_DELETE_CONFIRM = "🗑 Удалить"
+
+REVEAL_CONFIRM = "✅ Подтверждаю"
+REVEAL_CLOSE = "Закрыть"

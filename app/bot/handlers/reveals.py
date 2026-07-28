@@ -7,7 +7,10 @@ from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot.keyboards.reveals import reveal_checkout_keyboard
+from app.bot.keyboards.reveals import (
+    reveal_checkout_keyboard,
+    reveal_consent_keyboard,
+)
 from app.core import texts
 from app.core.config import load_settings
 from app.repositories import QuestionRepository, UserRepository
@@ -41,27 +44,44 @@ def build_client(settings) -> ImpayaClient:
     )
 
 
-@router.callback_query(F.data.startswith("reveal:"))
-async def reveal_sender(
+async def _load_reveal_context(
     callback: CallbackQuery,
     session: AsyncSession,
-    bot: Bot,
-) -> None:
-    if callback.from_user is None:
-        return
-
-    try:
-        question_id = int((callback.data or "").split(":", 1)[1])
-    except (IndexError, ValueError):
-        await callback.answer(texts.INVALID_LINK, show_alert=True)
-        return
-
+    *,
+    question_id: int,
+    context: str,
+):
     buyer = await UserRepository(session).upsert_from_telegram(
         callback.from_user
     )
     question = await QuestionRepository(session).get_with_users(question_id)
 
-    if question is None or question.recipient_id != buyer.id:
+    if question is None:
+        return buyer, None, None
+
+    if context == "question" and question.recipient_id == buyer.id:
+        return buyer, question, question.sender
+    if context == "answer" and question.sender_id == buyer.id:
+        return buyer, question, question.recipient
+
+    return buyer, None, None
+
+
+async def _show_or_reveal(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    bot: Bot,
+    *,
+    question_id: int,
+    context: str,
+) -> None:
+    buyer, question, target = await _load_reveal_context(
+        callback,
+        session,
+        question_id=question_id,
+        context=context,
+    )
+    if question is None or target is None:
         await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
         return
 
@@ -69,26 +89,110 @@ async def reveal_sender(
         buyer.id
     )
     if has_active_vip(subscription):
-        identity = await resolve_current_sender(bot, question.sender)
+        identity = await resolve_current_sender(bot, target)
         await CrmTrackingService(session).sender_revealed(
             user_id=buyer.id,
             question_id=question.id,
         )
         await session.commit()
         await callback.answer()
-
         if callback.message:
             await callback.message.answer(
                 texts.VIP_SENDER.format(sender=identity.label)
             )
         return
 
+    await callback.answer()
+    if callback.message:
+        await callback.message.answer(
+            texts.REVEAL_CONSENT,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=reveal_consent_keyboard(
+                question_id=question.id,
+                context=context,
+            ),
+        )
+
+
+@router.callback_query(F.data.startswith("reveal:"))
+async def reveal_sender(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    bot: Bot,
+) -> None:
+    try:
+        question_id = int((callback.data or "").split(":", 1)[1])
+    except (IndexError, ValueError):
+        await callback.answer(texts.INVALID_LINK, show_alert=True)
+        return
+    await _show_or_reveal(
+        callback,
+        session,
+        bot,
+        question_id=question_id,
+        context="question",
+    )
+
+
+@router.callback_query(F.data.startswith("reveal_answer:"))
+async def reveal_answerer(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    bot: Bot,
+) -> None:
+    try:
+        question_id = int((callback.data or "").split(":", 1)[1])
+    except (IndexError, ValueError):
+        await callback.answer(texts.INVALID_LINK, show_alert=True)
+        return
+    await _show_or_reveal(
+        callback,
+        session,
+        bot,
+        question_id=question_id,
+        context="answer",
+    )
+
+
+@router.callback_query(F.data == "reveal_close")
+async def close_reveal(callback: CallbackQuery) -> None:
+    await callback.answer()
+    if callback.message:
+        await callback.message.delete()
+
+
+@router.callback_query(F.data.startswith("reveal_confirm:"))
+async def confirm_reveal(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    bot: Bot,
+) -> None:
+    parts = (callback.data or "").split(":")
+    if len(parts) != 3:
+        await callback.answer(texts.INVALID_LINK, show_alert=True)
+        return
+
+    context = parts[1]
+    try:
+        question_id = int(parts[2])
+    except ValueError:
+        await callback.answer(texts.INVALID_LINK, show_alert=True)
+        return
+
+    buyer, question, target = await _load_reveal_context(
+        callback,
+        session,
+        question_id=question_id,
+        context=context,
+    )
+    if question is None or target is None:
+        await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
+        return
+
     settings = load_settings()
     if not settings.billing_enabled:
-        await callback.answer(
-            texts.VIP_PAYMENT_UNAVAILABLE,
-            show_alert=True,
-        )
+        await callback.answer(texts.VIP_PAYMENT_UNAVAILABLE, show_alert=True)
         return
 
     if (
@@ -96,10 +200,7 @@ async def reveal_sender(
         or not settings.impaya_payment_form_url_template.strip()
         or not settings.public_base_url.strip()
     ):
-        await callback.answer(
-            texts.VIP_CONFIGURATION_ERROR,
-            show_alert=True,
-        )
+        await callback.answer(texts.VIP_CONFIGURATION_ERROR, show_alert=True)
         return
 
     checkout = await RevealRepository(session).get_or_create(
@@ -115,9 +216,7 @@ async def reveal_sender(
         payment_url = await RevealCheckoutService(
             session,
             client,
-            payment_form_url_template=(
-                settings.impaya_payment_form_url_template
-            ),
+            payment_form_url_template=settings.impaya_payment_form_url_template,
             trial_amount=settings.trial_price_kopecks,
             trial_duration=timedelta(hours=settings.trial_duration_hours),
         ).create(
@@ -131,20 +230,14 @@ async def reveal_sender(
             "Could not create reveal checkout",
             extra={"telegram_user_id": callback.from_user.id},
         )
-        await callback.answer(
-            texts.VIP_PAYMENT_UNAVAILABLE,
-            show_alert=True,
-        )
+        await callback.answer(texts.VIP_PAYMENT_UNAVAILABLE, show_alert=True)
         return
     finally:
         await client.close()
 
     await callback.answer()
     if callback.message:
-        await callback.message.answer(
-            texts.VIP_OFFER,
-            reply_markup=reveal_checkout_keyboard(
-                payment_url=payment_url,
-                offer_url=settings.offer_url,
-            ),
+        await callback.message.edit_text(
+            texts.REVEAL_PAYMENT_READY,
+            reply_markup=reveal_checkout_keyboard(payment_url=payment_url),
         )

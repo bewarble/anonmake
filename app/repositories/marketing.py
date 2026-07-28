@@ -98,10 +98,53 @@ class MarketingRepository:
             )
             or 0
         )
+        clicks = int(source.clicks or 0)
+        cpa_kopecks = (
+            round(source.spend_kopecks / attributed)
+            if attributed
+            else 0
+        )
+        conversion_percent = (
+            attributed / clicks * 100
+            if clicks
+            else 0.0
+        )
         return {
-            "clicks": source.clicks,
+            "clicks": clicks,
             "attributed": attributed,
             "spend_kopecks": source.spend_kopecks,
+            "cpa_kopecks": cpa_kopecks,
+            "conversion_percent": conversion_percent,
+        }
+
+    async def sources_summary(self) -> dict[str, int]:
+        source_ids = select(TrafficSource.id).where(
+            TrafficSource.is_active.is_(True)
+        )
+        spend_kopecks = int(
+            await self.session.scalar(
+                select(func.coalesce(func.sum(TrafficSource.spend_kopecks), 0))
+                .where(TrafficSource.is_active.is_(True))
+            )
+            or 0
+        )
+        attributed = int(
+            await self.session.scalar(
+                select(func.count(SourceAttribution.id)).where(
+                    SourceAttribution.source_id.in_(source_ids)
+                )
+            )
+            or 0
+        )
+        average_cpa_kopecks = (
+            round(spend_kopecks / attributed)
+            if attributed
+            else 0
+        )
+        return {
+            "spend_kopecks": spend_kopecks,
+            "attributed": attributed,
+            "average_cpa_kopecks": average_cpa_kopecks,
         }
 
     async def create_broadcast(
@@ -135,6 +178,64 @@ class MarketingRepository:
             select(Broadcast).order_by(Broadcast.id.desc()).limit(limit)
         )
         return list(result.scalars())
+
+
+    async def broadcast_audience_count(self, audience: str) -> int:
+        from datetime import datetime, timezone
+        from sqlalchemy import exists
+        from app.models.billing import Subscription
+        from app.models.user import User
+
+        query = select(func.count(User.id))
+        now = datetime.now(timezone.utc)
+        active_access = exists(
+            select(Subscription.id).where(
+                Subscription.user_id == User.id,
+                Subscription.access_until.is_not(None),
+                Subscription.access_until > now,
+            )
+        )
+        if audience == "vip":
+            query = query.where(active_access)
+        elif audience == "non_vip":
+            query = query.where(~active_access)
+        return int(await self.session.scalar(query) or 0)
+
+    async def broadcast_delivery_stats(self, broadcast_id: int) -> dict[str, int]:
+        from app.models.delivery import DeliveryOutbox
+
+        prefix = f"broadcast:{broadcast_id}:user:%"
+        rows = await self.session.execute(
+            select(
+                DeliveryOutbox.status,
+                func.count(DeliveryOutbox.id),
+            )
+            .where(DeliveryOutbox.dedupe_key.like(prefix))
+            .group_by(DeliveryOutbox.status)
+        )
+        values = {status: int(count) for status, count in rows}
+        delivered = values.get("delivered", 0)
+        failed = values.get("failed", 0)
+        pending = sum(
+            values.get(status, 0)
+            for status in ("pending", "retry", "processing")
+        )
+        blocked = int(
+            await self.session.scalar(
+                select(func.count(DeliveryOutbox.id)).where(
+                    DeliveryOutbox.dedupe_key.like(prefix),
+                    DeliveryOutbox.status == "failed",
+                    func.lower(DeliveryOutbox.last_error).like("%blocked%"),
+                )
+            )
+            or 0
+        )
+        return {
+            "delivered": delivered,
+            "failed": failed,
+            "pending": pending,
+            "blocked": blocked,
+        }
 
     async def next_broadcast(self) -> Broadcast | None:
         result = await self.session.execute(

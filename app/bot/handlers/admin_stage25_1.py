@@ -98,8 +98,8 @@ async def profit(message: Message, session: AsyncSession) -> None:
     def row(title: str, item) -> str:
         return (
             f"• {title} — {money(item.revenue_kopecks)} ₽ "
-            f"({money(item.partner_kopecks)} ₽)\n"
-            f"Новых доступов: {number(item.trials)}"
+            f"({money(item.partner_kopecks)} ₽) "
+            f"+{number(item.trials)} пдп"
         )
 
     await message.answer_photo(
@@ -183,11 +183,16 @@ async def referrals(
     if message.from_user is None or not is_admin(message.from_user.id):
         return
 
-    sources = await MarketingRepository(session).sources()
+    repository = MarketingRepository(session)
+    sources = await repository.sources()
+    summary = await repository.sources_summary()
     await message.answer(
         (
             "🔗 Источники\n\n"
-            f"Источников: {number(len(sources))}\n"
+            f"• Активных источников — {number(len(sources))}\n"
+            f"• Бюджет — {money(summary['spend_kopecks'])} ₽\n"
+            f"• Пользователей — {number(summary['attributed'])}\n"
+            f"• Средняя цена — {money(summary['average_cpa_kopecks'])} ₽\n\n"
             f"{admin_texts.SOURCES_PROMPT}"
         ),
         reply_markup=referrals_keyboard(sources),
@@ -203,12 +208,17 @@ async def referrals_callback(
         await callback.answer(admin_texts.DENIED, show_alert=True)
         return
 
-    sources = await MarketingRepository(session).sources()
+    repository = MarketingRepository(session)
+    sources = await repository.sources()
+    summary = await repository.sources_summary()
     if callback.message:
         await callback.message.edit_text(
             (
                 "🔗 Источники\n\n"
-                f"Источников: {number(len(sources))}\n"
+                f"• Активных источников — {number(len(sources))}\n"
+                f"• Бюджет — {money(summary['spend_kopecks'])} ₽\n"
+                f"• Пользователей — {number(summary['attributed'])}\n"
+                f"• Средняя цена — {money(summary['average_cpa_kopecks'])} ₽\n\n"
                 f"{admin_texts.SOURCES_PROMPT}"
             ),
             reply_markup=referrals_keyboard(sources),
@@ -252,10 +262,13 @@ async def referral_details(
         await callback.message.edit_text(
             (
                 f"🔗 <b>{escape(source.name)}</b>\n\n"
-                f"Закуп: {int(stats['spend_kopecks']) / 100:.2f} ₽\n"
-                f"Переходы: {int(stats['clicks'])}\n"
-                f"Пользователи: {attributed}\n"
-                f"Цена пользователя: {cpa:.2f} ₽\n\n"
+                f"• Бюджет — {money(int(stats['spend_kopecks']))} ₽\n"
+                f"• Переходы — {number(int(stats['clicks']))}\n"
+                f"• Пользователи — {number(attributed)}\n"
+                f"• Конверсия — {stats['conversion_percent']:.1f}%\n"
+                f"• Цена пользователя — {money(int(stats['cpa_kopecks']))} ₽\n"
+                f"• Создан — {source.created_at.strftime('%d.%m.%Y %H:%M')}\n"
+                f"• Исходная ссылка — {escape(source.source_url)}\n\n"
                 f"<code>{escape(link)}</code>"
             ),
             parse_mode="HTML",

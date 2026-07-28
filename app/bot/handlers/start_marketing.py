@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from html import escape
-
 from aiogram import Bot, Router
 from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.filters import CommandStart
@@ -17,8 +15,6 @@ from app.repositories.marketing import MarketingRepository
 from app.services.crm_tracking import CrmTrackingService
 
 router = Router(name="start_marketing")
-TERMS_URL = "https://sms.evocloud.su/terms"
-
 
 @router.message(CommandStart())
 async def start_with_terms(
@@ -71,18 +67,6 @@ async def start_with_terms(
         f"https://t.me/{me.username}?start={user.public_code}"
     )
 
-    await message.answer(
-        "При использовании бота, вы автоматически соглашаетесь "
-        f'с <a href="{TERMS_URL}">условиями пользования</a>.',
-        parse_mode="HTML",
-        disable_web_page_preview=True,
-    )
-    await message.answer(
-        texts.WELCOME,
-        reply_markup=main_menu_keyboard(
-            is_admin=message.from_user.id in load_settings().admin_ids_set
-        ),
-    )
     await message.answer(
         f"{texts.PERSONAL_LINK.format(link=personal_link)}\n\n"
         f"{texts.PERSONAL_LINK_HINT}",

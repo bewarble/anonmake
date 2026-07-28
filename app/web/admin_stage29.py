@@ -13,7 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import load_settings
 from app.database.session import SessionFactory
 from app.models.billing import Subscription
-from app.models.marketing import Broadcast, TrafficSource
+from app.models.marketing import TrafficSource
 from app.repositories.marketing import MarketingRepository
 from app.web.admin import login_redirect, page_context, require_session, templates
 from app.web.admin_auth import COOKIE_NAME
@@ -339,7 +339,16 @@ async def broadcasts_page(request: Request, created: int = 0):
         return login_redirect(request)
 
     async with SessionFactory() as session:
-        rows = await MarketingRepository(session).recent_broadcasts(limit=50)
+        marketing = MarketingRepository(session)
+        rows = await marketing.recent_broadcasts(limit=50)
+        broadcast_stats = {
+            row.id: await marketing.broadcast_delivery_stats(row.id)
+            for row in rows
+        }
+        audience_counts = {
+            key: await marketing.broadcast_audience_count(key)
+            for key in ("all", "vip", "non_vip")
+        }
 
     return templates.TemplateResponse(
         request=request,
@@ -349,6 +358,8 @@ async def broadcasts_page(request: Request, created: int = 0):
             title="Рассылки",
             section="broadcasts",
             rows=rows,
+            broadcast_stats=broadcast_stats,
+            audience_counts=audience_counts,
             csrf=csrf_token(request, "broadcast-create"),
             error=None,
             created=bool(created),
@@ -380,14 +391,12 @@ async def broadcast_create(
     if error is None:
         try:
             async with SessionFactory() as session:
-                item = Broadcast(
-                    kind="subscription",
+                await MarketingRepository(session).create_broadcast(
+                    kind="anonymous",
                     audience=audience,
                     text=text,
-                    status="queued",
-                    created_by_telegram_id=next(iter(settings.admin_ids_set), 0),
+                    admin_telegram_id=next(iter(settings.admin_ids_set), 0),
                 )
-                session.add(item)
                 await session.commit()
             return RedirectResponse(
                 "/admin/business/broadcasts?created=1",
@@ -398,7 +407,16 @@ async def broadcast_create(
             error = "Не удалось создать рассылку. Ошибка записана в журнал web."
 
     async with SessionFactory() as session:
-        rows = await MarketingRepository(session).recent_broadcasts(limit=50)
+        marketing = MarketingRepository(session)
+        rows = await marketing.recent_broadcasts(limit=50)
+        broadcast_stats = {
+            row.id: await marketing.broadcast_delivery_stats(row.id)
+            for row in rows
+        }
+        audience_counts = {
+            key: await marketing.broadcast_audience_count(key)
+            for key in ("all", "vip", "non_vip")
+        }
 
     return templates.TemplateResponse(
         request=request,
@@ -408,6 +426,8 @@ async def broadcast_create(
             title="Рассылки",
             section="broadcasts",
             rows=rows,
+            broadcast_stats=broadcast_stats,
+            audience_counts=audience_counts,
             csrf=csrf_token(request, "broadcast-create"),
             error=error,
             created=False,
