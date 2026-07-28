@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from html import escape
 import logging
 
 from aiogram import Router
@@ -99,6 +100,7 @@ async def test_payment(
         "VIP статус: 1 день\n"
         "После оплаты карта будет сохранена для "
         "рекуррентных списаний.\n\n"
-        f"Операция: <code>{operation_id}</code>",
+        f"Операция: <code>{escape(operation_id)}</code>",
+        parse_mode="HTML",
         reply_markup=test_payment_keyboard(payment_url),
     )

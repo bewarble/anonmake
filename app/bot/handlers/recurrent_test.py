@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from html import escape
 import logging
 
 from aiogram import F, Router
@@ -192,8 +193,8 @@ async def confirm_test_charge(
         text = (
             f"✅ Списание {amount / 100:.2f} ₽ успешно.\n\n"
             f"Attempt: {result.attempt.id}\n"
-            f"Operation: <code>{result.attempt.customer_operation_id}</code>\n"
-            f"Доступ до: {result.access_until}"
+            f"Operation: <code>{escape(result.attempt.customer_operation_id)}</code>\n"
+            f"VIP статус активен до: {result.access_until}"
         )
     elif result.decision == ChargeDecision.INSUFFICIENT:
         text = (
@@ -213,4 +214,11 @@ async def confirm_test_charge(
         )
 
     if callback.message:
-        await callback.message.edit_text(text)
+        await callback.message.edit_text(
+            text,
+            parse_mode=(
+                "HTML"
+                if result.decision == ChargeDecision.SUCCESS
+                else None
+            ),
+        )
