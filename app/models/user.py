@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import secrets
 
-from sqlalchemy import BigInteger, DateTime, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -15,14 +15,22 @@ def generate_public_code() -> str:
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("bot_id", "telegram_id", name="uq_users_bot_telegram"),
+        UniqueConstraint("bot_id", "public_code", name="uq_users_bot_public_code"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    bot_id: Mapped[int] = mapped_column(
+        ForeignKey("bot_instances.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     telegram_id: Mapped[int] = mapped_column(
-        BigInteger, unique=True, index=True, nullable=False
+        BigInteger, index=True, nullable=False
     )
     public_code: Mapped[str] = mapped_column(
         String(32),
-        unique=True,
         index=True,
         nullable=False,
         default=generate_public_code,
@@ -39,6 +47,8 @@ class User(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    bot_instance: Mapped["BotInstance"] = relationship(back_populates="users")
 
     sent_questions: Mapped[list["Question"]] = relationship(
         back_populates="sender",
@@ -57,3 +67,5 @@ class User(Base):
 
 
 from app.models.question import Question  # noqa: E402,F401
+
+from app.models.bot_instance import BotInstance  # noqa: E402,F401

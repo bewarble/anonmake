@@ -22,7 +22,7 @@ async def main() -> None:
     dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.update.outer_middleware(RequestContextMiddleware())
 
-    database_middleware = DatabaseMiddleware()
+    database_middleware = DatabaseMiddleware(settings)
     dispatcher.message.outer_middleware(database_middleware)
     dispatcher.callback_query.outer_middleware(database_middleware)
     dispatcher.include_router(build_router())

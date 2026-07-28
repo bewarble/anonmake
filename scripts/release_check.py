@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 STATIC_CHECKS = (
     "scripts.check_final_qa",
+    "scripts.check_stage_38_1",
     "scripts.check_full_audit",
     "scripts.check_stage_36",
     "scripts.check_project",

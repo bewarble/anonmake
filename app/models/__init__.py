@@ -1,3 +1,4 @@
+from app.models.bot_instance import BotInstance
 from app.models.admin import AdminAuditLog
 from app.models.answer import Answer
 from app.models.billing import PaymentAttempt, PaymentMethod, Subscription
@@ -11,6 +12,7 @@ from app.models.user import User
 __all__ = (
     "AdminAuditLog",
     "Answer",
+    "BotInstance",
     "Broadcast",
     "CrmEvent",
     "CrmNote",

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bot_context import require_current_bot
 from app.models.user import User
 
 
@@ -16,14 +17,22 @@ class UserRepository:
         return await self.session.get(User, user_id)
 
     async def get_by_telegram_id(self, telegram_id: int) -> User | None:
+        bot_id = require_current_bot().id
         result = await self.session.execute(
-            select(User).where(User.telegram_id == telegram_id)
+            select(User).where(
+                User.bot_id == bot_id,
+                User.telegram_id == telegram_id,
+            )
         )
         return result.scalar_one_or_none()
 
     async def get_by_public_code(self, public_code: str) -> User | None:
+        bot_id = require_current_bot().id
         result = await self.session.execute(
-            select(User).where(User.public_code == public_code)
+            select(User).where(
+                User.bot_id == bot_id,
+                User.public_code == public_code,
+            )
         )
         return result.scalar_one_or_none()
 
@@ -49,6 +58,7 @@ class UserRepository:
             return user, False
 
         user = User(
+            bot_id=require_current_bot().id,
             telegram_id=telegram_user.id,
             username=telegram_user.username,
             first_name=telegram_user.first_name,

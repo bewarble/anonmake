@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     bot_token: str = Field(default="", alias="BOT_TOKEN")
     bot_username: str = Field(default="", alias="BOT_USERNAME")
+    bot_code: str = Field(default="primary", alias="BOT_CODE")
+    bot_display_name: str = Field(default="AnonMake", alias="BOT_DISPLAY_NAME")
     database_url: str = Field(
         default="sqlite+aiosqlite:///data/anonmake.db",
         alias="DATABASE_URL",
@@ -124,6 +126,20 @@ class Settings(BaseSettings):
             for raw in self.admin_ids.split(",")
             if (value := raw.strip()).isdigit()
         }
+
+    def require_bot_identity(self) -> tuple[str, str, str]:
+        code = self.bot_code.strip().lower()
+        username = self.bot_username.strip().lstrip("@")
+        display_name = self.bot_display_name.strip()
+
+        if not code:
+            raise RuntimeError("BOT_CODE is missing")
+        if not username:
+            raise RuntimeError("BOT_USERNAME is missing")
+        if not display_name:
+            display_name = username
+
+        return code, username, display_name
 
     def require_bot_token(self) -> str:
         token = self.bot_token.strip()
