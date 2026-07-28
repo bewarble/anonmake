@@ -5,6 +5,8 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bot_context import require_current_bot
+
 from app.models.billing import PaymentAttempt, PaymentMethod
 from app.models.reveal import RevealCheckout
 from app.repositories.billing import BillingRepository
@@ -47,20 +49,26 @@ class RevealCheckoutService:
         if not self.payment_form_url_template:
             raise RuntimeError("IMPAYA_PAYMENT_FORM_URL_TEMPLATE is not configured")
 
+        current_bot = require_current_bot()
+        current_bot = require_current_bot()
         subscription = await self.billing.get_or_create_subscription(user_id)
         method = await self.billing.payment_method_for_user(user_id)
 
         if method is None:
             method = PaymentMethod(
+                bot_id=current_bot.id,
                 user_id=user_id,
-                merchant_user_id=f"anonmake_{user_id}",
+                merchant_user_id=f"{current_bot.code}_anonmake_{user_id}",
             )
             self.session.add(method)
             await self.session.flush()
 
         operation_id = checkout.customer_operation_id
         if operation_id is None:
-            operation_id = f"vip_{checkout.id}_{uuid.uuid4().hex[:20]}"
+            operation_id = (
+                f"{current_bot.code}_vip_"
+                f"{checkout.id}_{uuid.uuid4().hex[:16]}"
+            )[:64]
 
         result = await self.client.create_trial_invoice(
             customer_operation_id=operation_id,
@@ -89,6 +97,7 @@ class RevealCheckoutService:
         if existing is None:
             self.session.add(
                 PaymentAttempt(
+                    bot_id=current_bot.id,
                     subscription_id=subscription.id,
                     customer_operation_id=operation_id,
                     transaction_id=result.data.get("transaction_id"),
@@ -134,10 +143,11 @@ class RevealCheckoutService:
 
         if method is None:
             method = PaymentMethod(
+                bot_id=current_bot.id,
                 user_id=user_id,
                 merchant_user_id=(
                     binding.get("merchant_user_id")
-                    or f"anonmake_{user_id}"
+                    or f"{current_bot.code}_anonmake_{user_id}"
                 ),
             )
             self.session.add(method)
