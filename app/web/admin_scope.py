@@ -64,6 +64,23 @@ async def load_admin_bot_scope(request: Request) -> AdminBotScope:
                 else []
             )
 
-    selected = next((bot for bot in bots if bot.code == requested), None)
-    denied = requested != ALL_PROJECTS and selected is None
+    can_view_all = (
+        principal is None
+        or principal.admin_id is None
+        or principal.is_superadmin
+    )
+
+    # Администратор проекта никогда не получает общий режим.
+    # При открытии /admin или ?bot=all автоматически выбирается
+    # первый разрешённый ему проект.
+    if not can_view_all and requested == ALL_PROJECTS:
+        selected = bots[0] if bots else None
+        denied = not bots
+    else:
+        selected = next(
+            (bot for bot in bots if bot.code == requested),
+            None,
+        )
+        denied = requested != ALL_PROJECTS and selected is None
+
     return AdminBotScope(tuple(bots), selected, denied)

@@ -72,7 +72,9 @@
           <label class="project-selector">
             <span>Проект</span>
             <select data-project-selector aria-label="Выбрать проект">
+              {% if not current_admin or current_admin.is_superadmin %}
               <option value="all" {{ 'selected' if selected_bot_code == 'all' else '' }}>Все проекты</option>
+              {% endif %}
               {% for bot in admin_bots %}
                 <option value="{{ bot.code }}" {{ 'selected' if selected_bot_code == bot.code else '' }}>{{ bot.display_name }} · @{{ bot.username }}</option>
               {% endfor %}
