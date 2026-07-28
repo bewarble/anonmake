@@ -22,6 +22,30 @@ class Settings(BaseSettings):
     bot_code: str = Field(default="primary", alias="BOT_CODE")
     bot_display_name: str = Field(default="AnonMake", alias="BOT_DISPLAY_NAME")
     multibot_tokens_json: str = Field(default="", alias="MULTIBOT_TOKENS_JSON")
+
+    bot_two_code: str = Field(default="secondary", alias="BOT_TWO_CODE")
+    bot_two_token: str = Field(default="", alias="BOT_TWO_TOKEN")
+    bot_two_username: str = Field(default="", alias="BOT_TWO_USERNAME")
+    bot_two_display_name: str = Field(
+        default="Second Bot",
+        alias="BOT_TWO_DISPLAY_NAME",
+    )
+
+    bot_three_code: str = Field(default="third", alias="BOT_THREE_CODE")
+    bot_three_token: str = Field(default="", alias="BOT_THREE_TOKEN")
+    bot_three_username: str = Field(default="", alias="BOT_THREE_USERNAME")
+    bot_three_display_name: str = Field(
+        default="Third Bot",
+        alias="BOT_THREE_DISPLAY_NAME",
+    )
+
+    bot_four_code: str = Field(default="fourth", alias="BOT_FOUR_CODE")
+    bot_four_token: str = Field(default="", alias="BOT_FOUR_TOKEN")
+    bot_four_username: str = Field(default="", alias="BOT_FOUR_USERNAME")
+    bot_four_display_name: str = Field(
+        default="Fourth Bot",
+        alias="BOT_FOUR_DISPLAY_NAME",
+    )
     database_url: str = Field(
         default="sqlite+aiosqlite:///data/anonmake.db",
         alias="DATABASE_URL",
@@ -131,10 +155,18 @@ class Settings(BaseSettings):
 
     def bot_tokens(self) -> dict[str, str]:
         tokens: dict[str, str] = {}
-        primary_code = self.bot_code.strip().lower()
-        primary_token = self.bot_token.strip()
-        if primary_code and primary_token:
-            tokens[primary_code] = primary_token
+
+        configured = (
+            (self.bot_code, self.bot_token),
+            (self.bot_two_code, self.bot_two_token),
+            (self.bot_three_code, self.bot_three_token),
+            (self.bot_four_code, self.bot_four_token),
+        )
+        for raw_code, raw_token in configured:
+            code = raw_code.strip().lower()
+            token = raw_token.strip()
+            if code and token:
+                tokens[code] = token
 
         raw = self.multibot_tokens_json.strip()
         if raw:
@@ -152,6 +184,66 @@ class Settings(BaseSettings):
                 tokens[normalized_code] = normalized_token
 
         return tokens
+
+    def configured_bot_identities(
+        self,
+    ) -> tuple[tuple[str, str, str, str], ...]:
+        items = (
+            (
+                self.bot_code,
+                self.bot_token,
+                self.bot_username,
+                self.bot_display_name,
+            ),
+            (
+                self.bot_two_code,
+                self.bot_two_token,
+                self.bot_two_username,
+                self.bot_two_display_name,
+            ),
+            (
+                self.bot_three_code,
+                self.bot_three_token,
+                self.bot_three_username,
+                self.bot_three_display_name,
+            ),
+            (
+                self.bot_four_code,
+                self.bot_four_token,
+                self.bot_four_username,
+                self.bot_four_display_name,
+            ),
+        )
+
+        configured: list[tuple[str, str, str, str]] = []
+        seen_codes: set[str] = set()
+        seen_usernames: set[str] = set()
+
+        for raw_code, raw_token, raw_username, raw_name in items:
+            token = raw_token.strip()
+            if not token:
+                continue
+
+            code = raw_code.strip().lower()
+            username = raw_username.strip().lstrip("@")
+            display_name = raw_name.strip() or username
+
+            if not code:
+                raise RuntimeError("Configured bot has an empty code")
+            if not username:
+                raise RuntimeError(
+                    f"BOT username is missing for configured code: {code}"
+                )
+            if code in seen_codes:
+                raise RuntimeError(f"Duplicate bot code: {code}")
+            if username.lower() in seen_usernames:
+                raise RuntimeError(f"Duplicate bot username: {username}")
+
+            seen_codes.add(code)
+            seen_usernames.add(username.lower())
+            configured.append((code, token, username, display_name))
+
+        return tuple(configured)
 
     def require_bot_identity(self) -> tuple[str, str, str]:
         code = self.bot_code.strip().lower()
