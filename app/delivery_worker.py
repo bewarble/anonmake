@@ -17,7 +17,9 @@ from aiogram.exceptions import (
 from app.core.config import load_settings
 from app.core.logging import configure_logging
 from app.database.session import SessionFactory, close_database, init_database
+from app.models.bot_instance import BotInstance
 from app.repositories.delivery import DeliveryRepository
+from app.services.bot_pool import BotPool
 from app.services.delivery import deserialize_markup
 
 logger = logging.getLogger(__name__)
@@ -107,7 +109,7 @@ async def main() -> None:
     max_attempts = int(os.getenv("DELIVERY_MAX_ATTEMPTS", "10"))
     stale_after = int(os.getenv("DELIVERY_LOCK_STALE_SECONDS", "120"))
 
-    bot = Bot(token=settings.require_bot_token())
+    bot_pool = BotPool(settings)
     await init_database()
 
     logger.info(
@@ -136,6 +138,24 @@ async def main() -> None:
                     if job is None or job.status != "processing":
                         continue
 
+                    instance = await session.get(BotInstance, job.bot_id)
+                    if instance is None:
+                        repository = DeliveryRepository(session)
+                        await repository.mark_failed(
+                            job,
+                            error=f"Unknown bot instance: {job.bot_id}",
+                        )
+                        await session.commit()
+                        continue
+
+                    try:
+                        bot = bot_pool.for_instance(instance)
+                    except RuntimeError as exc:
+                        repository = DeliveryRepository(session)
+                        await repository.mark_failed(job, error=str(exc))
+                        await session.commit()
+                        continue
+
                     status, value, error = await deliver_job(
                         bot,
                         job,
@@ -162,7 +182,7 @@ async def main() -> None:
 
                     await session.commit()
     finally:
-        await bot.session.close()
+        await bot_pool.close()
         await close_database()
 
 

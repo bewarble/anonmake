@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import json
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
     bot_username: str = Field(default="", alias="BOT_USERNAME")
     bot_code: str = Field(default="primary", alias="BOT_CODE")
     bot_display_name: str = Field(default="AnonMake", alias="BOT_DISPLAY_NAME")
+    multibot_tokens_json: str = Field(default="", alias="MULTIBOT_TOKENS_JSON")
     database_url: str = Field(
         default="sqlite+aiosqlite:///data/anonmake.db",
         alias="DATABASE_URL",
@@ -126,6 +128,30 @@ class Settings(BaseSettings):
             for raw in self.admin_ids.split(",")
             if (value := raw.strip()).isdigit()
         }
+
+    def bot_tokens(self) -> dict[str, str]:
+        tokens: dict[str, str] = {}
+        primary_code = self.bot_code.strip().lower()
+        primary_token = self.bot_token.strip()
+        if primary_code and primary_token:
+            tokens[primary_code] = primary_token
+
+        raw = self.multibot_tokens_json.strip()
+        if raw:
+            try:
+                loaded = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError("MULTIBOT_TOKENS_JSON is invalid JSON") from exc
+            if not isinstance(loaded, dict):
+                raise RuntimeError("MULTIBOT_TOKENS_JSON must be an object")
+            for code, token in loaded.items():
+                normalized_code = str(code).strip().lower()
+                normalized_token = str(token).strip()
+                if not normalized_code or not normalized_token:
+                    raise RuntimeError("MULTIBOT_TOKENS_JSON contains an empty key or token")
+                tokens[normalized_code] = normalized_token
+
+        return tokens
 
     def require_bot_identity(self) -> tuple[str, str, str]:
         code = self.bot_code.strip().lower()

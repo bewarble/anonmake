@@ -7,6 +7,8 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bot_context import get_current_bot
+from app.models.bot_instance import BotInstance
 from app.models.marketing import Broadcast, SourceAttribution, TrafficSource
 from app.models.user import User
 
@@ -154,6 +156,7 @@ class MarketingRepository:
         audience: str,
         text: str,
         admin_telegram_id: int,
+        bot_id: int | None = None,
     ) -> Broadcast:
         if kind != "anonymous":
             raise ValueError("Unsupported broadcast kind")
@@ -162,7 +165,23 @@ class MarketingRepository:
         if not text.strip() or len(text) > 4000:
             raise ValueError("Invalid broadcast text")
 
+        resolved_bot_id = bot_id
+        if resolved_bot_id is None:
+            current_bot = get_current_bot()
+            if current_bot is not None:
+                resolved_bot_id = current_bot.id
+            else:
+                resolved_bot_id = await self.session.scalar(
+                    select(BotInstance.id)
+                    .where(BotInstance.is_active.is_(True))
+                    .order_by(BotInstance.id)
+                    .limit(1)
+                )
+        if resolved_bot_id is None:
+            raise RuntimeError("No active bot instance is available")
+
         item = Broadcast(
+            bot_id=resolved_bot_id,
             kind=kind,
             audience=audience,
             text=text,
@@ -204,13 +223,20 @@ class MarketingRepository:
     async def broadcast_delivery_stats(self, broadcast_id: int) -> dict[str, int]:
         from app.models.delivery import DeliveryOutbox
 
+        item = await self.session.get(Broadcast, broadcast_id)
+        if item is None:
+            return {"delivered": 0, "failed": 0, "pending": 0, "blocked": 0}
+
         prefix = f"broadcast:{broadcast_id}:user:%"
         rows = await self.session.execute(
             select(
                 DeliveryOutbox.status,
                 func.count(DeliveryOutbox.id),
             )
-            .where(DeliveryOutbox.dedupe_key.like(prefix))
+            .where(
+                DeliveryOutbox.bot_id == item.bot_id,
+                DeliveryOutbox.dedupe_key.like(prefix),
+            )
             .group_by(DeliveryOutbox.status)
         )
         values = {status: int(count) for status, count in rows}
@@ -223,6 +249,7 @@ class MarketingRepository:
         blocked = int(
             await self.session.scalar(
                 select(func.count(DeliveryOutbox.id)).where(
+                    DeliveryOutbox.bot_id == item.bot_id,
                     DeliveryOutbox.dedupe_key.like(prefix),
                     DeliveryOutbox.status == "failed",
                     func.lower(DeliveryOutbox.last_error).like("%blocked%"),

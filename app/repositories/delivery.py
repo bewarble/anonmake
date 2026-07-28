@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bot_context import require_current_bot
 from app.models.delivery import DeliveryOutbox
 
 
@@ -23,7 +24,9 @@ class DeliveryRepository:
         text: str,
         reply_markup: dict | None = None,
         payload: dict | None = None,
+        bot_id: int | None = None,
     ) -> DeliveryOutbox:
+        resolved_bot_id = bot_id or require_current_bot().id
         bind = self.session.get_bind()
         dialect = bind.dialect.name
         if dialect == "postgresql":
@@ -36,6 +39,7 @@ class DeliveryRepository:
         statement = (
             insert(DeliveryOutbox)
             .values(
+                bot_id=resolved_bot_id,
                 kind=kind,
                 dedupe_key=dedupe_key,
                 chat_id=chat_id,
@@ -45,7 +49,7 @@ class DeliveryRepository:
                 status="pending",
                 next_attempt_at=datetime.now(timezone.utc),
             )
-            .on_conflict_do_nothing(index_elements=["dedupe_key"])
+            .on_conflict_do_nothing(index_elements=["bot_id", "dedupe_key"])
             .returning(DeliveryOutbox)
         )
         result = await self.session.execute(statement)
@@ -55,7 +59,8 @@ class DeliveryRepository:
 
         existing = await self.session.scalar(
             select(DeliveryOutbox).where(
-                DeliveryOutbox.dedupe_key == dedupe_key
+                DeliveryOutbox.bot_id == resolved_bot_id,
+                DeliveryOutbox.dedupe_key == dedupe_key,
             )
         )
         if existing is None:

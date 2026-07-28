@@ -71,6 +71,11 @@ class Broadcast(Base):
     __tablename__ = "broadcasts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(
+        ForeignKey("bot_instances.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     kind: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     audience: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)

@@ -25,7 +25,10 @@ logger = logging.getLogger(__name__)
 async def audience_users(session, item, batch_size: int) -> list[User]:
     query = (
         select(User)
-        .where(User.id > item.cursor_user_id)
+        .where(
+            User.bot_id == item.bot_id,
+            User.id > item.cursor_user_id,
+        )
         .order_by(User.id)
         .limit(batch_size)
     )
@@ -48,13 +51,16 @@ async def audience_users(session, item, batch_size: int) -> list[User]:
     return list(result.scalars())
 
 
-async def configured_sender(session, telegram_id: int) -> User:
+async def configured_sender(session, telegram_id: int, bot_id: int) -> User:
     sender = await session.scalar(
-        select(User).where(User.telegram_id == telegram_id)
+        select(User).where(
+            User.bot_id == bot_id,
+            User.telegram_id == telegram_id,
+        )
     )
     if sender is None:
         raise RuntimeError(
-            "BROADCAST_SENDER_TELEGRAM_ID does not belong to a registered user"
+            "BROADCAST_SENDER_TELEGRAM_ID does not belong to this bot"
         )
     return sender
 
@@ -77,6 +83,7 @@ async def enqueue_broadcast_batch(session, *, item, users: list[User], sender: U
         await delivery.enqueue(
             kind="broadcast_question",
             dedupe_key=f"broadcast:{item.id}:user:{recipient.id}",
+            bot_id=item.bot_id,
             chat_id=recipient.telegram_id,
             text=texts.NEW_QUESTION.format(text=question.text),
             reply_markup=serialize_markup(markup),
@@ -108,7 +115,11 @@ async def main() -> None:
                     await asyncio.sleep(interval)
                     continue
 
-                sender = await configured_sender(session, sender_telegram_id)
+                sender = await configured_sender(
+                    session,
+                    sender_telegram_id,
+                    item.bot_id,
+                )
                 await repository.mark_broadcast_started(item)
                 users = await audience_users(session, item, batch_size)
 

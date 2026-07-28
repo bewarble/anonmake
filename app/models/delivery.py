@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Integer, JSON, String, Text, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
@@ -12,13 +12,24 @@ class DeliveryOutbox(Base):
     """Durable Telegram delivery job stored in PostgreSQL."""
 
     __tablename__ = "delivery_outbox"
+    __table_args__ = (
+        UniqueConstraint(
+            "bot_id",
+            "dedupe_key",
+            name="uq_delivery_outbox_bot_dedupe",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(
+        ForeignKey("bot_instances.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     kind: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     dedupe_key: Mapped[str] = mapped_column(
         String(128),
         nullable=False,
-        unique=True,
         index=True,
     )
     chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
