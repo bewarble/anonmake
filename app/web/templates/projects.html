@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-toolbar business-toolbar">
+  <div>
+    <span class="panel-kicker">Multibot Control Center</span>
+    <h2>Все проекты</h2>
+    <p>Сравнение аудитории, VIP подписок, выручки и качества доставки.</p>
+  </div>
+</section>
+
+<section class="metric-grid project-summary-grid">
+  <article class="metric-card"><span>Проекты</span><strong>{{ rows|length }}</strong><small>Активные экземпляры ботов</small></article>
+  <article class="metric-card"><span>Пользователи</span><strong>{{ total_users }}</strong><small>Во всех проектах</small></article>
+  <article class="metric-card"><span>VIP статусы</span><strong>{{ total_vip }}</strong><small>Активные подписки</small></article>
+  <article class="metric-card"><span>Выручка</span><strong>{{ money(total_revenue) }} ₽</strong><small>Успешные платежи</small></article>
+</section>
+
+<section class="project-grid">
+{% for row in rows %}
+  <article class="project-card">
+    <div class="project-card-head">
+      <div class="project-avatar">{{ row.bot.display_name[:1]|upper }}</div>
+      <div>
+        <h3>{{ row.bot.display_name }}</h3>
+        <a href="https://t.me/{{ row.bot.username }}" target="_blank" rel="noreferrer">@{{ row.bot.username }}</a>
+      </div>
+      <span class="project-health {{ row.delivery_health }}">
+        {% if row.delivery_health == 'healthy' %}Работает{% elif row.delivery_health == 'pending' %}Очередь{% else %}Есть ошибки{% endif %}
+      </span>
+    </div>
+    <dl class="project-metrics">
+      <div><dt>Пользователи</dt><dd>{{ row.users }}</dd></div>
+      <div><dt>VIP</dt><dd>{{ row.active_vip }}</dd></div>
+      <div><dt>Выручка</dt><dd>{{ money(row.revenue_kopecks) }} ₽</dd></div>
+      <div><dt>Доставлено</dt><dd>{{ row.delivered }}</dd></div>
+      <div><dt>В очереди</dt><dd>{{ row.pending }}</dd></div>
+      <div><dt>Ошибки</dt><dd>{{ row.failed }}</dd></div>
+    </dl>
+    <div class="project-card-foot">
+      <span>Последняя доставка: {{ row.last_delivery_at|date_time if row.last_delivery_at else 'нет данных' }}</span>
+      <a class="button-primary" href="/admin/business?bot={{ row.bot.code }}">Открыть проект →</a>
+    </div>
+  </article>
+{% else %}
+  <div class="empty-state">Проекты ещё не зарегистрированы.</div>
+{% endfor %}
+</section>
+{% endblock %}

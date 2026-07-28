@@ -927,3 +927,15 @@
     initAccessibility();
   }
 })();
+
+
+(() => {
+  const selector = document.querySelector('[data-project-selector]');
+  if (!selector) return;
+  selector.addEventListener('change', () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('bot', selector.value);
+    url.searchParams.delete('page');
+    window.location.assign(url.toString());
+  });
+})();

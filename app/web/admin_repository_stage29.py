@@ -89,8 +89,14 @@ class SourceRow:
 
 
 class Stage29Repository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, bot_id: int | None = None) -> None:
         self.session = session
+        self.bot_id = bot_id
+
+    def _direct_bot_filter(self, model):
+        if self.bot_id is None or not hasattr(model, "bot_id"):
+            return None
+        return model.bot_id == self.bot_id
 
     async def dashboard(self, days: int | None) -> DashboardSnapshot:
         now = datetime.now(timezone.utc)
@@ -117,23 +123,31 @@ class Stage29Repository:
             start, kinds=("rebill", "renewal", "recurring"), success_only=True
         )
 
+        active_vip_filters = [
+            Subscription.access_until.is_not(None),
+            Subscription.access_until > now,
+        ]
+        if self.bot_id is not None:
+            active_vip_filters.append(Subscription.bot_id == self.bot_id)
         active_vip = int(
             await self.session.scalar(
                 select(func.count(Subscription.id)).where(
-                    Subscription.access_until.is_not(None),
-                    Subscription.access_until > now,
+                    *active_vip_filters,
                 )
             )
             or 0
         )
+        active_card_filters = [
+            PaymentMethod.is_active.is_(True),
+            PaymentMethod.is_recurrent.is_(True),
+            PaymentMethod.binding_id.is_not(None),
+            PaymentMethod.blocked_at.is_(None),
+        ]
+        if self.bot_id is not None:
+            active_card_filters.append(PaymentMethod.bot_id == self.bot_id)
         active_cards = int(
             await self.session.scalar(
-                select(func.count(PaymentMethod.id)).where(
-                    PaymentMethod.is_active.is_(True),
-                    PaymentMethod.is_recurrent.is_(True),
-                    PaymentMethod.binding_id.is_not(None),
-                    PaymentMethod.blocked_at.is_(None),
-                )
+                select(func.count(PaymentMethod.id)).where(*active_card_filters)
             )
             or 0
         )
@@ -216,6 +230,8 @@ class Stage29Repository:
     ) -> tuple[list[UserRow], int]:
         now = datetime.now(timezone.utc)
         filters = []
+        if self.bot_id is not None:
+            filters.append(User.bot_id == self.bot_id)
         cleaned = query.strip().lstrip("@")
         if cleaned:
             if cleaned.isdigit():
@@ -344,8 +360,11 @@ class Stage29Repository:
 
     async def sources(self) -> list[SourceRow]:
         now = datetime.now(timezone.utc)
+        source_query = select(TrafficSource)
+        if self.bot_id is not None:
+            source_query = source_query.where(TrafficSource.bot_id == self.bot_id)
         result = await self.session.execute(
-            select(TrafficSource).order_by(TrafficSource.id.desc())
+            source_query.order_by(TrafficSource.id.desc())
         )
         rows: list[SourceRow] = []
 
@@ -482,17 +501,28 @@ class Stage29Repository:
 
     async def _count_since(self, model, column, start):
         query = select(func.count(model.id))
+        direct = self._direct_bot_filter(model)
+        if direct is not None:
+            query = query.where(direct)
+        elif self.bot_id is not None and model is Question:
+            query = query.join(User, User.id == Question.recipient_id).where(User.bot_id == self.bot_id)
+        elif self.bot_id is not None and model is Answer:
+            query = query.join(Question, Question.id == Answer.question_id).join(User, User.id == Question.recipient_id).where(User.bot_id == self.bot_id)
         if start is not None:
             query = query.where(column >= start)
         return int(await self.session.scalar(query) or 0)
 
     async def _count_between(self, model, column, left, right):
-        return int(
-            await self.session.scalar(
-                select(func.count(model.id)).where(column >= left, column < right)
-            )
-            or 0
-        )
+        query = select(func.count(model.id))
+        direct = self._direct_bot_filter(model)
+        if direct is not None:
+            query = query.where(direct)
+        elif self.bot_id is not None and model is Question:
+            query = query.join(User, User.id == Question.recipient_id).where(User.bot_id == self.bot_id)
+        elif self.bot_id is not None and model is Answer:
+            query = query.join(Question, Question.id == Answer.question_id).join(User, User.id == Question.recipient_id).where(User.bot_id == self.bot_id)
+        query = query.where(column >= left, column < right)
+        return int(await self.session.scalar(query) or 0)
 
     async def _payment_sum_comparison(self, start, previous_start):
         current = await self._payment_sum_since(start)
@@ -522,6 +552,8 @@ class Stage29Repository:
 
     async def _payment_count(self, start, kinds, success_only):
         filters = [PaymentAttempt.attempt_kind.in_(kinds)]
+        if self.bot_id is not None:
+            filters.append(PaymentAttempt.bot_id == self.bot_id)
         if start is not None:
             filters.append(PaymentAttempt.created_at >= start)
         if success_only:
@@ -535,6 +567,8 @@ class Stage29Repository:
 
     async def _payment_sum_since(self, start):
         filters = [PaymentAttempt.status.in_(SUCCESS_STATUSES)]
+        if self.bot_id is not None:
+            filters.append(PaymentAttempt.bot_id == self.bot_id)
         if start is not None:
             filters.append(PaymentAttempt.created_at >= start)
         return int(
@@ -553,6 +587,7 @@ class Stage29Repository:
                     PaymentAttempt.status.in_(SUCCESS_STATUSES),
                     PaymentAttempt.created_at >= left,
                     PaymentAttempt.created_at < right,
+                    *([PaymentAttempt.bot_id == self.bot_id] if self.bot_id is not None else []),
                 )
             )
             or 0
@@ -565,6 +600,7 @@ class Stage29Repository:
                 .join(DeliveryOutbox, DeliveryOutbox.chat_id == User.telegram_id)
                 .where(
                     DeliveryOutbox.status == "failed",
+                    *([DeliveryOutbox.bot_id == self.bot_id] if self.bot_id is not None else []),
                     or_(
                         *(DeliveryOutbox.last_error.ilike(p) for p in PERMANENT_ERRORS)
                     ),

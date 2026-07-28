@@ -718,3 +718,20 @@ textarea:focus-visible {
     transition-duration: .01ms !important;
   }
 }
+
+
+/* Stage 40: multibot control center */
+.project-selector{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 12px;border:1px solid var(--border,#293041);border-radius:12px;background:var(--panel,#151923)}
+.project-selector span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted,#8d96a8)}
+.project-selector select{max-width:260px;border:0;background:transparent;color:inherit;font:inherit;outline:none}
+.project-selector option{color:#111}
+.project-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.project-card{border:1px solid var(--border,#293041);border-radius:18px;background:var(--panel,#151923);padding:20px;box-shadow:0 12px 30px rgba(0,0,0,.12)}
+.project-card-head{display:flex;align-items:center;gap:12px}
+.project-card-head h3{margin:0 0 3px;font-size:18px}.project-card-head a{color:var(--muted,#8d96a8);text-decoration:none}
+.project-avatar{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-weight:800;background:linear-gradient(135deg,#7c5cff,#25c2a0);color:white}
+.project-health{margin-left:auto;padding:6px 10px;border-radius:999px;font-size:12px}.project-health.healthy{background:rgba(37,194,160,.14);color:#43d9b6}.project-health.pending{background:rgba(246,190,60,.14);color:#f6be3c}.project-health.warning{background:rgba(245,89,105,.14);color:#ff7180}
+.project-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 0}.project-metrics div{padding:12px;border-radius:12px;background:rgba(127,139,164,.08)}.project-metrics dt{font-size:11px;color:var(--muted,#8d96a8)}.project-metrics dd{margin:5px 0 0;font-weight:750;font-size:16px}
+.project-card-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--muted,#8d96a8);font-size:12px}
+@media(max-width:980px){.project-grid{grid-template-columns:1fr}.project-selector span{display:none}.project-selector select{max-width:170px}}
+@media(max-width:640px){.project-selector{order:3;width:100%}.project-selector select{max-width:none;width:100%}.project-metrics{grid-template-columns:repeat(2,1fr)}.project-card-foot{align-items:flex-start;flex-direction:column}}

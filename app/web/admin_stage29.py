@@ -67,7 +67,7 @@ async def business_dashboard(request: Request, period: str = "1"):
     chart_days = 7 if days in (None, 1) else min(max(days, 7), 90)
 
     async with SessionFactory() as session:
-        repository = Stage29Repository(session)
+        repository = Stage29Repository(session, bot_id=getattr(request.state.admin_bot_scope, "bot_id", None))
         snapshot = await repository.dashboard(days)
         chart = await repository.chart(chart_days)
         sources = await repository.sources()
@@ -117,7 +117,7 @@ async def business_users(
     page_size = 50
 
     async with SessionFactory() as session:
-        repository = Stage29Repository(session)
+        repository = Stage29Repository(session, bot_id=getattr(request.state.admin_bot_scope, "bot_id", None))
         rows, total = await repository.users(
             query=q,
             vip=vip,
@@ -154,7 +154,7 @@ async def business_sources(request: Request):
         return login_redirect(request)
 
     async with SessionFactory() as session:
-        rows = await Stage29Repository(session).sources()
+        rows = await Stage29Repository(session, bot_id=getattr(request.state.admin_bot_scope, "bot_id", None)).sources()
 
     return templates.TemplateResponse(
         request=request,
@@ -258,7 +258,7 @@ async def source_details(request: Request, source_id: int):
 
     async with SessionFactory() as session:
         source = await session.get(TrafficSource, source_id)
-        rows = await Stage29Repository(session).sources()
+        rows = await Stage29Repository(session, bot_id=getattr(request.state.admin_bot_scope, "bot_id", None)).sources()
 
     if source is None:
         raise HTTPException(status_code=404, detail="Source not found")

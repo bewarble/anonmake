@@ -14,6 +14,7 @@ STATIC_CHECKS = (
     "scripts.check_stage_38_3",
     "scripts.check_stage_38_4",
     "scripts.check_stage_39",
+    "scripts.check_stage_40",
     "scripts.check_full_audit",
     "scripts.check_stage_36",
     "scripts.check_project",

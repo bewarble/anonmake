@@ -45,6 +45,31 @@ app.mount(
 
 
 @app.middleware("http")
+async def admin_bot_scope_middleware(request: Request, call_next):
+    if not request.url.path.startswith("/admin") or request.url.path.startswith("/admin/static"):
+        return await call_next(request)
+
+    from app.web.admin_scope import COOKIE_NAME, load_admin_bot_scope
+
+    scope = await load_admin_bot_scope(request)
+    request.state.admin_bot_scope = scope
+    response = await call_next(request)
+
+    requested = request.query_params.get("bot")
+    if requested is not None:
+        response.set_cookie(
+            COOKIE_NAME,
+            scope.code,
+            max_age=60 * 60 * 24 * 365,
+            httponly=True,
+            secure=settings.web_admin_secure_cookie,
+            samesite="lax",
+            path="/admin",
+        )
+    return response
+
+
+@app.middleware("http")
 async def performance_middleware(request: Request, call_next):
     if not settings.performance_enabled:
         return await call_next(request)
@@ -422,3 +447,15 @@ for performance_route in admin_performance_module.router.routes:
         for existing in app.router.routes
     ):
         app.router.routes.append(performance_route)
+
+
+# Stage 40 multibot admin control center.
+from app.web import admin_multibot as admin_multibot_module  # noqa: E402
+
+for multibot_route in admin_multibot_module.router.routes:
+    if not any(
+        getattr(existing, "path", None) == getattr(multibot_route, "path", None)
+        and getattr(existing, "methods", None) == getattr(multibot_route, "methods", None)
+        for existing in app.router.routes
+    ):
+        app.router.routes.append(multibot_route)

@@ -55,11 +55,17 @@ def page_context(
     section: str,
     **values,
 ) -> dict:
+    scope = getattr(request.state, "admin_bot_scope", None)
     return {
         "request": request,
         "title": title,
         "section": section,
         "money": money,
+        "admin_bots": scope.bots if scope is not None else (),
+        "selected_bot": scope.selected if scope is not None else None,
+        "selected_bot_id": scope.bot_id if scope is not None else None,
+        "selected_bot_code": scope.code if scope is not None else "all",
+        "selected_bot_label": scope.label if scope is not None else "Все проекты",
         **values,
     }
 
