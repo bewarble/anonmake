@@ -53,6 +53,9 @@ async def admin_bot_scope_middleware(request: Request, call_next):
 
     scope = await load_admin_bot_scope(request)
     request.state.admin_bot_scope = scope
+    if scope.denied:
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse("Доступ к проекту запрещён", status_code=403)
     response = await call_next(request)
 
     requested = request.query_params.get("bot")
@@ -459,3 +462,15 @@ for multibot_route in admin_multibot_module.router.routes:
         for existing in app.router.routes
     ):
         app.router.routes.append(multibot_route)
+
+
+# Stage 41 platform administration.
+from app.web import admin_platform as admin_platform_module  # noqa: E402
+
+for platform_route in admin_platform_module.router.routes:
+    if not any(
+        getattr(existing, "path", None) == getattr(platform_route, "path", None)
+        and getattr(existing, "methods", None) == getattr(platform_route, "methods", None)
+        for existing in app.router.routes
+    ):
+        app.router.routes.append(platform_route)

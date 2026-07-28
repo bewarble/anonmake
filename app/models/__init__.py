@@ -5,12 +5,15 @@ from app.models.billing import PaymentAttempt, PaymentMethod, Subscription
 from app.models.crm import CrmEvent, CrmNote, CrmTag, CrmUserTag
 from app.models.delivery import DeliveryOutbox
 from app.models.marketing import Broadcast, SourceAttribution, TrafficSource
+from app.models.platform_admin import AdminProjectAccess, AdminUser, PaymentGatewayConfig
 from app.models.question import Question
 from app.models.reveal import RevealCheckout
 from app.models.user import User
 
 __all__ = (
     "AdminAuditLog",
+    "AdminProjectAccess",
+    "AdminUser",
     "Answer",
     "BotInstance",
     "Broadcast",
@@ -20,6 +23,7 @@ __all__ = (
     "CrmUserTag",
     "DeliveryOutbox",
     "PaymentAttempt",
+    "PaymentGatewayConfig",
     "PaymentMethod",
     "Question",
     "RevealCheckout",

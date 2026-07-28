@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+  <div><h1>Платёжные системы</h1><p>Отдельная конфигурация Impaya для каждого проекта.</p></div>
+</section>
+
+{% for bot in bots %}
+{% set gateway = gateways.get(bot.id) %}
+<div class="panel">
+  <h2>{{ bot.display_name }} · @{{ bot.username }}</h2>
+  <form method="post" action="/admin/platform/payments/{{ bot.id }}" class="form-grid">
+    <label>API URL<input name="api_url" value="{{ gateway.api_url if gateway else '' }}" required></label>
+    <label>API token<input name="api_token" type="password" placeholder="{{ 'Сохранён' if gateway else 'Введите токен' }}"></label>
+    <label>Terminal<input name="terminal_name" value="{{ gateway.terminal_name if gateway else '' }}" required></label>
+    <label>Binding terminal<input name="binding_terminal_name" value="{{ gateway.binding_terminal_name if gateway else '' }}" required></label>
+    <label>Recurrent terminal<input name="recurrent_terminal_name" value="{{ gateway.recurrent_terminal_name if gateway else '' }}" required></label>
+    <label>Payment form URL<input name="payment_form_url_template" value="{{ gateway.payment_form_url_template if gateway else '' }}" required></label>
+    <label>Webhook secret<input name="webhook_secret" type="password" placeholder="{{ 'Сохранён' if gateway and gateway.webhook_secret_encrypted else 'Не задан' }}"></label>
+    <label><input type="checkbox" name="is_active" value="true" {% if not gateway or gateway.is_active %}checked{% endif %}> Активна</label>
+    <button class="button" type="submit">Сохранить</button>
+  </form>
+</div>
+{% endfor %}
+{% endblock %}

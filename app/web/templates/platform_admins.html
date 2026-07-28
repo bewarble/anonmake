@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+  <div><h1>Администраторы</h1><p>Аккаунты и доступ к проектам.</p></div>
+</section>
+
+<div class="panel">
+  <h2>Создать аккаунт</h2>
+  <form method="post" class="form-grid">
+    <label>Email<input name="email" type="email" required></label>
+    <label>Имя<input name="display_name" required></label>
+    <label>Пароль<input name="password" type="password" minlength="10" required></label>
+    <label>Роль
+      <select name="role">
+        <option value="project_admin">Администратор проекта</option>
+        <option value="superadmin">Суперадминистратор</option>
+      </select>
+    </label>
+    <fieldset>
+      <legend>Проекты</legend>
+      {% for bot in bots %}
+      <label><input type="checkbox" name="bot_ids" value="{{ bot.id }}"> {{ bot.display_name }} · @{{ bot.username }}</label>
+      {% endfor %}
+    </fieldset>
+    <button class="button" type="submit">Создать аккаунт</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>Аккаунты</h2>
+  <table class="data-table">
+    <thead><tr><th>ID</th><th>Имя</th><th>Email</th><th>Роль</th><th>Активен</th><th>Последний вход</th></tr></thead>
+    <tbody>
+    {% for admin in admins %}
+      <tr>
+        <td>{{ admin.id }}</td><td>{{ admin.display_name }}</td><td>{{ admin.email }}</td>
+        <td>{{ "Суперадминистратор" if admin.is_superadmin else "Администратор проекта" }}</td>
+        <td>{{ "Да" if admin.is_active else "Нет" }}</td>
+        <td>{{ admin.last_login_at|date_time }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6">Аккаунтов в базе пока нет. Используется legacy-вход из .env.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

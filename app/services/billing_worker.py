@@ -31,7 +31,8 @@ class TickStats:
 class BillingWorker:
     def __init__(
         self,
-        client: ImpayaClient,
+        client: ImpayaClient | None = None,
+        client_factory=None,
         interval_seconds: int = 60,
         *,
         automatic_charges_enabled: bool = False,
@@ -39,6 +40,7 @@ class BillingWorker:
         **options,
     ) -> None:
         self.client = client
+        self.client_factory = client_factory
         self.interval_seconds = interval_seconds
         self.automatic_charges_enabled = automatic_charges_enabled
         self.batch_size = batch_size
@@ -147,10 +149,19 @@ class BillingWorker:
                     stats.skipped += 1
                     return
 
+                owned_client = None
                 try:
+                    client = self.client
+                    if self.client_factory is not None:
+                        owned_client = await self.client_factory(
+                            session, subscription.bot_id
+                        )
+                        client = owned_client
+                    if client is None:
+                        raise RuntimeError("Impaya client is not configured")
                     result = await BillingService(
                         session,
-                        self.client,
+                        client,
                         **self.options,
                     ).renew(subscription, method)
                 except Exception:
@@ -161,6 +172,9 @@ class BillingWorker:
                         subscription.id,
                     )
                     return
+                finally:
+                    if owned_client is not None:
+                        await owned_client.close()
 
                 if result.decision == ChargeDecision.SUCCESS:
                     stats.success += 1

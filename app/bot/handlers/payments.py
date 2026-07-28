@@ -13,6 +13,7 @@ from app.bot.keyboards.payments import test_payment_keyboard
 from app.core.config import load_settings
 from app.repositories.users import UserRepository
 from app.services.impaya import ImpayaClient
+from app.services.impaya_factory import create_impaya_client, load_impaya_config
 from app.services.subscription_checkout import SubscriptionCheckoutService
 
 router = Router(name="payments")
@@ -67,14 +68,15 @@ async def test_payment(
     user = await UserRepository(session).upsert_from_telegram(
         message.from_user
     )
-    client = make_client(settings)
+    impaya_config = await load_impaya_config(session, settings, user.bot_id)
+    client = create_impaya_client(impaya_config)
 
     try:
         payment_url, operation_id = await SubscriptionCheckoutService(
             session,
             client,
             payment_form_url_template=(
-                settings.impaya_payment_form_url_template
+                impaya_config.payment_form_url_template
             ),
             trial_amount=settings.trial_price_kopecks,
             trial_duration=timedelta(

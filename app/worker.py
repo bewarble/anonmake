@@ -8,6 +8,7 @@ from app.core.config import load_settings
 from app.database.session import close_database, init_database
 from app.services.billing_worker import BillingWorker
 from app.services.impaya import ImpayaClient
+from app.services.impaya_factory import create_impaya_client, load_impaya_config
 
 
 async def main() -> None:
@@ -38,8 +39,13 @@ async def main() -> None:
             or settings.impaya_terminal_name
         ),
     )
+    async def client_factory(session, bot_id: int):
+        config = await load_impaya_config(session, settings, bot_id)
+        return create_impaya_client(config)
+
     worker = BillingWorker(
         client,
+        client_factory=client_factory,
         interval_seconds=settings.billing_worker_interval_seconds,
         automatic_charges_enabled=settings.billing_automatic_charges_enabled,
         batch_size=settings.billing_worker_batch_size,

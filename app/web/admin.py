@@ -66,6 +66,7 @@ def page_context(
         "selected_bot_id": scope.bot_id if scope is not None else None,
         "selected_bot_code": scope.code if scope is not None else "all",
         "selected_bot_label": scope.label if scope is not None else "Все проекты",
+        "current_admin": auth.session_from_request(request),
         **values,
     }
 
@@ -112,7 +113,8 @@ async def login_submit(
     password: str = Form(...),
     next: str = Form("/admin/business"),
 ):
-    if not auth.verify_credentials(username, password):
+    principal = await auth.verify_credentials(username, password)
+    if principal is None:
         return templates.TemplateResponse(
             request=request,
             name="login.html",
@@ -128,7 +130,7 @@ async def login_submit(
     response = RedirectResponse(destination, status_code=303)
     response.set_cookie(
         COOKIE_NAME,
-        auth.create_token(),
+        auth.create_token(principal),
         max_age=settings.web_admin_session_minutes * 60,
         httponly=True,
         secure=settings.web_admin_secure_cookie,

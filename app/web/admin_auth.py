@@ -9,6 +9,9 @@ import secrets
 from fastapi import HTTPException, Request, status
 
 from app.core.config import Settings
+from app.core.platform_security import verify_password
+from app.database.session import SessionFactory
+from app.repositories.platform_admin import PlatformAdminRepository
 
 
 COOKIE_NAME = "anonmake_admin_session"
@@ -16,13 +19,17 @@ COOKIE_NAME = "anonmake_admin_session"
 
 @dataclass(slots=True, frozen=True)
 class AdminSession:
+    admin_id: int | None
     username: str
+    role: str
     expires_at: datetime
+
+    @property
+    def is_superadmin(self) -> bool:
+        return self.role == "superadmin"
 
 
 class AdminAuth:
-    """Small signed-cookie authentication layer for the internal admin UI."""
-
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
@@ -32,74 +39,82 @@ class AdminAuth:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Web admin is disabled",
             )
-
-        if not self.settings.web_admin_username.strip():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="WEB_ADMIN_USERNAME is not configured",
-            )
-
-        if not self.settings.web_admin_password:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="WEB_ADMIN_PASSWORD is not configured",
-            )
-
         if len(self.settings.web_admin_secret.strip()) < 32:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="WEB_ADMIN_SECRET must contain at least 32 characters",
             )
 
-    def verify_credentials(self, username: str, password: str) -> bool:
+    async def verify_credentials(
+        self, username: str, password: str
+    ) -> AdminSession | None:
         self.ensure_configured()
-        return (
-            hmac.compare_digest(
-                username.strip(),
-                self.settings.web_admin_username.strip(),
-            )
-            and hmac.compare_digest(
-                password,
-                self.settings.web_admin_password,
-            )
-        )
+        normalized = username.strip().lower()
 
-    def create_token(self) -> str:
+        async with SessionFactory() as session:
+            repo = PlatformAdminRepository(session)
+            admin = await repo.admin_by_email(normalized)
+            if admin is not None and verify_password(password, admin.password_hash):
+                await repo.mark_login(admin)
+                return AdminSession(
+                    admin_id=admin.id,
+                    username=admin.email,
+                    role=admin.role,
+                    expires_at=datetime.now(timezone.utc),
+                )
+
+        # Legacy bootstrap login remains available until the first DB account
+        # is created, preserving production compatibility.
+        if (
+            self.settings.web_admin_username.strip()
+            and self.settings.web_admin_password
+            and hmac.compare_digest(
+                normalized,
+                self.settings.web_admin_username.strip().lower(),
+            )
+            and hmac.compare_digest(password, self.settings.web_admin_password)
+        ):
+            return AdminSession(
+                admin_id=None,
+                username=self.settings.web_admin_username.strip(),
+                role="superadmin",
+                expires_at=datetime.now(timezone.utc),
+            )
+        return None
+
+    def create_token(self, principal: AdminSession) -> str:
         self.ensure_configured()
-        username = self.settings.web_admin_username.strip()
         expires_at = datetime.now(timezone.utc) + timedelta(
             minutes=self.settings.web_admin_session_minutes
         )
         nonce = secrets.token_urlsafe(18)
-        payload = f"{username}|{int(expires_at.timestamp())}|{nonce}"
+        admin_id = principal.admin_id or 0
+        payload = (
+            f"{admin_id}|{principal.username}|{principal.role}|"
+            f"{int(expires_at.timestamp())}|{nonce}"
+        )
         return f"{payload}|{self._sign(payload)}"
 
     def parse_token(self, token: str | None) -> AdminSession | None:
         if not token:
             return None
-
         try:
-            username, expires_raw, nonce, signature = token.split("|", 3)
-            payload = f"{username}|{expires_raw}|{nonce}"
+            admin_raw, username, role, expires_raw, nonce, signature = token.split("|", 5)
+            payload = f"{admin_raw}|{username}|{role}|{expires_raw}|{nonce}"
             if not hmac.compare_digest(signature, self._sign(payload)):
                 return None
-            expires_at = datetime.fromtimestamp(
-                int(expires_raw),
-                tz=timezone.utc,
-            )
+            expires_at = datetime.fromtimestamp(int(expires_raw), tz=timezone.utc)
+            admin_id = int(admin_raw) or None
         except (TypeError, ValueError, OverflowError):
             return None
-
         if expires_at <= datetime.now(timezone.utc):
             return None
-
-        if not hmac.compare_digest(
-            username,
-            self.settings.web_admin_username.strip(),
-        ):
-            return None
-
-        return AdminSession(username=username, expires_at=expires_at)
+        return AdminSession(
+            admin_id=admin_id,
+            username=username,
+            role=role,
+            expires_at=expires_at,
+        )
 
     def session_from_request(self, request: Request) -> AdminSession | None:
         return self.parse_token(request.cookies.get(COOKIE_NAME))
