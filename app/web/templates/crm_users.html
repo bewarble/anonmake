@@ -10,7 +10,7 @@
   </div>
 
   <form class="filters" method="get" action="/admin/crm/users">
-    <input name="q" value="{{ q }}" placeholder="ID, Telegram ID, username или имя">
+    <input name="q" value="{{ q }}" placeholder="ID, Номер Telegram, username или имя">
     <select name="vip">
       <option value="all" {{ 'selected' if vip == 'all' else '' }}>Любая подписка</option>
       <option value="active" {{ 'selected' if vip == 'active' else '' }}>С VIP статусом</option>
@@ -33,7 +33,7 @@
 
   <div class="table-wrap">
     <table>
-      <thead><tr><th>ID</th><th>Пользователь</th><th>Telegram ID</th><th>Статус</th><th>VIP до</th><th>Источник</th><th>Регистрация</th></tr></thead>
+      <thead><tr><th>Номер</th><th>Пользователь</th><th>Номер Telegram</th><th>Статус</th><th>VIP до</th><th>Источник</th><th>Регистрация</th></tr></thead>
       <tbody>
       {% for row in rows %}
         <tr>

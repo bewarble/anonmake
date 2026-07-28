@@ -3,7 +3,7 @@
 {% block content %}
 {{ page_intro('📨', 'Доставка', 'Очередь исходящих сообщений и состояние отправки.', total) }}
 <section class="panel"><div class="table-wrap"><table>
-  <thead><tr><th>ID</th><th>Тип</th><th>Получатель</th><th>Статус</th><th>Попытки</th><th>Последняя ошибка</th><th>Создано</th></tr></thead>
+  <thead><tr><th>Номер</th><th>Тип</th><th>Получатель</th><th>Статус</th><th>Попытки</th><th>Последняя ошибка</th><th>Создано</th></tr></thead>
   <tbody>{% for row in rows %}<tr>
     <td>#{{ row.id }}</td><td>{{ row.kind|delivery_kind }}</td><td>{{ row.chat_id }}</td>
     <td>{{ badge(row.status) }}</td><td>{{ row.attempts }}</td><td class="error-text">{{ row.last_error or '—' }}</td><td>{{ row.created_at|date_time }}</td>

@@ -939,3 +939,18 @@
     window.location.assign(url.toString());
   });
 })();
+
+
+// Stage 42: hide project access for the platform-wide role.
+document.querySelectorAll('[data-role-selector]').forEach((select) => {
+  const form = select.closest('form');
+  const access = form?.querySelector('[data-project-access]');
+  const sync = () => {
+    if (!access) return;
+    const globalRole = select.value === 'superadmin';
+    access.classList.toggle('is-disabled', globalRole);
+    access.querySelectorAll('input').forEach((input) => { input.disabled = globalRole; });
+  };
+  select.addEventListener('change', sync);
+  sync();
+});

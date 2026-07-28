@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header platform-page-header">
+  <div><span class="section-kicker">Управление доступом</span><h1>Редактирование аккаунта</h1><p>Измените данные, роль, статус и доступ к проектам.</p></div>
+  <a class="button secondary" href="/admin/platform/admins">← К списку</a>
+</section>
+
+<div class="panel platform-form-card edit-account-card">
+  <div class="panel-heading"><div><span class="section-kicker">Аккаунт №{{ admin.id }}</span><h2>{{ admin.display_name }}</h2></div><span class="role-badge {{ 'super' if admin.is_superadmin else 'project' }}">{{ "Суперадминистратор" if admin.is_superadmin else "Администратор проекта" }}</span></div>
+  <form method="post" class="platform-form">
+    <div class="form-field full"><label>Электронная почта</label><input name="email" type="email" value="{{ admin.email }}" required></div>
+    <div class="form-field"><label>Имя</label><input name="display_name" value="{{ admin.display_name }}" required></div>
+    <div class="form-field"><label>Новый пароль</label><input name="password" type="password" minlength="10" autocomplete="new-password"><small>Оставьте пустым, чтобы сохранить текущий пароль.</small></div>
+    <div class="form-field full"><label>Роль</label><select name="role" data-role-selector><option value="project_admin" {{ 'selected' if not admin.is_superadmin else '' }}>Администратор проекта</option><option value="superadmin" {{ 'selected' if admin.is_superadmin else '' }}>Суперадминистратор</option></select></div>
+    <fieldset class="project-access full" data-project-access><legend>Доступные проекты</legend><p>Для суперадминистратора список не применяется.</p><div class="project-choice-grid">{% for bot in bots %}<label class="project-choice"><input type="checkbox" name="bot_ids" value="{{ bot.id }}" {{ 'checked' if bot.id in access_bot_ids else '' }}><span class="project-choice-mark">{{ bot.display_name[:1] }}</span><span><strong>{{ bot.display_name }}</strong><small>@{{ bot.username }}</small></span></label>{% endfor %}</div></fieldset>
+    <label class="switch-row full"><input type="checkbox" name="is_active" value="true" {{ 'checked' if admin.is_active else '' }} {{ 'disabled' if is_current_account else '' }}><span><strong>Аккаунт активен</strong><small>{% if is_current_account %}Собственный аккаунт нельзя отключить.{% else %}Отключённый пользователь не сможет войти.{% endif %}</small></span></label>
+    {% if is_current_account %}<input type="hidden" name="is_active" value="true">{% endif %}
+    <div class="form-actions full"><button class="button primary" type="submit">Сохранить изменения</button><a class="button secondary" href="/admin/platform/admins">Отмена</a></div>
+  </form>
+</div>
+{% endblock %}

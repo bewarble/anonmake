@@ -1,24 +1,31 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="page-header">
-  <div><h1>Платёжные системы</h1><p>Отдельная конфигурация Impaya для каждого проекта.</p></div>
+<section class="page-header platform-page-header">
+  <div><span class="section-kicker">Финансы</span><h1>Платёжные системы</h1><p>Отдельные настройки Impaya для каждого проекта.</p></div>
 </section>
+{% if notice == 'saved' %}<div class="notice success">✓ Настройки платёжной системы сохранены.</div>{% endif %}
 
+<div class="payment-project-grid">
 {% for bot in bots %}
 {% set gateway = gateways.get(bot.id) %}
-<div class="panel">
-  <h2>{{ bot.display_name }} · @{{ bot.username }}</h2>
-  <form method="post" action="/admin/platform/payments/{{ bot.id }}" class="form-grid">
-    <label>API URL<input name="api_url" value="{{ gateway.api_url if gateway else '' }}" required></label>
-    <label>API token<input name="api_token" type="password" placeholder="{{ 'Сохранён' if gateway else 'Введите токен' }}"></label>
-    <label>Terminal<input name="terminal_name" value="{{ gateway.terminal_name if gateway else '' }}" required></label>
-    <label>Binding terminal<input name="binding_terminal_name" value="{{ gateway.binding_terminal_name if gateway else '' }}" required></label>
-    <label>Recurrent terminal<input name="recurrent_terminal_name" value="{{ gateway.recurrent_terminal_name if gateway else '' }}" required></label>
-    <label>Payment form URL<input name="payment_form_url_template" value="{{ gateway.payment_form_url_template if gateway else '' }}" required></label>
-    <label>Webhook secret<input name="webhook_secret" type="password" placeholder="{{ 'Сохранён' if gateway and gateway.webhook_secret_encrypted else 'Не задан' }}"></label>
-    <label><input type="checkbox" name="is_active" value="true" {% if not gateway or gateway.is_active %}checked{% endif %}> Активна</label>
-    <button class="button" type="submit">Сохранить</button>
+<article class="payment-project-card">
+  <header class="payment-project-head">
+    <div class="project-avatar">{{ bot.display_name[:1] }}</div>
+    <div><span class="section-kicker">Проект</span><h2>{{ bot.display_name }}</h2><a href="https://t.me/{{ bot.username }}" target="_blank" rel="noreferrer">@{{ bot.username }}</a></div>
+    <span class="status-badge {{ 'active' if not gateway or gateway.is_active else 'inactive' }}">{{ 'Подключена' if gateway and gateway.is_active else ('Не настроена' if not gateway else 'Отключена') }}</span>
+  </header>
+  <form method="post" action="/admin/platform/payments/{{ bot.id }}" class="platform-form payment-form">
+    <div class="form-field full"><label>Адрес сервера Impaya</label><input name="api_url" value="{{ gateway.api_url if gateway else '' }}" placeholder="https://..." required><small>Адрес программного интерфейса платёжной системы.</small></div>
+    <div class="form-field full"><label>Ключ доступа</label><input name="api_token" type="password" placeholder="{{ 'Ключ сохранён — оставьте поле пустым' if gateway else 'Введите ключ доступа' }}"><small>Значение хранится в зашифрованном виде.</small></div>
+    <div class="form-field"><label>Основной терминал</label><input name="terminal_name" value="{{ gateway.terminal_name if gateway else '' }}" required></div>
+    <div class="form-field"><label>Терминал привязки карты</label><input name="binding_terminal_name" value="{{ gateway.binding_terminal_name if gateway else '' }}" required></div>
+    <div class="form-field"><label>Терминал повторных списаний</label><input name="recurrent_terminal_name" value="{{ gateway.recurrent_terminal_name if gateway else '' }}" required></div>
+    <div class="form-field"><label>Секрет входящих уведомлений</label><input name="webhook_secret" type="password" placeholder="{{ 'Секрет сохранён — оставьте поле пустым' if gateway and gateway.webhook_secret_encrypted else 'Введите секрет' }}"></div>
+    <div class="form-field full"><label>Шаблон адреса платёжной формы</label><input name="payment_form_url_template" value="{{ gateway.payment_form_url_template if gateway else '' }}" placeholder="https://.../{transaction_id}" required></div>
+    <label class="switch-row full"><input type="checkbox" name="is_active" value="true" {% if not gateway or gateway.is_active %}checked{% endif %}><span><strong>Платёжная система активна</strong><small>Новые платежи проекта будут использовать эти реквизиты.</small></span></label>
+    <div class="form-actions full"><button class="button primary" type="submit">Сохранить настройки</button></div>
   </form>
-</div>
+</article>
 {% endfor %}
+</div>
 {% endblock %}

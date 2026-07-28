@@ -11,8 +11,8 @@
       <div><dt>Тип</dt><dd>{{ attempt.attempt_kind }}</dd></div>
       <div><dt>Сумма</dt><dd>{{ money(attempt.amount_kopecks) }} ₽</dd></div>
       <div><dt>Статус</dt><dd>{{ attempt.status|status_label }}</dd></div>
-      <div><dt>Operation ID</dt><dd><code>{{ attempt.customer_operation_id }}</code></dd></div>
-      <div><dt>Transaction ID</dt><dd><code>{{ attempt.transaction_id or '—' }}</code></dd></div>
+      <div><dt>Номер операции</dt><dd><code>{{ attempt.customer_operation_id }}</code></dd></div>
+      <div><dt>Номер транзакции</dt><dd><code>{{ attempt.transaction_id or '—' }}</code></dd></div>
       <div><dt>Ошибка</dt><dd>{{ attempt.error_code or '—' }}</dd></div>
       <div><dt>Описание</dt><dd>{{ attempt.error_message or '—' }}</dd></div>
       <div><dt>Создан</dt><dd>{{ attempt.created_at.strftime('%d.%m.%Y %H:%M:%S') }}</dd></div>
@@ -22,13 +22,13 @@
   <article class="panel">
     <div class="panel-header"><h2>Подписка и карта</h2></div>
     <dl class="details">
-      <div><dt>Subscription ID</dt><dd>{{ subscription.id }}</dd></div>
+      <div><dt>Номер подписки</dt><dd>{{ subscription.id }}</dd></div>
       <div><dt>Статус подписки</dt><dd>{{ subscription.status|status_label }}</dd></div>
       <div><dt>VIP статус до</dt><dd>{{ subscription.access_until or '—' }}</dd></div>
       <div><dt>Следующее списание</dt><dd>{{ subscription.next_charge_at or '—' }}</dd></div>
-      <div><dt>Binding ID</dt><dd><code>{{ payment_method.binding_id if payment_method else '—' }}</code></dd></div>
-      <div><dt>Impaya User ID</dt><dd><code>{{ payment_method.impaya_user_id if payment_method else '—' }}</code></dd></div>
-      <div><dt>Merchant User ID</dt><dd><code>{{ payment_method.merchant_user_id if payment_method else '—' }}</code></dd></div>
+      <div><dt>Номер привязки</dt><dd><code>{{ payment_method.binding_id if payment_method else '—' }}</code></dd></div>
+      <div><dt>Номер пользователя Impaya</dt><dd><code>{{ payment_method.impaya_user_id if payment_method else '—' }}</code></dd></div>
+      <div><dt>Номер пользователя продавца</dt><dd><code>{{ payment_method.merchant_user_id if payment_method else '—' }}</code></dd></div>
     </dl>
   </article>
 </section>

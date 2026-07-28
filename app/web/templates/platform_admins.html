@@ -1,47 +1,107 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="page-header">
-  <div><h1>Администраторы</h1><p>Аккаунты и доступ к проектам.</p></div>
+<section class="page-header platform-page-header">
+  <div>
+    <span class="section-kicker">Управление доступом</span>
+    <h1>Администраторы</h1>
+    <p>Создавайте аккаунты и назначайте доступ только к нужным проектам.</p>
+  </div>
 </section>
 
-<div class="panel">
-  <h2>Создать аккаунт</h2>
-  <form method="post" class="form-grid">
-    <label>Email<input name="email" type="email" required></label>
-    <label>Имя<input name="display_name" required></label>
-    <label>Пароль<input name="password" type="password" minlength="10" required></label>
-    <label>Роль
-      <select name="role">
-        <option value="project_admin">Администратор проекта</option>
-        <option value="superadmin">Суперадминистратор</option>
-      </select>
-    </label>
-    <fieldset>
-      <legend>Проекты</legend>
-      {% for bot in bots %}
-      <label><input type="checkbox" name="bot_ids" value="{{ bot.id }}"> {{ bot.display_name }} · @{{ bot.username }}</label>
-      {% endfor %}
-    </fieldset>
-    <button class="button" type="submit">Создать аккаунт</button>
-  </form>
-</div>
+{% if notice == 'created' %}<div class="notice success">✓ Аккаунт успешно создан.</div>{% endif %}
+{% if notice == 'updated' %}<div class="notice success">✓ Изменения аккаунта сохранены.</div>{% endif %}
+{% if notice == 'deleted' %}<div class="notice success">✓ Аккаунт удалён.</div>{% endif %}
 
-<div class="panel">
-  <h2>Аккаунты</h2>
-  <table class="data-table">
-    <thead><tr><th>ID</th><th>Имя</th><th>Email</th><th>Роль</th><th>Активен</th><th>Последний вход</th></tr></thead>
-    <tbody>
-    {% for admin in admins %}
-      <tr>
-        <td>{{ admin.id }}</td><td>{{ admin.display_name }}</td><td>{{ admin.email }}</td>
-        <td>{{ "Суперадминистратор" if admin.is_superadmin else "Администратор проекта" }}</td>
-        <td>{{ "Да" if admin.is_active else "Нет" }}</td>
-        <td>{{ admin.last_login_at|date_time }}</td>
-      </tr>
-    {% else %}
-      <tr><td colspan="6">Аккаунтов в базе пока нет. Используется legacy-вход из .env.</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
+<section class="platform-layout">
+  <div class="panel platform-form-card">
+    <div class="panel-heading">
+      <div><span class="section-kicker">Новый пользователь</span><h2>Создать аккаунт</h2></div>
+      <span class="panel-icon">＋</span>
+    </div>
+    <form method="post" class="platform-form">
+      <div class="form-field full">
+        <label for="admin-email">Электронная почта</label>
+        <input id="admin-email" name="email" type="email" placeholder="admin@example.ru" autocomplete="email" required>
+        <small>Используется для входа в панель управления.</small>
+      </div>
+      <div class="form-field">
+        <label for="admin-name">Имя</label>
+        <input id="admin-name" name="display_name" placeholder="Иван Иванов" required>
+      </div>
+      <div class="form-field">
+        <label for="admin-password">Пароль</label>
+        <input id="admin-password" name="password" type="password" minlength="10" autocomplete="new-password" required>
+        <small>Не менее 10 символов.</small>
+      </div>
+      <div class="form-field full">
+        <label for="admin-role">Роль</label>
+        <select id="admin-role" name="role" data-role-selector>
+          <option value="project_admin">Администратор проекта</option>
+          <option value="superadmin">Суперадминистратор</option>
+        </select>
+      </div>
+      <fieldset class="project-access full" data-project-access>
+        <legend>Доступные проекты</legend>
+        <p>Суперадминистратор автоматически получает доступ ко всей платформе.</p>
+        <div class="project-choice-grid">
+          {% for bot in bots %}
+          <label class="project-choice">
+            <input type="checkbox" name="bot_ids" value="{{ bot.id }}">
+            <span class="project-choice-mark">{{ bot.display_name[:1] }}</span>
+            <span><strong>{{ bot.display_name }}</strong><small>@{{ bot.username }}</small></span>
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <div class="form-actions full">
+        <button class="button primary" type="submit">Создать аккаунт</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="platform-summary-card">
+    <span class="section-kicker">Кратко</span>
+    <h2>{{ admins|length }} аккаунтов</h2>
+    <p>Суперадминистраторы управляют всей платформой. Администраторы проектов видят только назначенные проекты.</p>
+    <div class="summary-points">
+      <span>🔐 Раздельные права</span><span>🧩 Доступ по проектам</span><span>🛡 Защита главного аккаунта</span>
+    </div>
+  </div>
+</section>
+
+<section class="platform-section">
+  <div class="section-heading"><div><span class="section-kicker">Команда</span><h2>Аккаунты</h2></div></div>
+  <div class="admin-card-grid">
+  {% for admin in admins %}
+    <article class="admin-account-card">
+      <div class="admin-card-head">
+        <div class="admin-avatar">{{ admin.display_name[:1]|upper }}</div>
+        <div><h3>{{ admin.display_name }}</h3><a href="mailto:{{ admin.email }}">{{ admin.email }}</a></div>
+        <span class="role-badge {{ 'super' if admin.is_superadmin else 'project' }}">{{ "Суперадминистратор" if admin.is_superadmin else "Администратор проекта" }}</span>
+      </div>
+      <div class="admin-card-meta">
+        <div><span>Статус</span><strong class="status-text {{ 'active' if admin.is_active else 'inactive' }}">{{ "Активен" if admin.is_active else "Отключён" }}</strong></div>
+        <div><span>Последний вход</span><strong>{{ admin.last_login_at|date_time }}</strong></div>
+        <div class="full"><span>Проекты</span><strong>
+          {% if admin.is_superadmin %}Все проекты платформы
+          {% else %}
+            {% set assigned = access.get(admin.id, []) %}
+            {% for bot in bots if bot.id in assigned %}{{ bot.display_name }}{% if not loop.last %}, {% endif %}{% else %}Не назначены{% endfor %}
+          {% endif %}
+        </strong></div>
+      </div>
+      <div class="admin-card-actions">
+        <a class="button secondary" href="/admin/platform/admins/{{ admin.id }}/edit">Редактировать</a>
+        {% if not current_admin or current_admin.admin_id != admin.id %}
+        <form method="post" action="/admin/platform/admins/{{ admin.id }}/delete" onsubmit="return confirm('Удалить аккаунт «{{ admin.display_name }}» без возможности восстановления?')">
+          <button class="button danger" type="submit">Удалить</button>
+        </form>
+        {% endif %}
+      </div>
+    </article>
+  {% else %}
+    <div class="empty-state">Аккаунтов в базе пока нет. Для входа используется резервная учётная запись из настроек сервера.</div>
+  {% endfor %}
+  </div>
+</section>
 {% endblock %}
