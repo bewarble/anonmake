@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+{% if notice == 'saved' %}<div class="notice success">Настройки проекта сохранены.</div>{% endif %}
+<section class="page-toolbar platform-page-header project-detail-header">
+  <div>
+    <a class="back-link" href="/admin/projects">← Все проекты</a>
+    <span class="section-kicker">Карточка проекта</span>
+    <h1>{{ row.bot.display_name }}</h1>
+    <p>@{{ row.bot.username }} · код проекта {{ row.bot.code }}</p>
+  </div>
+  <span class="project-health {{ row.status_class }}">{{ row.operational_status }}</span>
+</section>
+<section class="metric-grid">
+  <article class="metric-card"><span>Пользователи</span><strong>{{ row.users }}</strong><small>+{{ row.users_today }} сегодня</small></article>
+  <article class="metric-card"><span>Активные VIP</span><strong>{{ row.active_vip }}</strong><small>Действующие статусы</small></article>
+  <article class="metric-card"><span>Выручка сегодня</span><strong>{{ money(row.revenue_today) }} ₽</strong><small>Успешные платежи</small></article>
+  <article class="metric-card"><span>Выручка за 30 дней</span><strong>{{ money(row.revenue_month) }} ₽</strong><small>Проект отдельно</small></article>
+</section>
+<section class="project-detail-grid">
+  <article class="panel project-operations-panel">
+    <div class="panel-heading"><div><span class="section-kicker">Операции</span><h2>Состояние проекта</h2></div></div>
+    <div class="health-list">
+      <div><span>Telegram-проект</span><strong>{{ 'Включён' if row.bot.is_active else 'Отключён' }}</strong></div>
+      <div><span>Режим обслуживания</span><strong>{{ 'Включён' if row.bot.is_maintenance else 'Выключен' }}</strong></div>
+      <div><span>Impaya</span><strong>{{ 'Настроена' if row.impaya_ready else 'Используется общая настройка' }}</strong></div>
+      <div><span>Очередь доставки</span><strong>{{ row.pending }}</strong></div>
+      <div><span>Ошибки доставки</span><strong>{{ row.failed }}</strong></div>
+      <div><span>Ожидающие платежи</span><strong>{{ row.payment_pending }}</strong></div>
+    </div>
+    <div class="quick-action-grid">
+      <a class="button" href="/admin/business?bot={{ row.bot.code }}">Обзор</a>
+      <a class="button" href="/admin/business/users?bot={{ row.bot.code }}">Клиенты</a>
+      <a class="button" href="/admin/payments?bot={{ row.bot.code }}">Платежи</a>
+      <a class="button" href="/admin/business/broadcasts?bot={{ row.bot.code }}">Рассылки</a>
+      <a class="button" href="/admin/delivery?bot={{ row.bot.code }}">Доставка</a>
+      {% if current_admin and current_admin.is_superadmin %}<a class="button" href="/admin/platform/payments">Настройки Impaya</a>{% endif %}
+    </div>
+  </article>
+  {% if current_admin and current_admin.is_superadmin %}
+  <article class="panel project-settings-panel">
+    <div class="panel-heading"><div><span class="section-kicker">Настройки</span><h2>Управление проектом</h2></div></div>
+    <form method="post" action="/admin/projects/{{ row.bot.code }}/settings" class="platform-form project-settings-form">
+      <div class="form-field full"><label>Название проекта</label><input name="display_name" value="{{ row.bot.display_name }}" required maxlength="96"></div>
+      <label class="switch-row full"><input type="checkbox" name="is_active" value="true" {% if row.bot.is_active %}checked{% endif %}><span><strong>Проект включён</strong><small>Отключение блокирует отправку через общие сервисы доставки.</small></span></label>
+      <label class="switch-row full"><input type="checkbox" name="is_maintenance" value="true" {% if row.bot.is_maintenance %}checked{% endif %}><span><strong>Режим обслуживания</strong><small>Отображается в центре управления как технические работы.</small></span></label>
+      <div class="form-field full"><label>Сообщение о технических работах</label><input name="maintenance_message" value="{{ row.bot.maintenance_message or '' }}" placeholder="Проект временно недоступен"></div>
+      <div class="form-actions full"><button class="button-primary" type="submit">Сохранить настройки</button></div>
+    </form>
+  </article>
+  {% endif %}
+</section>
+<section class="project-detail-grid project-activity-grid">
+  <article class="panel"><div class="panel-heading"><div><span class="section-kicker">Доставка</span><h2>Последние задания</h2></div></div><div class="compact-list">{% for item in recent_delivery %}<div><span>{{ item.kind }} · {{ item.chat_id }}</span><strong class="status-text {{ 'active' if item.status == 'delivered' else 'inactive' }}">{{ item.status }}</strong><small>{{ item.created_at|date_time }}</small></div>{% else %}<p class="empty-state">Заданий пока нет.</p>{% endfor %}</div></article>
+  <article class="panel"><div class="panel-heading"><div><span class="section-kicker">Платежи</span><h2>Последние операции</h2></div></div><div class="compact-list">{% for item in recent_payments %}<div><span>{{ money(item.amount_kopecks) }} ₽ · {{ item.attempt_kind }}</span><strong>{{ item.status }}</strong><small>{{ item.created_at|date_time }}</small></div>{% else %}<p class="empty-state">Платежей пока нет.</p>{% endfor %}</div></article>
+</section>
+{% endblock %}

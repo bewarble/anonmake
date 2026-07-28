@@ -1,48 +1,44 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="page-toolbar business-toolbar">
+<section class="page-toolbar platform-page-header">
   <div>
-    <span class="panel-kicker">Multibot Control Center</span>
-    <h2>Все проекты</h2>
-    <p>Сравнение аудитории, VIP подписок, выручки и качества доставки.</p>
+    <span class="section-kicker">Управление платформой</span>
+    <h1>Проекты</h1>
+    <p>Ключевые показатели, очереди, платежи и состояние каждого проекта.</p>
   </div>
 </section>
-
 <section class="metric-grid project-summary-grid">
-  <article class="metric-card"><span>Проекты</span><strong>{{ rows|length }}</strong><small>Активные экземпляры ботов</small></article>
-  <article class="metric-card"><span>Пользователи</span><strong>{{ total_users }}</strong><small>Во всех проектах</small></article>
-  <article class="metric-card"><span>VIP статусы</span><strong>{{ total_vip }}</strong><small>Активные подписки</small></article>
-  <article class="metric-card"><span>Выручка</span><strong>{{ money(total_revenue) }} ₽</strong><small>Успешные платежи</small></article>
+  <article class="metric-card"><span>Доступные проекты</span><strong>{{ rows|length }}</strong><small>С учётом прав аккаунта</small></article>
+  <article class="metric-card"><span>Пользователи</span><strong>{{ total_users }}</strong><small>Общая аудитория</small></article>
+  <article class="metric-card"><span>Активные VIP</span><strong>{{ total_vip }}</strong><small>Действующие статусы</small></article>
+  <article class="metric-card"><span>Выручка за 30 дней</span><strong>{{ money(total_revenue) }} ₽</strong><small>Успешные платежи</small></article>
 </section>
-
-<section class="project-grid">
+<section class="project-grid project-control-grid">
 {% for row in rows %}
-  <article class="project-card">
+  <article class="project-card project-control-card">
     <div class="project-card-head">
       <div class="project-avatar">{{ row.bot.display_name[:1]|upper }}</div>
-      <div>
-        <h3>{{ row.bot.display_name }}</h3>
-        <a href="https://t.me/{{ row.bot.username }}" target="_blank" rel="noreferrer">@{{ row.bot.username }}</a>
-      </div>
-      <span class="project-health {{ row.delivery_health }}">
-        {% if row.delivery_health == 'healthy' %}Работает{% elif row.delivery_health == 'pending' %}Очередь{% else %}Есть ошибки{% endif %}
-      </span>
+      <div class="project-identity"><h2>{{ row.bot.display_name }}</h2><a href="https://t.me/{{ row.bot.username }}" target="_blank" rel="noreferrer">@{{ row.bot.username }}</a></div>
+      <span class="project-health {{ row.status_class }}">{{ row.operational_status }}</span>
+    </div>
+    <div class="project-revenue-row">
+      <div><span>Сегодня</span><strong>{{ money(row.revenue_today) }} ₽</strong></div>
+      <div><span>7 дней</span><strong>{{ money(row.revenue_week) }} ₽</strong></div>
+      <div><span>30 дней</span><strong>{{ money(row.revenue_month) }} ₽</strong></div>
     </div>
     <dl class="project-metrics">
-      <div><dt>Пользователи</dt><dd>{{ row.users }}</dd></div>
+      <div><dt>Пользователи</dt><dd>{{ row.users }}</dd><small>+{{ row.users_today }} сегодня</small></div>
       <div><dt>VIP</dt><dd>{{ row.active_vip }}</dd></div>
-      <div><dt>Выручка</dt><dd>{{ money(row.revenue_kopecks) }} ₽</dd></div>
-      <div><dt>Доставлено</dt><dd>{{ row.delivered }}</dd></div>
-      <div><dt>В очереди</dt><dd>{{ row.pending }}</dd></div>
+      <div><dt>Очередь</dt><dd>{{ row.pending }}</dd></div>
       <div><dt>Ошибки</dt><dd>{{ row.failed }}</dd></div>
+      <div><dt>Рассылки</dt><dd>{{ row.active_broadcasts }}</dd></div>
+      <div><dt>Impaya</dt><dd>{{ 'Подключена' if row.impaya_ready else 'Не настроена' }}</dd></div>
     </dl>
     <div class="project-card-foot">
       <span>Последняя доставка: {{ row.last_delivery_at|date_time if row.last_delivery_at else 'нет данных' }}</span>
-      <a class="button-primary" href="/admin/business?bot={{ row.bot.code }}">Открыть проект →</a>
+      <a class="button-primary" href="/admin/projects/{{ row.bot.code }}">Управление проектом</a>
     </div>
   </article>
-{% else %}
-  <div class="empty-state">Проекты ещё не зарегистрированы.</div>
-{% endfor %}
+{% else %}<div class="empty-state">Для этого аккаунта проекты не назначены.</div>{% endfor %}
 </section>
 {% endblock %}
