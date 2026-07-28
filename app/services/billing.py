@@ -73,8 +73,8 @@ class BillingService:
         if existing is not None:
             return ChargeResult(self._decision(existing), existing, subscription.access_until)
         if not method.binding_id or not method.impaya_user_id: raise RuntimeError("Recurrent binding is incomplete")
-        op=f"sub_{subscription.id}_{cycle.replace('-','')[:20]}_{kind}"[:64]
-        attempt=PaymentAttempt(subscription_id=subscription.id, customer_operation_id=op, billing_cycle_key=cycle, attempt_kind=kind, amount_kopecks=amount, status="pending")
+        op=f"{subscription.bot_id}_sub_{subscription.id}_{cycle.replace('-','')[:16]}_{kind}"[:64]
+        attempt=PaymentAttempt(bot_id=subscription.bot_id, subscription_id=subscription.id, customer_operation_id=op, billing_cycle_key=cycle, attempt_kind=kind, amount_kopecks=amount, status="pending")
         self.session.add(attempt); await self.session.flush()
         result=await self.client.recurrent_pay(customer_operation_id=op, amount=amount, binding_id=method.binding_id, impaya_user_id=method.impaya_user_id, merchant_user_id=method.merchant_user_id)
         attempt.raw_response=json.dumps(result.data, ensure_ascii=False); attempt.transaction_id=result.data.get("transaction_id")

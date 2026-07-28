@@ -6,6 +6,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bot_context import require_current_bot
 from app.models.billing import PaymentAttempt, PaymentMethod, Subscription
 from app.repositories.billing import BillingRepository
 from app.services.impaya import ImpayaClient
@@ -46,15 +47,19 @@ class SubscriptionCheckoutService:
         subscription = await self.repo.get_or_create_subscription(user_id)
         method = await self.repo.payment_method_for_user(user_id)
         if method is None:
+            current_bot = require_current_bot()
             method = PaymentMethod(
+                bot_id=current_bot.id,
                 user_id=user_id,
-                merchant_user_id=f"anonmake_{user_id}",
+                merchant_user_id=f"{current_bot.code}_anonmake_{user_id}",
             )
             self.session.add(method)
             await self.session.flush()
 
-        operation_id = f"test_{user_id}_{uuid.uuid4().hex[:20]}"
+        current_bot = require_current_bot()
+        operation_id = f"{current_bot.code}_test_{user_id}_{uuid.uuid4().hex[:16]}"[:64]
         attempt = PaymentAttempt(
+            bot_id=current_bot.id,
             subscription_id=subscription.id,
             customer_operation_id=operation_id,
             billing_cycle_key=f"test-{uuid.uuid4().hex[:16]}",

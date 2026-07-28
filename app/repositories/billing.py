@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bot_context import require_current_bot
 from app.models.billing import PaymentAttempt, PaymentMethod, Subscription
 
 
@@ -14,7 +15,10 @@ class BillingRepository:
 
     async def subscription_for_user(self, user_id: int) -> Subscription | None:
         result = await self.session.execute(
-            select(Subscription).where(Subscription.user_id == user_id)
+            select(Subscription).where(
+                Subscription.bot_id == require_current_bot().id,
+                Subscription.user_id == user_id,
+            )
         )
         return result.scalar_one_or_none()
 
@@ -22,14 +26,17 @@ class BillingRepository:
         item = await self.subscription_for_user(user_id)
         if item:
             return item
-        item = Subscription(user_id=user_id)
+        item = Subscription(bot_id=require_current_bot().id, user_id=user_id)
         self.session.add(item)
         await self.session.flush()
         return item
 
     async def payment_method_for_user(self, user_id: int) -> PaymentMethod | None:
         result = await self.session.execute(
-            select(PaymentMethod).where(PaymentMethod.user_id == user_id)
+            select(PaymentMethod).where(
+                PaymentMethod.bot_id == require_current_bot().id,
+                PaymentMethod.user_id == user_id,
+            )
         )
         return result.scalar_one_or_none()
 
@@ -113,6 +120,7 @@ class BillingRepository:
     ) -> PaymentAttempt | None:
         result = await self.session.execute(
             select(PaymentAttempt).where(
+                PaymentAttempt.bot_id == require_current_bot().id,
                 PaymentAttempt.subscription_id == subscription_id,
                 PaymentAttempt.billing_cycle_key == cycle,
                 PaymentAttempt.attempt_kind == kind,
@@ -146,7 +154,8 @@ class BillingRepository:
         for_update: bool = False,
     ) -> PaymentAttempt | None:
         statement = select(PaymentAttempt).where(
-            PaymentAttempt.customer_operation_id == customer_operation_id
+            PaymentAttempt.bot_id == require_current_bot().id,
+            PaymentAttempt.customer_operation_id == customer_operation_id,
         )
         if for_update:
             statement = statement.with_for_update()

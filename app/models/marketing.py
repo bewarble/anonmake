@@ -20,10 +20,18 @@ from app.database.base import Base
 
 class TrafficSource(Base):
     __tablename__ = "traffic_sources"
+    __table_args__ = (
+        UniqueConstraint("bot_id", "code", name="uq_traffic_sources_bot_code"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(
+        ForeignKey("bot_instances.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    code: Mapped[str] = mapped_column(String(32), index=True)
     source_url: Mapped[str] = mapped_column(String(1000), nullable=False)
     spend_kopecks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     clicks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

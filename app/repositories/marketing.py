@@ -25,7 +25,11 @@ class MarketingRepository:
         spend_kopecks: int,
         admin_telegram_id: int,
     ) -> TrafficSource:
+        current_bot = get_current_bot()
+        if current_bot is None:
+            raise RuntimeError("Current bot context is required")
         source = TrafficSource(
+            bot_id=current_bot.id,
             name=name,
             code=secrets.token_urlsafe(8).replace("-", "").replace("_", "")[:12],
             source_url=source_url,
@@ -39,6 +43,7 @@ class MarketingRepository:
     async def source_by_code(self, code: str) -> TrafficSource | None:
         return await self.session.scalar(
             select(TrafficSource).where(
+                TrafficSource.bot_id == get_current_bot().id,
                 TrafficSource.code == code,
                 TrafficSource.is_active.is_(True),
             )
@@ -81,14 +86,22 @@ class MarketingRepository:
     async def sources(self, limit: int = 20) -> list[TrafficSource]:
         result = await self.session.execute(
             select(TrafficSource)
-            .where(TrafficSource.is_active.is_(True))
+            .where(
+                TrafficSource.bot_id == get_current_bot().id,
+                TrafficSource.is_active.is_(True),
+            )
             .order_by(TrafficSource.id.desc())
             .limit(limit)
         )
         return list(result.scalars())
 
     async def source_stats(self, source_id: int) -> dict[str, int] | None:
-        source = await self.session.get(TrafficSource, source_id)
+        source = await self.session.scalar(
+            select(TrafficSource).where(
+                TrafficSource.id == source_id,
+                TrafficSource.bot_id == get_current_bot().id,
+            )
+        )
         if source is None:
             return None
 

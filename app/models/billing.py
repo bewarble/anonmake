@@ -10,15 +10,38 @@ from app.database.base import Base
 
 class PaymentMethod(Base):
     __tablename__ = "payment_methods"
+    __table_args__ = (
+        UniqueConstraint("bot_id", "user_id", name="uq_payment_methods_bot_user"),
+        UniqueConstraint(
+            "bot_id",
+            "merchant_user_id",
+            name="uq_payment_methods_bot_merchant_user",
+        ),
+        UniqueConstraint(
+            "bot_id",
+            "impaya_operation_id",
+            name="uq_payment_methods_bot_impaya_operation",
+        ),
+        UniqueConstraint(
+            "bot_id",
+            "binding_id",
+            name="uq_payment_methods_bot_binding",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
+    bot_id: Mapped[int] = mapped_column(
+        ForeignKey("bot_instances.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
-    merchant_user_id: Mapped[str] = mapped_column(String(36), unique=True)
-    impaya_operation_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    merchant_user_id: Mapped[str] = mapped_column(String(64))
+    impaya_operation_id: Mapped[str | None] = mapped_column(String(64))
     impaya_user_id: Mapped[str | None] = mapped_column(String(64))
-    binding_id: Mapped[str | None] = mapped_column(String(128), unique=True)
+    binding_id: Mapped[str | None] = mapped_column(String(128))
     masked_pan: Mapped[str | None] = mapped_column(String(32))
     card_brand: Mapped[str | None] = mapped_column(String(32))
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -34,10 +57,18 @@ class PaymentMethod(Base):
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
+    __table_args__ = (
+        UniqueConstraint("bot_id", "user_id", name="uq_subscriptions_bot_user"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(
+        ForeignKey("bot_instances.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     status: Mapped[str] = mapped_column(
         String(32), default="pending_binding", index=True
@@ -65,19 +96,30 @@ class PaymentAttempt(Base):
     __tablename__ = "payment_attempts"
     __table_args__ = (
         UniqueConstraint(
+            "bot_id",
             "subscription_id",
             "billing_cycle_key",
             "attempt_kind",
-            name="uq_payment_attempt_cycle_kind",
+            name="uq_payment_attempt_bot_cycle_kind",
+        ),
+        UniqueConstraint(
+            "bot_id",
+            "customer_operation_id",
+            name="uq_payment_attempt_bot_operation",
         ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    bot_id: Mapped[int] = mapped_column(
+        ForeignKey("bot_instances.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     subscription_id: Mapped[int] = mapped_column(
         ForeignKey("subscriptions.id", ondelete="CASCADE"), index=True
     )
     customer_operation_id: Mapped[str] = mapped_column(
-        String(64), unique=True, index=True
+        String(64), index=True
     )
     transaction_id: Mapped[str | None] = mapped_column(String(64), unique=True)
     billing_cycle_key: Mapped[str] = mapped_column(String(32), index=True)
