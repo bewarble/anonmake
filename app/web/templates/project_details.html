@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-{% if notice == 'saved' %}<div class="notice success">Настройки проекта сохранены.</div>{% endif %}
+{% if notice == 'saved' %}<div class="notice success">Настройки проекта сохранены.</div>{% elif notice == 'created' %}<div class="notice success">Проект создан. Управляемый процесс подключит его автоматически.</div>{% elif notice == 'token_saved' %}<div class="notice success">Telegram-токен проверен и сохранён.</div>{% elif notice == 'token_error' %}<div class="notice danger">Telegram не принял новый токен.</div>{% endif %}
 <section class="page-toolbar platform-page-header project-detail-header">
   <div>
     <a class="back-link" href="/admin/projects">← Все проекты</a>
@@ -47,6 +47,10 @@
       <div class="form-actions full"><button class="button-primary" type="submit">Сохранить настройки</button></div>
     </form>
   </article>
+  {% endif %}
+
+  {% if current_admin and current_admin.is_superadmin %}
+  <article class="panel project-settings-panel"><div class="panel-heading"><div><span class="section-kicker">Telegram</span><h2>Подключение проекта</h2></div></div><div class="health-list"><div><span>Режим запуска</span><strong>{{ 'Управляется платформой' if row.bot.runtime_mode == 'managed' else 'Внешний контейнер' }}</strong></div><div><span>Токен</span><strong>{{ row.bot.token_hint or 'Задан через окружение' }}</strong></div><div><span>Последняя проверка</span><strong>{{ row.bot.token_verified_at|date_time if row.bot.token_verified_at else 'нет данных' }}</strong></div></div><form method="post" action="/admin/projects/{{ row.bot.code }}/telegram" class="platform-form"><div class="form-field full"><label>Новый Telegram-токен</label><input name="telegram_token" type="password" required autocomplete="off" placeholder="Введите токен для замены"></div><div class="form-actions full"><button class="button-primary" type="submit">Проверить и заменить токен</button></div></form></article>
   {% endif %}
 </section>
 <section class="project-detail-grid project-activity-grid">

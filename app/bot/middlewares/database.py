@@ -14,9 +14,9 @@ from app.repositories.bot_instances import BotInstanceRepository
 
 
 class DatabaseMiddleware(BaseMiddleware):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, current_bot: CurrentBot | None = None) -> None:
         self.settings = settings
-        self._current_bot: CurrentBot | None = None
+        self._current_bot: CurrentBot | None = current_bot
         self._bootstrap_lock = asyncio.Lock()
 
     async def _resolve_current_bot(self) -> CurrentBot:

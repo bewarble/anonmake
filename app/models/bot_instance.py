@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -19,6 +19,13 @@ class BotInstance(Base):
         String(64), unique=True, index=True, nullable=False
     )
     display_name: Mapped[str] = mapped_column(String(96), nullable=False)
+    runtime_mode: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="external", server_default="external", index=True
+    )
+    telegram_bot_id: Mapped[int | None] = mapped_column(BigInteger)
+    token_encrypted: Mapped[str | None] = mapped_column(Text)
+    token_hint: Mapped[str | None] = mapped_column(String(32))
+    token_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )

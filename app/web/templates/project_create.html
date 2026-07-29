@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-toolbar platform-page-header"><div><a class="back-link" href="/admin/projects">← Проекты</a><span class="section-kicker">Подключение</span><h1>Новый проект</h1><p>Токен проверяется через Telegram и сохраняется в зашифрованном виде.</p></div></section>
+{% if error == 'token' %}<div class="notice danger">Telegram не принял токен. Проверьте значение у BotFather.</div>{% elif error == 'code' %}<div class="notice danger">Код может содержать только буквы, цифры и подчёркивание.</div>{% elif error == 'exists' %}<div class="notice danger">Проект с таким кодом или Telegram-именем уже существует.</div>{% endif %}
+<section class="panel project-create-panel"><form method="post" class="platform-form project-settings-form">
+<div class="form-field"><label>Название проекта</label><input name="display_name" required maxlength="96" placeholder="Например, Секретные вопросы"></div>
+<div class="form-field"><label>Код проекта</label><input name="code" required maxlength="32" pattern="[A-Za-z0-9_-]+" placeholder="secret_questions"><small>Используется только внутри платформы и в адресах.</small></div>
+<div class="form-field full"><label>Telegram-токен</label><input name="telegram_token" type="password" required autocomplete="off" placeholder="123456:ABC..."><small>Полное значение после сохранения не отображается.</small></div>
+<div class="form-actions full"><button class="button-primary" type="submit">Проверить и создать проект</button></div>
+</form></section>
+{% endblock %}

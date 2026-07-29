@@ -163,7 +163,7 @@ async def main() -> None:
                         continue
 
                     try:
-                        bot = bot_pool.for_instance(instance)
+                        bot = await bot_pool.for_instance(session, instance)
                     except RuntimeError as exc:
                         repository = DeliveryRepository(session)
                         await repository.mark_failed(job, error=str(exc))
