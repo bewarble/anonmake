@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header system-page-header">
+  <div>
+    <span class="eyebrow">Эксплуатация платформы</span>
+    <h2>Состояние системы</h2>
+    <p>Версии, очереди, последнее развёртывание и снимок состояния сервисов.</p>
+  </div>
+  <span class="status-badge {{ 'healthy' if deploy.status == 'success' else 'warning' }}">
+    {{ 'Последний деплой успешен' if deploy.status == 'success' else 'Нет успешного отчёта о деплое' }}
+  </span>
+</section>
+
+<section class="system-status-grid">
+  <article class="system-status-card {{ 'healthy' if postgres_ok else 'danger' }}">
+    <span class="system-status-dot"></span><div><small>PostgreSQL</small><strong>{{ 'Работает' if postgres_ok else 'Недоступен' }}</strong></div>
+  </article>
+  <article class="system-status-card {{ 'healthy' if redis_ok else 'danger' }}">
+    <span class="system-status-dot"></span><div><small>Redis</small><strong>{{ 'Работает' if redis_ok else 'Недоступен' }}</strong></div>
+  </article>
+  <article class="system-status-card {{ 'healthy' if source_head == database_head else 'warning' }}">
+    <span class="system-status-dot"></span><div><small>Миграции</small><strong>{{ database_head }}</strong><span>Код: {{ source_head }}</span></div>
+  </article>
+  <article class="system-status-card {{ 'healthy' if deploy.status == 'success' else 'warning' }}">
+    <span class="system-status-dot"></span><div><small>Версия приложения</small><strong>{{ deploy.commit or 'Не определена' }}</strong><span>{{ deploy.branch or '' }}</span></div>
+  </article>
+</section>
+
+<section class="system-layout-grid">
+  <article class="panel system-panel">
+    <div class="panel-heading"><div><span class="eyebrow">Развёртывание</span><h3>Последний деплой</h3></div></div>
+    {% if deploy %}
+    <dl class="system-details-list">
+      <div><dt>Результат</dt><dd><span class="status-badge {{ 'healthy' if deploy.status == 'success' else 'danger' }}">{{ 'Успешно' if deploy.status == 'success' else 'Ошибка' }}</span></dd></div>
+      <div><dt>Коммит</dt><dd><code>{{ deploy.commit or '—' }}</code></dd></div>
+      <div><dt>Завершён</dt><dd>{{ deploy.completed_at or '—' }}</dd></div>
+      <div><dt>Длительность</dt><dd>{{ deploy.duration_seconds or 0 }} сек.</dd></div>
+      <div><dt>Резервная копия</dt><dd>{{ deploy.backup_path or 'Не создавалась' }}</dd></div>
+      {% if deploy.error %}<div><dt>Ошибка</dt><dd class="danger-text">{{ deploy.error }}</dd></div>{% endif %}
+    </dl>
+    {% else %}
+    <p class="empty">Запустите первый управляемый деплой командой <code>make deploy</code>.</p>
+    {% endif %}
+  </article>
+
+  <article class="panel system-panel">
+    <div class="panel-heading"><div><span class="eyebrow">Нагрузка</span><h3>Текущие очереди</h3></div></div>
+    <div class="system-queue-grid">
+      <div><strong>{{ queues.delivery }}</strong><span>Доставка</span></div>
+      <div><strong>{{ queues.broadcasts }}</strong><span>Рассылки</span></div>
+      <div><strong>{{ queues.payments }}</strong><span>Платежи</span></div>
+    </div>
+    <div class="backup-summary">
+      <span>Последняя локальная копия</span>
+      {% if last_backup %}<strong>{{ last_backup.name }}</strong><small>{{ last_backup.size }} байт · {{ last_backup.modified_at|date_time }}</small>
+      {% else %}<strong>Пока отсутствует</strong>{% endif %}
+    </div>
+  </article>
+</section>
+
+<section class="panel system-panel">
+  <div class="panel-heading"><div><span class="eyebrow">Снимок после деплоя</span><h3>Сервисы приложения</h3></div></div>
+  <div class="service-snapshot-grid">
+    {% for service, info in services.items() %}
+    <article class="service-snapshot-card">
+      <span class="system-status-dot"></span>
+      <div><strong>{{ service }}</strong><span>{{ info.state or 'Не определено' }}{% if info.health %} · {{ info.health }}{% endif %}</span></div>
+    </article>
+    {% else %}
+    <p class="empty">Снимок сервисов появится после запуска <code>make deploy</code>.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

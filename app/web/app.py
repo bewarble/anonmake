@@ -482,3 +482,15 @@ from app.web import admin_project_wizard as admin_project_wizard_module  # noqa:
 for wizard_route in admin_project_wizard_module.router.routes:
     if not any(getattr(existing, "path", None) == getattr(wizard_route, "path", None) and getattr(existing, "methods", None) == getattr(wizard_route, "methods", None) for existing in app.router.routes):
         app.router.routes.append(wizard_route)
+
+
+# Stage 47 platform system operations.
+from app.web import admin_system as admin_system_module  # noqa: E402
+
+for system_route in admin_system_module.router.routes:
+    if not any(
+        getattr(existing, "path", None) == getattr(system_route, "path", None)
+        and getattr(existing, "methods", None) == getattr(system_route, "methods", None)
+        for existing in app.router.routes
+    ):
+        app.router.routes.append(system_route)

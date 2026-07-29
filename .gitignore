@@ -264,3 +264,7 @@ data/
 *.pyc
 *.pyo
 # Python bytecode
+
+var/deploy-state.json
+var/deploy-history.jsonl
+backups/deploy/*.dump

@@ -151,6 +151,9 @@ services:
 
   web:
     <<: *app-common
+    volumes:
+      - ./var:/app/var:ro
+      - ./backups/deploy:/app/backups/deploy:ro
     command:
       [
         "uvicorn",
