@@ -474,3 +474,11 @@ for platform_route in admin_platform_module.router.routes:
         for existing in app.router.routes
     ):
         app.router.routes.append(platform_route)
+
+
+# Stage 45 project creation wizard.
+from app.web import admin_project_wizard as admin_project_wizard_module  # noqa: E402
+
+for wizard_route in admin_project_wizard_module.router.routes:
+    if not any(getattr(existing, "path", None) == getattr(wizard_route, "path", None) and getattr(existing, "methods", None) == getattr(wizard_route, "methods", None) for existing in app.router.routes):
+        app.router.routes.append(wizard_route)

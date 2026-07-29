@@ -954,3 +954,54 @@ document.querySelectorAll('[data-role-selector]').forEach((select) => {
   select.addEventListener('change', sync);
   sync();
 });
+
+/* Stage 45.1: project wizard interactions */
+(() => {
+  const wizard = document.querySelector("[data-project-wizard]");
+  if (!wizard) return;
+
+  const profileSelect = wizard.querySelector("[data-profile-select]");
+  const profileName = wizard.querySelector("[data-profile-name]");
+  const profileDescription = wizard.querySelector("[data-profile-description]");
+  const refreshProfile = () => {
+    const option = profileSelect?.selectedOptions?.[0];
+    if (!option) return;
+    if (profileName) profileName.textContent = option.dataset.name || option.textContent;
+    if (profileDescription) profileDescription.textContent = option.dataset.description || "Готовый набор стартовых настроек проекта.";
+  };
+  profileSelect?.addEventListener("change", refreshProfile);
+  refreshProfile();
+
+  wizard.querySelectorAll("[data-secret-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const input = button.closest(".secret-input")?.querySelector("[data-secret-input]");
+      if (!input) return;
+      input.type = input.type === "password" ? "text" : "password";
+      button.textContent = input.type === "password" ? "◉" : "○";
+    });
+  });
+
+  wizard.querySelectorAll("[data-count-target]").forEach((field) => {
+    const output = document.getElementById(field.dataset.countTarget || "");
+    const update = () => {
+      if (output) output.textContent = `${field.value.length} / ${field.maxLength}`;
+    };
+    field.addEventListener("input", update);
+    update();
+  });
+
+  const nameInput = wizard.querySelector('input[name="display_name"]');
+  const slugInput = wizard.querySelector("[data-slug-input]");
+  let slugTouched = Boolean(slugInput?.value);
+  slugInput?.addEventListener("input", () => { slugTouched = true; });
+  nameInput?.addEventListener("input", () => {
+    if (!slugInput || slugTouched) return;
+    slugInput.value = nameInput.value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-zа-яё0-9]+/gi, "_")
+      .replace(/[а-яё]/gi, "")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 32);
+  });
+})();

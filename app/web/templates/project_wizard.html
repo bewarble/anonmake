@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block content %}
+{% set step_titles = ("Основное", "Telegram", "Платежи", "Администратор", "Запуск") %}
+<section class="wizard-page" data-project-wizard>
+  <header class="wizard-hero">
+    <div>
+      <a class="back-link" href="/admin/projects">← Вернуться к проектам</a>
+      <span class="section-kicker">Пошаговая настройка</span>
+      <h2>Мастер создания проекта</h2>
+      <p>Настройте проект за пять коротких шагов. Черновик сохраняется после каждого перехода.</p>
+    </div>
+    <div class="wizard-save-state" aria-live="polite">
+      <span class="wizard-save-dot"></span>
+      <div><strong>Черновик сохранён</strong><small>Шаг {{ step }} из 5</small></div>
+    </div>
+  </header>
+
+  <nav class="wizard-progress" aria-label="Этапы создания проекта">
+    {% for title in step_titles %}
+      <a
+        class="wizard-step {{ 'active' if loop.index == step else 'done' if loop.index < step else 'locked' }}"
+        {% if loop.index < step %}
+          href="/admin/projects/create/{{ draft.id }}/{{ ('basic','telegram','payments','administrator','review')[loop.index0] }}"
+        {% else %}
+          aria-current="{{ 'step' if loop.index == step else 'false' }}"
+        {% endif %}
+      >
+        <b>{{ '✓' if loop.index < step else loop.index }}</b>
+        <span>{{ title }}</span>
+      </a>
+    {% endfor %}
+  </nav>
+
+  <div class="wizard-layout">
+    <aside class="wizard-side-panel">
+      <div class="wizard-side-heading">
+        <span class="wizard-side-icon">{{ ('✦','✈','₽','◎','✓')[step-1] }}</span>
+        <div><small>Шаг {{ step }} из 5</small><strong>{{ step_titles[step-1] }}</strong></div>
+      </div>
+      <ol class="wizard-side-steps">
+        {% for title in step_titles %}
+          <li class="{{ 'active' if loop.index == step else 'done' if loop.index < step else '' }}">
+            <span>{{ '✓' if loop.index < step else loop.index }}</span>
+            <div><strong>{{ title }}</strong><small>{{ ('Информация о проекте','Подключение Telegram-бота','Настройки Impaya','Доступ к проекту','Проверка и запуск')[loop.index0] }}</small></div>
+          </li>
+        {% endfor %}
+      </ol>
+      <div class="wizard-help-card">
+        <span>?</span>
+        <div><strong>Можно продолжить позже</strong><p>Все завершённые шаги сохраняются в черновике автоматически.</p></div>
+      </div>
+    </aside>
+
+    <main class="wizard-main-card">
+      {% if step == 1 %}
+      <header class="wizard-card-header">
+        <span class="wizard-card-icon">✦</span>
+        <div><small>Шаг 1 из 5</small><h3>Основные сведения</h3><p>Выберите профиль и укажите базовую информацию о новом проекте.</p></div>
+      </header>
+      {% if request.query_params.get('error') == 'code' %}<div class="notice danger">Проверьте внутренний код проекта: разрешены латинские буквы, цифры и знак подчёркивания.</div>{% elif request.query_params.get('error') == 'exists' %}<div class="notice danger">Проект с таким внутренним кодом уже существует.</div>{% endif %}
+      <form method="post" class="wizard-form">
+        <label class="wizard-field wizard-field-full">
+          <span class="wizard-label">Профиль проекта <i title="Профиль определяет стартовый набор функций">?</i></span>
+          <select name="profile_code" required data-profile-select>
+            {% for profile in profiles %}
+            <option
+              value="{{ profile.code }}"
+              data-name="{{ profile.name }}"
+              data-description="{{ profile.description or 'Готовый набор стартовых настроек проекта.' }}"
+              {{ 'selected' if draft.profile_code == profile.code else '' }}
+            >{{ profile.name }}</option>
+            {% endfor %}
+          </select>
+          <small>Вы сможете расширить возможности проекта после запуска.</small>
+        </label>
+
+        <article class="wizard-profile-preview" data-profile-preview>
+          <div class="wizard-profile-mark">◉</div>
+          <div class="wizard-profile-copy">
+            <span class="badge info">Рекомендуемый профиль</span>
+            <h4 data-profile-name>Анонимные вопросы</h4>
+            <p data-profile-description>Стандартный профиль AnonMake для анонимных вопросов и VIP-доступа.</p>
+            <ul>
+              <li>Анонимные вопросы и ответы</li>
+              <li>VIP-доступ и платные функции</li>
+              <li>Модерация, аналитика и рассылки</li>
+            </ul>
+          </div>
+        </article>
+
+        <label class="wizard-field wizard-field-full">
+          <span class="wizard-label">Название проекта</span>
+          <input name="display_name" value="{{ draft.display_name or '' }}" maxlength="96" placeholder="Например: Тайные вопросы" required data-count-target="project-name-count">
+          <small><span>Отображается в панели управления.</span><span id="project-name-count">{{ (draft.display_name or '')|length }} / 96</span></small>
+        </label>
+        <label class="wizard-field">
+          <span class="wizard-label">Внутренний код</span>
+          <input name="code" value="{{ draft.code or '' }}" maxlength="32" pattern="[A-Za-z0-9_-]+" placeholder="Например: secret_questions" required data-slug-input>
+          <small>Латинские буквы, цифры, «_» и «-».</small>
+        </label>
+        <label class="wizard-field">
+          <span class="wizard-label">Краткое описание <em>необязательно</em></span>
+          <textarea name="description" rows="4" maxlength="500" placeholder="Опишите назначение и особенности проекта…" data-count-target="project-description-count">{{ draft.description or '' }}</textarea>
+          <small><span>Будет видно только администраторам.</span><span id="project-description-count">{{ (draft.description or '')|length }} / 500</span></small>
+        </label>
+        <div class="wizard-actions wizard-field-full">
+          <a class="button-secondary" href="/admin/projects">Отмена</a>
+          <button type="submit" class="button-primary">Далее: Telegram <span>→</span></button>
+        </div>
+      </form>
+
+      {% elif step == 2 %}
+      <header class="wizard-card-header">
+        <span class="wizard-card-icon">✈</span>
+        <div><small>Шаг 2 из 5</small><h3>Подключение Telegram</h3><p>Добавьте токен из BotFather. Мы проверим его и безопасно зашифруем.</p></div>
+      </header>
+      {% if error == 'token' %}<div class="notice danger">Telegram не принял токен. Проверьте значение и повторите попытку.</div>{% elif error == 'exists' %}<div class="notice danger">Этот Telegram-бот уже подключён к другому проекту.</div>{% endif %}
+      {% if draft.telegram_username %}
+      <article class="telegram-identity-card">
+        <div class="telegram-avatar-wrap">
+          <img src="/admin/projects/create/{{ draft.id }}/telegram/avatar" alt="Аватар @{{ draft.telegram_username }}" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+          <span class="telegram-avatar-fallback" hidden>{{ draft.telegram_username[:1]|upper }}</span>
+          <i></i>
+        </div>
+        <div><span class="badge success">Токен проверен</span><h4>@{{ draft.telegram_username }}</h4><p>Telegram ID: {{ draft.telegram_bot_id }} · {{ draft.telegram_token_hint }}</p></div>
+      </article>
+      {% endif %}
+      <form method="post" class="wizard-form">
+        <label class="wizard-field wizard-field-full">
+          <span class="wizard-label">Telegram-токен</span>
+          <div class="secret-input"><input name="telegram_token" type="password" required autocomplete="off" placeholder="1234567890:AA…" data-secret-input><button type="button" data-secret-toggle aria-label="Показать или скрыть токен">◉</button></div>
+          <small>Токен проверяется через Telegram API и хранится только в зашифрованном виде.</small>
+        </label>
+        <div class="wizard-security-note wizard-field-full"><span>⌾</span><p><strong>Безопасное хранение</strong> Токен не отображается после сохранения и не попадает в журналы приложения.</p></div>
+        <div class="wizard-actions wizard-field-full"><a class="button-secondary" href="/admin/projects/create/{{ draft.id }}/basic">← Назад</a><button type="submit" class="button-primary">Проверить и продолжить <span>→</span></button></div>
+      </form>
+
+      {% elif step == 3 %}
+      <header class="wizard-card-header"><span class="wizard-card-icon">₽</span><div><small>Шаг 3 из 5</small><h3>Платежи Impaya</h3><p>Подключите собственные реквизиты проекта или пропустите шаг и настройте их позже.</p></div></header>
+      <form method="post" class="wizard-form">
+        <div class="wizard-form-section wizard-field-full"><span>01</span><div><strong>Подключение к API</strong><small>Адрес сервера и ключ авторизации</small></div></div>
+        <label class="wizard-field"><span class="wizard-label">Адрес сервера Impaya</span><input name="api_url" value="{{ draft.impaya_api_url or '' }}" placeholder="https://api.impaya.ru"></label>
+        <label class="wizard-field"><span class="wizard-label">Ключ доступа</span><div class="secret-input"><input name="api_token" type="password" autocomplete="off" placeholder="Оставьте пустым, если не настраиваете сейчас" data-secret-input><button type="button" data-secret-toggle aria-label="Показать или скрыть ключ">◉</button></div></label>
+        <div class="wizard-form-section wizard-field-full"><span>02</span><div><strong>Терминалы</strong><small>Отдельные терминалы для разных типов операций</small></div></div>
+        <label class="wizard-field"><span class="wizard-label">Основной терминал</span><input name="terminal_name" value="{{ draft.impaya_terminal_name or '' }}"></label>
+        <label class="wizard-field"><span class="wizard-label">Терминал привязки карты</span><input name="binding_terminal_name" value="{{ draft.impaya_binding_terminal_name or '' }}"></label>
+        <label class="wizard-field"><span class="wizard-label">Терминал повторных списаний</span><input name="recurrent_terminal_name" value="{{ draft.impaya_recurrent_terminal_name or '' }}"></label>
+        <label class="wizard-field"><span class="wizard-label">Шаблон адреса платёжной формы</span><input name="payment_form_url_template" value="{{ draft.impaya_payment_form_url_template or '' }}" placeholder="https://pay.example.ru/{operation_id}"></label>
+        <label class="wizard-field wizard-field-full"><span class="wizard-label">Секрет входящих уведомлений</span><div class="secret-input"><input name="webhook_secret" type="password" autocomplete="off" data-secret-input><button type="button" data-secret-toggle aria-label="Показать или скрыть секрет">◉</button></div></label>
+        <div class="wizard-actions wizard-field-full"><a class="button-secondary" href="/admin/projects/create/{{ draft.id }}/telegram">← Назад</a><button type="submit" class="button-primary">Далее: администратор <span>→</span></button></div>
+      </form>
+
+      {% elif step == 4 %}
+      <header class="wizard-card-header"><span class="wizard-card-icon">◎</span><div><small>Шаг 4 из 5</small><h3>Администратор проекта</h3><p>Назначьте аккаунт, который получит доступ только к этому проекту.</p></div></header>
+      <form method="post" class="wizard-form">
+        <label class="wizard-field wizard-field-full"><span class="wizard-label">Аккаунт администратора</span><select name="assigned_admin_id"><option value="">Не назначать сейчас</option>{% for admin in admins %}<option value="{{ admin.id }}" {{ 'selected' if draft.assigned_admin_id == admin.id else '' }}>{{ admin.display_name }} · {{ admin.email }}</option>{% endfor %}</select><small>Суперадминистраторы сохраняют доступ ко всем проектам.</small></label>
+        <div class="wizard-security-note wizard-field-full"><span>⌾</span><p><strong>Изолированный доступ</strong> Администратор проекта не увидит общую статистику и данные других проектов.</p></div>
+        <div class="wizard-actions wizard-field-full"><a class="button-secondary" href="/admin/projects/create/{{ draft.id }}/payments">← Назад</a><button type="submit" class="button-primary">Далее: проверка <span>→</span></button></div>
+      </form>
+
+      {% else %}
+      <header class="wizard-card-header"><span class="wizard-card-icon">✓</span><div><small>Шаг 5 из 5</small><h3>Проверка и запуск</h3><p>Проверьте конфигурацию. После запуска проект автоматически подключится к платформе.</p></div></header>
+      <div class="wizard-review-grid">
+        <article><span>Проект</span><strong>{{ draft.display_name }}</strong><small>{{ draft.code }} · {{ draft.profile_code }}</small></article>
+        <article><span>Telegram</span><strong>@{{ draft.telegram_username }}</strong><small>{{ draft.telegram_token_hint }}</small></article>
+        <article><span>Impaya</span><strong>{{ 'Настроена' if draft.impaya_api_url else 'Настроить позже' }}</strong><small>{{ draft.impaya_terminal_name or 'Реквизиты не заполнены' }}</small></article>
+        <article><span>Администратор</span><strong>{{ assigned_admin.display_name if assigned_admin else 'Не назначен' }}</strong><small>{{ assigned_admin.email if assigned_admin else 'Можно назначить после запуска' }}</small></article>
+      </div>
+      {% if readiness_errors %}<div class="notice danger"><strong>Проект пока нельзя запустить:</strong><ul>{% for error in readiness_errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% else %}<div class="notice success"><strong>Всё готово.</strong> После запуска проект подхватит служба управляемых ботов.</div>{% endif %}
+      <div class="wizard-actions"><a class="button-secondary" href="/admin/projects/create/{{ draft.id }}/administrator">← Назад</a>{% if not readiness_errors %}<form method="post" action="/admin/projects/create/{{ draft.id }}/launch"><button type="submit" class="button-primary">Запустить проект <span>→</span></button></form>{% endif %}<form method="post" action="/admin/projects/create/{{ draft.id }}/delete" onsubmit="return confirm('Удалить этот черновик?')"><button type="submit" class="button-danger">Удалить черновик</button></form></div>
+      {% endif %}
+    </main>
+
+    <aside class="wizard-summary-panel">
+      <article><span class="wizard-summary-icon">🚀</span><h3>Что будет создано</h3><ul><li>Telegram-бот и его настройки</li><li>Платёжный шлюз проекта</li><li>CRM, аналитика и рассылки</li><li>Изолированный доступ администратора</li></ul></article>
+      <article class="wizard-progress-card"><div class="wizard-progress-ring" style="--progress: {{ step * 20 }}"><strong>{{ step * 20 }}%</strong></div><div><h3>Прогресс создания</h3><p>{{ 'Последний шаг — проект готов к запуску.' if step == 5 else 'Заполните оставшиеся шаги мастера.' }}</p></div></article>
+    </aside>
+  </div>
+</section>
+{% endblock %}

@@ -15,6 +15,7 @@ from app.models.billing import PaymentAttempt, Subscription
 from app.models.delivery import DeliveryOutbox
 from app.models.marketing import Broadcast
 from app.models.platform_admin import PaymentGatewayConfig
+from app.models.project_setup import ProjectSetupDraft
 from app.models.user import User
 from app.services.bot_credentials import token_hint, verify_telegram_token
 from app.web.admin import login_redirect, page_context, require_session, templates
@@ -139,6 +140,7 @@ async def projects_overview(request: Request):
     allowed = await _allowed_bots(request)
     async with SessionFactory() as session:
         rows = [await _project_row(session, bot, now) for bot in allowed]
+        drafts = list((await session.execute(select(ProjectSetupDraft).where(ProjectSetupDraft.status.in_(("draft", "needs_attention", "ready"))).order_by(ProjectSetupDraft.updated_at.desc()))).scalars()) if require_session(request).is_superadmin else []
     return templates.TemplateResponse(
         request=request,
         name="projects.html",
@@ -151,6 +153,7 @@ async def projects_overview(request: Request):
             total_vip=sum(row.active_vip for row in rows),
             total_revenue=sum(row.revenue_month for row in rows),
             total_errors=sum(row.failed for row in rows),
+            drafts=drafts,
         ),
     )
 
@@ -225,11 +228,7 @@ async def project_create_page(request: Request):
         return login_redirect(request)
     if not principal.is_superadmin:
         raise HTTPException(status_code=403, detail="Создание проекта доступно только суперадминистратору")
-    return templates.TemplateResponse(
-        request=request,
-        name="project_create.html",
-        context=page_context(request, title="Новый проект", section="projects", error=request.query_params.get("error")),
-    )
+    return RedirectResponse("/admin/projects/create/wizard", status_code=303)
 
 
 @router.post("/projects/create/new")

@@ -6,7 +6,7 @@
     <h1>Проекты</h1>
     <p>Ключевые показатели, очереди, платежи и состояние каждого проекта.</p>
   </div>
-  {% if current_admin and current_admin.is_superadmin %}<a class="button-primary" href="/admin/projects/create/new">Создать проект</a>{% endif %}
+  {% if current_admin and current_admin.is_superadmin %}<a class="button-primary" href="/admin/projects/create/wizard">Создать проект</a>{% endif %}
 </section>
 <section class="metric-grid project-summary-grid">
   <article class="metric-card"><span>Доступные проекты</span><strong>{{ rows|length }}</strong><small>С учётом прав аккаунта</small></article>
@@ -14,6 +14,22 @@
   <article class="metric-card"><span>Активные VIP</span><strong>{{ total_vip }}</strong><small>Действующие статусы</small></article>
   <article class="metric-card"><span>Выручка за 30 дней</span><strong>{{ money(total_revenue) }} ₽</strong><small>Успешные платежи</small></article>
 </section>
+
+{% if drafts %}
+<section class="panel wizard-drafts-panel">
+  <div class="panel-heading"><div><span class="section-kicker">Незавершённая настройка</span><h2>Черновики проектов</h2></div></div>
+  <div class="wizard-draft-grid">
+  {% for draft in drafts %}
+    <article class="wizard-draft-card">
+      <div><strong>{{ draft.display_name or 'Новый проект' }}</strong><span>{{ draft.code or 'Код ещё не задан' }}</span></div>
+      <span class="status-badge {{ 'success' if draft.status == 'ready' else 'warning' }}">Шаг {{ draft.current_step }} из 5</span>
+      <a class="button-secondary" href="/admin/projects/create/{{ draft.id }}/{{ 'basic' if draft.current_step == 1 else 'telegram' if draft.current_step == 2 else 'payments' if draft.current_step == 3 else 'administrator' if draft.current_step == 4 else 'review' }}">Продолжить</a>
+    </article>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 <section class="project-grid project-control-grid">
 {% for row in rows %}
   <article class="project-card project-control-card">

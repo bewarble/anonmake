@@ -33,6 +33,11 @@ class BotInstance(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     maintenance_message: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    profile_code: Mapped[str | None] = mapped_column(String(48), index=True)
+    setup_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="running", server_default="running", index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
