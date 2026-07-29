@@ -6,6 +6,7 @@
     <h1>Проекты</h1>
     <p>Ключевые показатели, очереди, платежи и состояние каждого проекта.</p>
   </div>
+  {% if current_admin and current_admin.is_superadmin %}<a class="button-primary" href="/admin/projects/create/new">Создать проект</a>{% endif %}
 </section>
 <section class="metric-grid project-summary-grid">
   <article class="metric-card"><span>Доступные проекты</span><strong>{{ rows|length }}</strong><small>С учётом прав аккаунта</small></article>

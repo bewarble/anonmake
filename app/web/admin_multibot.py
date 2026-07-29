@@ -7,6 +7,8 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 
+from app.core.config import load_settings
+from app.core.platform_security import encrypt_secret
 from app.database.session import SessionFactory
 from app.models.bot_instance import BotInstance
 from app.models.billing import PaymentAttempt, Subscription
@@ -14,10 +16,12 @@ from app.models.delivery import DeliveryOutbox
 from app.models.marketing import Broadcast
 from app.models.platform_admin import PaymentGatewayConfig
 from app.models.user import User
+from app.services.bot_credentials import token_hint, verify_telegram_token
 from app.web.admin import login_redirect, page_context, require_session, templates
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 SUCCESS = ("success", "paid", "completed")
+settings = load_settings()
 
 
 @dataclass(slots=True, frozen=True)
@@ -212,3 +216,83 @@ async def update_project(
         bot.maintenance_message = maintenance_message.strip() or None
         await session.commit()
     return RedirectResponse(f"/admin/projects/{code}?notice=saved", status_code=303)
+
+
+@router.get("/projects/create/new", response_class=HTMLResponse)
+async def project_create_page(request: Request):
+    principal = require_session(request)
+    if principal is None:
+        return login_redirect(request)
+    if not principal.is_superadmin:
+        raise HTTPException(status_code=403, detail="Создание проекта доступно только суперадминистратору")
+    return templates.TemplateResponse(
+        request=request,
+        name="project_create.html",
+        context=page_context(request, title="Новый проект", section="projects", error=request.query_params.get("error")),
+    )
+
+
+@router.post("/projects/create/new")
+async def create_project(
+    request: Request,
+    code: str = Form(...),
+    display_name: str = Form(...),
+    telegram_token: str = Form(...),
+):
+    principal = require_session(request)
+    if principal is None:
+        return login_redirect(request)
+    if not principal.is_superadmin:
+        raise HTTPException(status_code=403, detail="Создание проекта доступно только суперадминистратору")
+    normalized = code.strip().lower().replace("-", "_")
+    if not normalized or not normalized.replace("_", "").isalnum() or len(normalized) > 32:
+        return RedirectResponse("/admin/projects/create/new?error=code", status_code=303)
+    token = telegram_token.strip()
+    try:
+        me = await verify_telegram_token(token)
+    except Exception:
+        return RedirectResponse("/admin/projects/create/new?error=token", status_code=303)
+    async with SessionFactory() as session:
+        exists = await session.scalar(select(BotInstance.id).where((BotInstance.code == normalized) | (BotInstance.username == me.username)))
+        if exists:
+            return RedirectResponse("/admin/projects/create/new?error=exists", status_code=303)
+        item = BotInstance(
+            code=normalized,
+            username=me.username,
+            display_name=display_name.strip()[:96],
+            runtime_mode="managed",
+            telegram_bot_id=me.id,
+            token_encrypted=encrypt_secret(token, settings.web_admin_secret),
+            token_hint=token_hint(token),
+            token_verified_at=datetime.now(timezone.utc),
+            is_active=True,
+        )
+        session.add(item)
+        await session.commit()
+    return RedirectResponse(f"/admin/projects/{normalized}?notice=created", status_code=303)
+
+
+@router.post("/projects/{code}/telegram")
+async def update_project_token(request: Request, code: str, telegram_token: str = Form(...)):
+    principal = require_session(request)
+    if principal is None:
+        return login_redirect(request)
+    if not principal.is_superadmin:
+        raise HTTPException(status_code=403, detail="Настройки Telegram доступны только суперадминистратору")
+    token = telegram_token.strip()
+    try:
+        me = await verify_telegram_token(token)
+    except Exception:
+        return RedirectResponse(f"/admin/projects/{code}?notice=token_error", status_code=303)
+    async with SessionFactory() as session:
+        item = await session.scalar(select(BotInstance).where(BotInstance.code == code))
+        if item is None:
+            raise HTTPException(status_code=404, detail="Проект не найден")
+        item.username = me.username
+        item.telegram_bot_id = me.id
+        item.token_encrypted = encrypt_secret(token, settings.web_admin_secret)
+        item.token_hint = token_hint(token)
+        item.token_verified_at = datetime.now(timezone.utc)
+        item.runtime_mode = "managed"
+        await session.commit()
+    return RedirectResponse(f"/admin/projects/{code}?notice=token_saved", status_code=303)
