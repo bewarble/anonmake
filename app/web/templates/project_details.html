@@ -1,60 +1,152 @@
 {% extends "base.html" %}
 {% block content %}
-{% if notice == 'saved' %}<div class="notice success">Настройки проекта сохранены.</div>{% elif notice == 'created' %}<div class="notice success">Проект создан. Управляемый процесс подключит его автоматически.</div>{% elif notice == 'token_saved' %}<div class="notice success">Telegram-токен проверен и сохранён.</div>{% elif notice == 'token_error' %}<div class="notice danger">Telegram не принял новый токен.</div>{% endif %}
-<section class="page-toolbar platform-page-header project-detail-header">
-  <div>
+{% if notice == 'saved' %}<div class="notice success">Настройки проекта сохранены.</div>{% elif notice == 'created' %}<div class="notice success">Проект создан и подключён к платформе.</div>{% elif notice == 'token_saved' %}<div class="notice success">Telegram-токен проверен и сохранён.</div>{% elif notice == 'telegram_ok' %}<div class="notice success">Подключение к Telegram успешно проверено.</div>{% elif notice == 'token_error' %}<div class="notice danger">Не удалось проверить подключение к Telegram.</div>{% endif %}
+
+<section class="project-console-hero">
+  <div class="project-console-identity">
     <a class="back-link" href="/admin/projects">← Все проекты</a>
-    <span class="section-kicker">Карточка проекта</span>
-    <h1>{{ row.bot.display_name }}</h1>
-    <p>@{{ row.bot.username }} · код проекта {{ row.bot.code }}</p>
-  </div>
-  <span class="project-health {{ row.status_class }}">{{ row.operational_status }}</span>
-</section>
-<section class="metric-grid">
-  <article class="metric-card"><span>Пользователи</span><strong>{{ row.users }}</strong><small>+{{ row.users_today }} сегодня</small></article>
-  <article class="metric-card"><span>Активные VIP</span><strong>{{ row.active_vip }}</strong><small>Действующие статусы</small></article>
-  <article class="metric-card"><span>Выручка сегодня</span><strong>{{ money(row.revenue_today) }} ₽</strong><small>Успешные платежи</small></article>
-  <article class="metric-card"><span>Выручка за 30 дней</span><strong>{{ money(row.revenue_month) }} ₽</strong><small>Проект отдельно</small></article>
-</section>
-<section class="project-detail-grid">
-  <article class="panel project-operations-panel">
-    <div class="panel-heading"><div><span class="section-kicker">Операции</span><h2>Состояние проекта</h2></div></div>
-    <div class="health-list">
-      <div><span>Telegram-проект</span><strong>{{ 'Включён' if row.bot.is_active else 'Отключён' }}</strong></div>
-      <div><span>Режим обслуживания</span><strong>{{ 'Включён' if row.bot.is_maintenance else 'Выключен' }}</strong></div>
-      <div><span>Impaya</span><strong>{{ 'Настроена' if row.impaya_ready else 'Используется общая настройка' }}</strong></div>
-      <div><span>Очередь доставки</span><strong>{{ row.pending }}</strong></div>
-      <div><span>Ошибки доставки</span><strong>{{ row.failed }}</strong></div>
-      <div><span>Ожидающие платежи</span><strong>{{ row.payment_pending }}</strong></div>
+    <div class="project-console-title-row">
+      <div class="project-console-avatar">{{ row.bot.display_name[:1]|upper }}</div>
+      <div>
+        <span class="section-kicker">Центр управления проектом</span>
+        <h2>{{ row.bot.display_name }}</h2>
+        <p>@{{ row.bot.username }} · {{ row.bot.code }} · {{ 'Управляется платформой' if row.bot.runtime_mode == 'managed' else 'Внешний процесс' }}</p>
+      </div>
     </div>
-    <div class="quick-action-grid">
-      <a class="button" href="/admin/business?bot={{ row.bot.code }}">Обзор</a>
-      <a class="button" href="/admin/business/users?bot={{ row.bot.code }}">Клиенты</a>
-      <a class="button" href="/admin/payments?bot={{ row.bot.code }}">Платежи</a>
-      <a class="button" href="/admin/business/broadcasts?bot={{ row.bot.code }}">Рассылки</a>
-      <a class="button" href="/admin/delivery?bot={{ row.bot.code }}">Доставка</a>
-      {% if current_admin and current_admin.is_superadmin %}<a class="button" href="/admin/platform/payments">Настройки Impaya</a>{% endif %}
+  </div>
+  <div class="project-console-status-block">
+    <span class="project-health {{ row.status_class }}">{{ row.operational_status }}</span>
+    <small>Последняя активность: {{ last_activity|date_time if last_activity else 'нет данных' }}</small>
+  </div>
+</section>
+
+<nav class="project-tabs" aria-label="Разделы проекта">
+  <a class="{{ 'active' if active_tab == 'overview' else '' }}" href="/admin/projects/{{ row.bot.code }}?tab=overview">Обзор</a>
+  <a class="{{ 'active' if active_tab == 'telegram' else '' }}" href="/admin/projects/{{ row.bot.code }}?tab=telegram">Telegram</a>
+  <a class="{{ 'active' if active_tab == 'payments' else '' }}" href="/admin/projects/{{ row.bot.code }}?tab=payments">Impaya</a>
+  <a class="{{ 'active' if active_tab == 'admins' else '' }}" href="/admin/projects/{{ row.bot.code }}?tab=admins">Администраторы</a>
+  <a class="{{ 'active' if active_tab == 'activity' else '' }}" href="/admin/projects/{{ row.bot.code }}?tab=activity">Журнал и операции</a>
+  <a class="{{ 'active' if active_tab == 'settings' else '' }}" href="/admin/projects/{{ row.bot.code }}?tab=settings">Настройки</a>
+</nav>
+
+{% if active_tab == 'overview' %}
+<section class="metric-grid project-kpi-grid">
+  <article class="metric-card"><span>Пользователи</span><strong>{{ row.users }}</strong><small>+{{ row.users_today }} сегодня</small></article>
+  <article class="metric-card"><span>Активные VIP</span><strong>{{ row.active_vip }}</strong><small>Действующие подписки</small></article>
+  <article class="metric-card"><span>Сообщения</span><strong>{{ row.messages }}</strong><small>+{{ row.messages_today }} сегодня</small></article>
+  <article class="metric-card"><span>Выручка за 30 дней</span><strong>{{ money(row.revenue_month) }} ₽</strong><small>{{ money(row.revenue_today) }} ₽ сегодня</small></article>
+</section>
+
+<section class="project-control-grid">
+  <article class="panel project-health-panel">
+    <div class="panel-heading"><div><span class="section-kicker">Здоровье проекта</span><h2>Состояние сервисов</h2></div></div>
+    <div class="service-health-grid">
+      <div class="service-health-item {{ 'ok' if health.telegram else 'bad' }}"><i></i><span>Telegram</span><strong>{{ 'Работает' if health.telegram else 'Требует внимания' }}</strong></div>
+      <div class="service-health-item {{ 'ok' if health.database else 'bad' }}"><i></i><span>PostgreSQL</span><strong>{{ 'Работает' if health.database else 'Недоступен' }}</strong></div>
+      <div class="service-health-item {{ 'ok' if health.redis else 'bad' }}"><i></i><span>Redis</span><strong>{{ 'Работает' if health.redis else 'Недоступен' }}</strong></div>
+      <div class="service-health-item {{ 'ok' if health.delivery else 'warning' }}"><i></i><span>Доставка</span><strong>{{ 'Без ошибок' if health.delivery else 'Есть ошибки' }}</strong></div>
+      <div class="service-health-item {{ 'ok' if health.payments else 'warning' }}"><i></i><span>Impaya</span><strong>{{ 'Настроена' if health.payments else 'Не настроена' }}</strong></div>
+    </div>
+    {% if row.last_error %}<div class="project-alert"><strong>Последняя ошибка доставки</strong><p>{{ row.last_error }}</p></div>{% else %}<div class="project-empty-success">Критических ошибок проекта не обнаружено.</div>{% endif %}
+  </article>
+
+  <article class="panel project-quick-panel">
+    <div class="panel-heading"><div><span class="section-kicker">Быстрые действия</span><h2>Работа с проектом</h2></div></div>
+    <div class="project-quick-actions">
+      <a href="/admin/business/users?bot={{ row.bot.code }}"><span>◎</span><div><strong>Пользователи</strong><small>CRM и карточки клиентов</small></div></a>
+      <a href="/admin/payments?bot={{ row.bot.code }}"><span>₽</span><div><strong>Платежи</strong><small>Операции и подписки</small></div></a>
+      <a href="/admin/business/broadcasts?bot={{ row.bot.code }}"><span>✦</span><div><strong>Рассылки</strong><small>Кампании проекта</small></div></a>
+      <a href="/admin/delivery?bot={{ row.bot.code }}"><span>⇢</span><div><strong>Доставка</strong><small>Очередь и ошибки</small></div></a>
     </div>
   </article>
+</section>
+
+<section class="project-control-grid project-activity-grid">
+  <article class="panel"><div class="panel-heading"><div><span class="section-kicker">Доставка</span><h2>Последние задания</h2></div><a href="/admin/delivery?bot={{ row.bot.code }}">Все задания</a></div><div class="compact-list">{% for item in recent_delivery[:6] %}<div><span>{{ item.kind }} · {{ item.chat_id }}</span><strong class="status-text {{ 'active' if item.status == 'delivered' else 'inactive' }}">{{ item.status|status_label }}</strong><small>{{ item.created_at|date_time }}</small></div>{% else %}<p class="empty-state">Заданий пока нет.</p>{% endfor %}</div></article>
+  <article class="panel"><div class="panel-heading"><div><span class="section-kicker">Платежи</span><h2>Последние операции</h2></div><a href="/admin/payments?bot={{ row.bot.code }}">Все платежи</a></div><div class="compact-list">{% for item in recent_payments[:6] %}<div><span>{{ money(item.amount_kopecks) }} ₽ · {{ item.attempt_kind|payment_kind }}</span><strong>{{ item.status|status_label }}</strong><small>{{ item.created_at|date_time }}</small></div>{% else %}<p class="empty-state">Платежей пока нет.</p>{% endfor %}</div></article>
+</section>
+
+{% elif active_tab == 'telegram' %}
+<section class="project-tab-grid">
+  <article class="panel project-telegram-card">
+    <div class="panel-heading"><div><span class="section-kicker">Подключение</span><h2>Telegram-бот проекта</h2></div></div>
+    <div class="telegram-project-profile">
+      <div class="telegram-project-avatar">{{ row.bot.display_name[:1]|upper }}</div>
+      <div><strong>@{{ row.bot.username }}</strong><span>ID: {{ row.bot.telegram_bot_id or 'не определён' }}</span><small>{{ 'Управляется платформой' if row.bot.runtime_mode == 'managed' else 'Работает во внешнем контейнере' }}</small></div>
+    </div>
+    <div class="health-list">
+      <div><span>Токен</span><strong>{{ row.bot.token_hint or 'Задан через окружение' }}</strong></div>
+      <div><span>Последняя проверка</span><strong>{{ row.bot.token_verified_at|date_time if row.bot.token_verified_at else 'нет данных' }}</strong></div>
+      <div><span>Состояние</span><strong>{{ 'Подключён' if health.telegram else 'Требует проверки' }}</strong></div>
+    </div>
+    <form method="post" action="/admin/projects/{{ row.bot.code }}/telegram/check" class="inline-action-form"><button type="submit" class="button-secondary">Проверить подключение</button></form>
+  </article>
+
   {% if current_admin and current_admin.is_superadmin %}
-  <article class="panel project-settings-panel">
-    <div class="panel-heading"><div><span class="section-kicker">Настройки</span><h2>Управление проектом</h2></div></div>
+  <article class="panel">
+    <div class="panel-heading"><div><span class="section-kicker">Безопасная замена</span><h2>Обновить Telegram-токен</h2></div></div>
+    <form method="post" action="/admin/projects/{{ row.bot.code }}/telegram" class="platform-form">
+      <div class="form-field full"><label>Новый токен</label><input name="telegram_token" type="password" required autocomplete="off" placeholder="Введите токен из BotFather"><small>Токен будет проверен и сохранён в зашифрованном виде.</small></div>
+      <div class="form-actions full"><button class="button-primary" type="submit">Проверить и заменить</button></div>
+    </form>
+  </article>
+  {% endif %}
+</section>
+
+{% elif active_tab == 'payments' %}
+<section class="project-tab-grid">
+  <article class="panel">
+    <div class="panel-heading"><div><span class="section-kicker">Impaya</span><h2>Платёжная конфигурация</h2></div>{% if current_admin and current_admin.is_superadmin %}<a href="/admin/platform/payments">Редактировать</a>{% endif %}</div>
+    {% if gateway %}
+    <div class="health-list">
+      <div><span>Состояние</span><strong>{{ 'Активна' if gateway.is_active else 'Отключена' }}</strong></div>
+      <div><span>Адрес API</span><strong>{{ gateway.api_url }}</strong></div>
+      <div><span>Основной терминал</span><strong>{{ gateway.terminal_name }}</strong></div>
+      <div><span>Терминал привязки</span><strong>{{ gateway.binding_terminal_name }}</strong></div>
+      <div><span>Повторные списания</span><strong>{{ gateway.recurrent_terminal_name }}</strong></div>
+      <div><span>Последнее изменение</span><strong>{{ gateway.updated_at|date_time }}</strong></div>
+    </div>
+    {% else %}<div class="project-empty-warning">Отдельная конфигурация Impaya не создана. Используются общие настройки платформы.</div>{% endif %}
+  </article>
+  <article class="panel">
+    <div class="panel-heading"><div><span class="section-kicker">Статистика</span><h2>Платежи проекта</h2></div></div>
+    <div class="project-payment-stats"><div><span>Сегодня</span><strong>{{ money(row.revenue_today) }} ₽</strong></div><div><span>7 дней</span><strong>{{ money(row.revenue_week) }} ₽</strong></div><div><span>30 дней</span><strong>{{ money(row.revenue_month) }} ₽</strong></div><div><span>Ожидают</span><strong>{{ row.payment_pending }}</strong></div></div>
+    <a class="button-secondary project-wide-button" href="/admin/payments?bot={{ row.bot.code }}">Открыть все платежи</a>
+  </article>
+</section>
+
+{% elif active_tab == 'admins' %}
+<section class="panel">
+  <div class="panel-heading"><div><span class="section-kicker">Доступ</span><h2>Администраторы проекта</h2></div>{% if current_admin and current_admin.is_superadmin %}<a href="/admin/platform/admins">Управлять аккаунтами</a>{% endif %}</div>
+  <div class="project-admin-grid">
+    {% for admin in project_admins %}<article><div class="admin-avatar">{{ admin.display_name[:1]|upper }}</div><div><strong>{{ admin.display_name }}</strong><span>{{ admin.email }}</span><small>{{ 'Суперадминистратор' if admin.is_superadmin else 'Администратор проекта' }} · {{ 'активен' if admin.is_active else 'отключён' }}</small></div>{% if current_admin and current_admin.is_superadmin %}<a href="/admin/platform/admins/{{ admin.id }}/edit">Редактировать</a>{% endif %}</article>{% else %}<p class="empty-state">К проекту пока не назначены отдельные администраторы.</p>{% endfor %}
+  </div>
+</section>
+
+{% elif active_tab == 'activity' %}
+<section class="project-control-grid">
+  <article class="panel"><div class="panel-heading"><div><span class="section-kicker">Журнал</span><h2>Действия администраторов</h2></div></div><div class="project-timeline">{% for item in recent_audit %}<div><time>{{ item.created_at|date_time }}</time><i></i><section><strong>{{ item.action|audit_action }}</strong><p>{{ item.details or item.target or 'Без дополнительных сведений' }}</p></section></div>{% else %}<p class="empty-state">Для проекта пока нет записей в журнале.</p>{% endfor %}</div></article>
+  <article class="panel"><div class="panel-heading"><div><span class="section-kicker">Ошибки и очереди</span><h2>Операционное состояние</h2></div></div><div class="health-list"><div><span>Ожидают доставки</span><strong>{{ row.pending }}</strong></div><div><span>Ошибки доставки</span><strong>{{ row.failed }}</strong></div><div><span>Активные рассылки</span><strong>{{ row.active_broadcasts }}</strong></div><div><span>Ожидающие платежи</span><strong>{{ row.payment_pending }}</strong></div></div>{% if row.last_error %}<div class="project-alert"><strong>Последняя ошибка</strong><p>{{ row.last_error }}</p></div>{% endif %}</article>
+</section>
+
+{% elif active_tab == 'settings' %}
+<section class="project-tab-grid">
+  <article class="panel">
+    <div class="panel-heading"><div><span class="section-kicker">Проект</span><h2>Основные сведения</h2></div></div>
+    <div class="health-list"><div><span>Код проекта</span><strong>{{ row.bot.code }}</strong></div><div><span>Профиль</span><strong>{{ row.bot.profile_code or 'Анонимные вопросы' }}</strong></div><div><span>Создан</span><strong>{{ row.bot.created_at|date_time }}</strong></div><div><span>Статус настройки</span><strong>{{ row.bot.setup_status }}</strong></div></div>
+  </article>
+  {% if current_admin and current_admin.is_superadmin %}
+  <article class="panel">
+    <div class="panel-heading"><div><span class="section-kicker">Управление</span><h2>Настройки проекта</h2></div></div>
     <form method="post" action="/admin/projects/{{ row.bot.code }}/settings" class="platform-form project-settings-form">
       <div class="form-field full"><label>Название проекта</label><input name="display_name" value="{{ row.bot.display_name }}" required maxlength="96"></div>
-      <label class="switch-row full"><input type="checkbox" name="is_active" value="true" {% if row.bot.is_active %}checked{% endif %}><span><strong>Проект включён</strong><small>Отключение блокирует отправку через общие сервисы доставки.</small></span></label>
-      <label class="switch-row full"><input type="checkbox" name="is_maintenance" value="true" {% if row.bot.is_maintenance %}checked{% endif %}><span><strong>Режим обслуживания</strong><small>Отображается в центре управления как технические работы.</small></span></label>
+      <label class="switch-row full"><input type="checkbox" name="is_active" value="true" {% if row.bot.is_active %}checked{% endif %}><span><strong>Проект включён</strong><small>Отключение останавливает обработку проекта.</small></span></label>
+      <label class="switch-row full"><input type="checkbox" name="is_maintenance" value="true" {% if row.bot.is_maintenance %}checked{% endif %}><span><strong>Режим обслуживания</strong><small>Временно ограничивает работу проекта.</small></span></label>
       <div class="form-field full"><label>Сообщение о технических работах</label><input name="maintenance_message" value="{{ row.bot.maintenance_message or '' }}" placeholder="Проект временно недоступен"></div>
       <div class="form-actions full"><button class="button-primary" type="submit">Сохранить настройки</button></div>
     </form>
   </article>
-  {% endif %}
-
-  {% if current_admin and current_admin.is_superadmin %}
-  <article class="panel project-settings-panel"><div class="panel-heading"><div><span class="section-kicker">Telegram</span><h2>Подключение проекта</h2></div></div><div class="health-list"><div><span>Режим запуска</span><strong>{{ 'Управляется платформой' if row.bot.runtime_mode == 'managed' else 'Внешний контейнер' }}</strong></div><div><span>Токен</span><strong>{{ row.bot.token_hint or 'Задан через окружение' }}</strong></div><div><span>Последняя проверка</span><strong>{{ row.bot.token_verified_at|date_time if row.bot.token_verified_at else 'нет данных' }}</strong></div></div><form method="post" action="/admin/projects/{{ row.bot.code }}/telegram" class="platform-form"><div class="form-field full"><label>Новый Telegram-токен</label><input name="telegram_token" type="password" required autocomplete="off" placeholder="Введите токен для замены"></div><div class="form-actions full"><button class="button-primary" type="submit">Проверить и заменить токен</button></div></form></article>
-  {% endif %}
+  {% else %}<article class="panel"><div class="project-empty-warning">Изменение системных настроек доступно только суперадминистратору.</div></article>{% endif %}
 </section>
-<section class="project-detail-grid project-activity-grid">
-  <article class="panel"><div class="panel-heading"><div><span class="section-kicker">Доставка</span><h2>Последние задания</h2></div></div><div class="compact-list">{% for item in recent_delivery %}<div><span>{{ item.kind }} · {{ item.chat_id }}</span><strong class="status-text {{ 'active' if item.status == 'delivered' else 'inactive' }}">{{ item.status }}</strong><small>{{ item.created_at|date_time }}</small></div>{% else %}<p class="empty-state">Заданий пока нет.</p>{% endfor %}</div></article>
-  <article class="panel"><div class="panel-heading"><div><span class="section-kicker">Платежи</span><h2>Последние операции</h2></div></div><div class="compact-list">{% for item in recent_payments %}<div><span>{{ money(item.amount_kopecks) }} ₽ · {{ item.attempt_kind }}</span><strong>{{ item.status }}</strong><small>{{ item.created_at|date_time }}</small></div>{% else %}<p class="empty-state">Платежей пока нет.</p>{% endfor %}</div></article>
-</section>
+{% endif %}
 {% endblock %}

@@ -1,23 +1,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import aliased
 
 from app.core.config import load_settings
 from app.core.platform_security import encrypt_secret
 from app.database.session import SessionFactory
+from app.models.admin import AdminAuditLog
 from app.models.bot_instance import BotInstance
 from app.models.billing import PaymentAttempt, Subscription
 from app.models.delivery import DeliveryOutbox
 from app.models.marketing import Broadcast
-from app.models.platform_admin import PaymentGatewayConfig
+from app.models.platform_admin import AdminProjectAccess, AdminUser, PaymentGatewayConfig
 from app.models.project_setup import ProjectSetupDraft
+from app.models.question import Question
 from app.models.user import User
-from app.services.bot_credentials import token_hint, verify_telegram_token
+from app.services.bot_credentials import resolve_bot_token, token_hint, verify_telegram_token
+from app.services.redis_client import get_redis
 from app.web.admin import login_redirect, page_context, require_session, templates
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -30,6 +35,8 @@ class ProjectRow:
     bot: BotInstance
     users: int
     users_today: int
+    messages: int
+    messages_today: int
     active_vip: int
     revenue_today: int
     revenue_week: int
@@ -41,6 +48,8 @@ class ProjectRow:
     payment_pending: int
     impaya_ready: bool
     last_delivery_at: datetime | None
+    last_payment_at: datetime | None
+    last_user_at: datetime | None
     last_error: str | None
 
     @property
@@ -82,6 +91,18 @@ async def _revenue(session, bot_id: int, start: datetime) -> int:
     ) or 0)
 
 
+async def _question_count(session, bot_id: int, start: datetime | None = None) -> int:
+    recipient = aliased(User)
+    statement = (
+        select(func.count(Question.id))
+        .join(recipient, recipient.id == Question.recipient_id)
+        .where(recipient.bot_id == bot_id)
+    )
+    if start is not None:
+        statement = statement.where(Question.created_at >= start)
+    return int(await session.scalar(statement) or 0)
+
+
 async def _project_row(session, bot: BotInstance, now: datetime) -> ProjectRow:
     day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week = now - timedelta(days=7)
@@ -106,6 +127,8 @@ async def _project_row(session, bot: BotInstance, now: datetime) -> ProjectRow:
         bot=bot,
         users=await _count(session, User, User.bot_id == bot.id),
         users_today=await _count(session, User, User.bot_id == bot.id, User.created_at >= day),
+        messages=await _question_count(session, bot.id),
+        messages_today=await _question_count(session, bot.id, day),
         active_vip=await _count(
             session,
             Subscription,
@@ -123,6 +146,8 @@ async def _project_row(session, bot: BotInstance, now: datetime) -> ProjectRow:
         payment_pending=await _count(session, PaymentAttempt, PaymentAttempt.bot_id == bot.id, PaymentAttempt.status == "pending"),
         impaya_ready=gateway is not None,
         last_delivery_at=await session.scalar(select(func.max(DeliveryOutbox.delivered_at)).where(DeliveryOutbox.bot_id == bot.id)),
+        last_payment_at=await session.scalar(select(func.max(PaymentAttempt.created_at)).where(PaymentAttempt.bot_id == bot.id)),
+        last_user_at=await session.scalar(select(func.max(User.created_at)).where(User.bot_id == bot.id)),
         last_error=last_failed.scalar_one_or_none(),
     )
 
@@ -159,15 +184,26 @@ async def projects_overview(request: Request):
 
 
 @router.get("/projects/{code}", response_class=HTMLResponse)
-async def project_details(request: Request, code: str):
-    if require_session(request) is None:
+async def project_details(request: Request, code: str, tab: str = "overview"):
+    principal = require_session(request)
+    if principal is None:
         return login_redirect(request)
     allowed = await _allowed_bots(request)
     bot = next((item for item in allowed if item.code == code), None)
     if bot is None:
         raise HTTPException(status_code=403, detail="Доступ к проекту запрещён")
+
+    allowed_tabs = {"overview", "telegram", "payments", "admins", "activity", "settings"}
+    active_tab = tab if tab in allowed_tabs else "overview"
+    now = datetime.now(timezone.utc)
     async with SessionFactory() as session:
-        row = await _project_row(session, bot, datetime.now(timezone.utc))
+        row = await _project_row(session, bot, now)
+        gateway = await session.scalar(
+            select(PaymentGatewayConfig).where(
+                PaymentGatewayConfig.bot_id == bot.id,
+                PaymentGatewayConfig.provider == "impaya",
+            )
+        )
         recent_delivery = list((await session.execute(
             select(DeliveryOutbox)
             .where(DeliveryOutbox.bot_id == bot.id)
@@ -180,6 +216,40 @@ async def project_details(request: Request, code: str):
             .order_by(PaymentAttempt.created_at.desc())
             .limit(10)
         )).scalars())
+        project_admins = list((await session.execute(
+            select(AdminUser)
+            .join(AdminProjectAccess, AdminProjectAccess.admin_user_id == AdminUser.id)
+            .where(AdminProjectAccess.bot_id == bot.id)
+            .order_by(AdminUser.display_name)
+        )).scalars())
+        recent_audit = list((await session.execute(
+            select(AdminAuditLog)
+            .where(or_(
+                AdminAuditLog.target == bot.code,
+                AdminAuditLog.target == str(bot.id),
+                AdminAuditLog.details.ilike(f"%{bot.code}%"),
+            ))
+            .order_by(AdminAuditLog.created_at.desc())
+            .limit(20)
+        )).scalars())
+
+    redis_ok = False
+    try:
+        redis_ok = bool(await asyncio.wait_for(get_redis(settings.redis_url).ping(), timeout=2.0))
+    except Exception:
+        redis_ok = False
+
+    last_activity = max(
+        (value for value in (row.last_delivery_at, row.last_payment_at, row.last_user_at) if value is not None),
+        default=None,
+    )
+    health = {
+        "database": True,
+        "redis": redis_ok,
+        "telegram": bool(bot.is_active and (bot.token_verified_at or bot.runtime_mode == "external")),
+        "delivery": row.failed == 0,
+        "payments": row.impaya_ready or bool(settings.impaya_api_token),
+    }
     return templates.TemplateResponse(
         request=request,
         name="project_details.html",
@@ -188,8 +258,14 @@ async def project_details(request: Request, code: str):
             title=bot.display_name,
             section="projects",
             row=row,
+            gateway=gateway,
+            project_admins=project_admins,
+            recent_audit=recent_audit,
             recent_delivery=recent_delivery,
             recent_payments=recent_payments,
+            active_tab=active_tab,
+            health=health,
+            last_activity=last_activity,
             notice=request.query_params.get("notice"),
         ),
     )
@@ -271,6 +347,33 @@ async def create_project(
     return RedirectResponse(f"/admin/projects/{normalized}?notice=created", status_code=303)
 
 
+@router.post("/projects/{code}/telegram/check")
+async def check_project_telegram(request: Request, code: str):
+    principal = require_session(request)
+    if principal is None:
+        return login_redirect(request)
+    allowed = await _allowed_bots(request)
+    item = next((bot for bot in allowed if bot.code == code), None)
+    if item is None:
+        raise HTTPException(status_code=403, detail="Доступ к проекту запрещён")
+    try:
+        async with SessionFactory() as session:
+            item = await session.scalar(select(BotInstance).where(BotInstance.code == code))
+            if item is None:
+                raise HTTPException(status_code=404, detail="Проект не найден")
+            token = await resolve_bot_token(session, settings, item)
+            me = await verify_telegram_token(token)
+            item.username = me.username
+            item.telegram_bot_id = me.id
+            item.token_verified_at = datetime.now(timezone.utc)
+            await session.commit()
+    except HTTPException:
+        raise
+    except Exception:
+        return RedirectResponse(f"/admin/projects/{code}?tab=telegram&notice=token_error", status_code=303)
+    return RedirectResponse(f"/admin/projects/{code}?tab=telegram&notice=telegram_ok", status_code=303)
+
+
 @router.post("/projects/{code}/telegram")
 async def update_project_token(request: Request, code: str, telegram_token: str = Form(...)):
     principal = require_session(request)
@@ -282,7 +385,7 @@ async def update_project_token(request: Request, code: str, telegram_token: str 
     try:
         me = await verify_telegram_token(token)
     except Exception:
-        return RedirectResponse(f"/admin/projects/{code}?notice=token_error", status_code=303)
+        return RedirectResponse(f"/admin/projects/{code}?tab=telegram&notice=token_error", status_code=303)
     async with SessionFactory() as session:
         item = await session.scalar(select(BotInstance).where(BotInstance.code == code))
         if item is None:
@@ -294,4 +397,4 @@ async def update_project_token(request: Request, code: str, telegram_token: str 
         item.token_verified_at = datetime.now(timezone.utc)
         item.runtime_mode = "managed"
         await session.commit()
-    return RedirectResponse(f"/admin/projects/{code}?notice=token_saved", status_code=303)
+    return RedirectResponse(f"/admin/projects/{code}?tab=telegram&notice=token_saved", status_code=303)
