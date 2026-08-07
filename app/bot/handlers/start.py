@@ -50,23 +50,14 @@ async def command_start(
     current_user = await users.upsert_from_telegram(message.from_user)
 
     code = (command.args or "").strip()
-    # Marketing source payloads are consumed by start_marketing; once attribution
-    # is recorded they must render the exact same UI as a plain /start.
     if code.startswith("src_"):
         code = ""
 
     if not code:
-        # Telegram cannot attach a reply keyboard and an inline keyboard to the
-        # same message. Install the one-button persistent menu first, then render
-        # the launch card with native copy/share actions.
+        link = await personal_link(bot, current_user.public_code)
         await message.answer(
-            "💬",
+            texts.START_PROMO.format(link=link.removeprefix("https://")),
             reply_markup=main_menu_for(message.from_user.id),
-        )
-        await show_personal_link_message(
-            message,
-            bot=bot,
-            public_code=current_user.public_code,
         )
         return
 
