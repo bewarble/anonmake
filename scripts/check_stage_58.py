@@ -29,16 +29,17 @@ def main() -> None:
     )
     require(
         "app/bot/keyboards/personal_link.py",
-        'SHARE_TEXT = "Отправь мне анонимное сообщение 👉 {link}"',
-        'short_link = link.removeprefix("https://")',
-        "quote(share_text, safe=\"\")",
+        'SHARE_TEXT = "Отправь мне анонимное сообщение 👉"',
+        'encoded_url = quote(link, safe="")',
+        'encoded_text = quote(SHARE_TEXT, safe="")',
         'text="Поделиться ссылкой"',
-        'url=f"https://t.me/share/url?text={encoded_text}"',
+        '"tg://msg_url?"',
+        'f"url={encoded_url}&text={encoded_text}"',
     )
     reject(
         "app/bot/keyboards/personal_link.py",
-        '"url": link',
-        'url=f"https://t.me/share/url?{query}"',
+        "https://t.me/share/url?text=",
+        "urlencode(",
     )
     require(
         "app/bot/handlers/navigation.py",
@@ -98,7 +99,7 @@ def main() -> None:
     assert not list((ROOT / "migrations/versions").glob("*stage_58*"))
     print("Stage 58 check: OK")
     print("/start installs the reply keyboard and personal-link messages own their inline share button")
-    print("Share action sends one encoded text payload with the personal link in the requested order")
+    print("Share action uses Telegram's native msg_url deep link without browser fallback")
     print("Help and unknown-input guidance are button-driven without command mentions")
     print("/cancel remains reserved for subscription auto-renew cancellation")
     print("No Stage 58 migration required")
