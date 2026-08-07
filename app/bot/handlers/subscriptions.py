@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,13 +28,19 @@ async def _safe_edit(callback: CallbackQuery, text: str) -> None:
             raise
 
 
-@router.message(StateFilter(None), Command("cancel"))
+@router.message(Command("cancel"))
 async def cancel_subscription_command(
     message: Message,
+    state: FSMContext,
     session: AsyncSession,
 ) -> None:
+    """`/cancel` is reserved exclusively for disabling subscription auto-renewal."""
     if message.from_user is None:
         return
+
+    # Do not let the literal command become question/answer content when a user
+    # happens to invoke it while an input FSM is active.
+    await state.clear()
 
     user = await UserRepository(session).get_by_telegram_id(message.from_user.id)
     if user is None:
