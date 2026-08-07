@@ -1,57 +1,20 @@
 {% extends "base.html" %}
+{% from "ui_macros.html" import data_state %}
 {% block content %}
 <section class="page-toolbar">
-  <div>
-    <h2>Источники</h2>
-    <p>Полная воронка: переходы, регистрации, оплаты, стоимость и окупаемость.</p>
-  </div>
+  <div><h2>Источники</h2><p>Полная воронка: переходы, регистрации, оплаты, стоимость и окупаемость.</p></div>
   <a class="button-primary" href="/admin/business/sources/new">＋ Создать источник</a>
 </section>
-
-<section class="panel">
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Источник</th>
-          <th>Переходы</th>
-          <th>Пользователи</th>
-          <th>Оплатили</th>
-          <th>Платежи</th>
-          <th>Выручка</th>
-          <th>CPA</th>
-          <th>Цена оплаты</th>
-          <th>Конверсия</th>
-          <th>ROI</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        <tr>
-          <td>
-            <a href="/admin/business/sources/{{ row.source.id }}">
-              <strong>{{ row.source.name }}</strong>
-            </a>
-            <small>{{ 'Активен' if row.source.is_active else 'Архив' }} · {{ money(row.source.spend_kopecks) }} ₽</small>
-          </td>
-          <td>{{ row.source.clicks }}</td>
-          <td>{{ row.users }}</td>
-          <td>{{ row.paid_users }}</td>
-          <td>{{ row.payments }}</td>
-          <td>{{ money(row.revenue_kopecks) }} ₽</td>
-          <td>{{ money(row.cpa_kopecks) + ' ₽' if row.cpa_kopecks is not none else '—' }}</td>
-          <td>{{ money(row.payment_cpa_kopecks) + ' ₽' if row.payment_cpa_kopecks is not none else '—' }}</td>
-          <td>
-            <small>в регистрацию: {{ row.registration_conversion_percent if row.registration_conversion_percent is not none else '—' }}%</small>
-            <small>в оплату: {{ row.payment_conversion_percent if row.payment_conversion_percent is not none else '—' }}%</small>
-          </td>
-          <td>{{ row.roi_percent if row.roi_percent is not none else '—' }}%</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="10"><div class="empty-state"><strong>Источников пока нет</strong></div></td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<section class="panel" data-data-scope>
+  <div class="table-wrap" data-results><table>
+    <thead><tr><th>Источник</th><th>Переходы</th><th>Пользователи</th><th>Оплатили</th><th>Платежи</th><th>Выручка</th><th>CPA</th><th>Цена оплаты</th><th>Конверсия</th><th>ROI</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr><td><a href="/admin/business/sources/{{ row.source.id }}"><strong>{{ row.source.name }}</strong></a><small>{{ 'Активен' if row.source.is_active else 'Архив' }} · {{ money(row.source.spend_kopecks) }} ₽</small></td><td>{{ row.source.clicks }}</td><td>{{ row.users }}</td><td>{{ row.paid_users }}</td><td>{{ row.payments }}</td><td>{{ money(row.revenue_kopecks) }} ₽</td><td>{{ money(row.cpa_kopecks) + ' ₽' if row.cpa_kopecks is not none else '—' }}</td><td>{{ money(row.payment_cpa_kopecks) + ' ₽' if row.payment_cpa_kopecks is not none else '—' }}</td><td><small>в регистрацию: {{ row.registration_conversion_percent if row.registration_conversion_percent is not none else '—' }}%</small><small>в оплату: {{ row.payment_conversion_percent if row.payment_conversion_percent is not none else '—' }}%</small></td><td>{{ row.roi_percent if row.roi_percent is not none else '—' }}%</td></tr>
+      {% else %}
+      <tr><td colspan="10">{{ data_state('Источников пока нет', 'Создайте первый источник, чтобы отслеживать воронку и окупаемость трафика.', '↗', '', '/admin/business/sources/new', 'Создать источник') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
 </section>
 {% endblock %}
