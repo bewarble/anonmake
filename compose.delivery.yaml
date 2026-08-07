@@ -21,3 +21,9 @@ services:
     networks:
       - anonmake
     stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-m", "scripts.worker_healthcheck", "delivery-worker", "--max-age", "90"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+      start_period: 30s
