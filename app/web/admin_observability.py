@@ -3,17 +3,18 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
-from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select, update
 
 from app.database.session import SessionFactory
+from app.models.admin import AdminAuditLog
 from app.models.billing import PaymentAttempt
 from app.models.bot_instance import BotInstance
 from app.models.delivery import DeliveryOutbox
 from app.web.admin import login_redirect, page_context, require_session, templates
+from app.web.admin_error_ux import decode_error_event, redirect_with_flash
 
 router = APIRouter(prefix="/admin/platform", include_in_schema=False)
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,13 +31,6 @@ def require_superadmin(request: Request):
             detail="Раздел доступен только суперадминистратору",
         )
     return principal
-
-
-def redirect_with_notice(notice: str) -> RedirectResponse:
-    return RedirectResponse(
-        f"/admin/platform/observability?{urlencode({'notice': notice})}",
-        status_code=303,
-    )
 
 
 def _failed_deploys(limit: int = 20) -> list[dict]:
@@ -102,6 +96,18 @@ async def observability_page(request: Request):
             ).scalars()
         )
 
+        error_rows = list(
+            (
+                await session.execute(
+                    select(AdminAuditLog)
+                    .where(AdminAuditLog.action == "web_error")
+                    .order_by(AdminAuditLog.created_at.desc())
+                    .limit(30)
+                )
+            ).scalars()
+        )
+        recent_admin_errors = [decode_error_event(row) for row in error_rows]
+
     return templates.TemplateResponse(
         request=request,
         name="platform_observability.html",
@@ -114,8 +120,8 @@ async def observability_page(request: Request):
             failed_deliveries=failed_deliveries,
             payment_errors=payment_errors,
             failed_deploys=_failed_deploys(),
+            recent_admin_errors=recent_admin_errors,
             bot_names=bot_names,
-            notice=request.query_params.get("notice"),
         ),
     )
 
@@ -142,7 +148,10 @@ async def retry_delivery(request: Request, job_id: int):
         job.last_error = None
         await session.commit()
 
-    return redirect_with_notice("delivery_retried")
+    return redirect_with_flash(
+        "/admin/platform/observability",
+        "Задание доставки возвращено в очередь.",
+    )
 
 
 @router.post("/observability/delivery/unlock-stale")
@@ -169,4 +178,8 @@ async def unlock_stale_deliveries(request: Request):
         await session.commit()
         count = int(result.rowcount or 0)
 
-    return redirect_with_notice(f"unlocked_{count}")
+    return redirect_with_flash(
+        "/admin/platform/observability",
+        f"Освобождено зависших доставок: {count}.",
+        tone="success" if count else "info",
+    )
