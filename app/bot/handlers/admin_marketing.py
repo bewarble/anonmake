@@ -28,21 +28,24 @@ def is_admin(telegram_id: int) -> bool:
     return telegram_id in load_settings().admin_ids_set
 
 
+async def delete_message_quietly(message: Message | None) -> None:
+    if message is None:
+        return
+    try:
+        await message.delete()
+    except Exception:
+        return
+
+
 @router.callback_query(F.data == "adminm:source:create")
-async def source_create_start(
-    callback: CallbackQuery,
-    state: FSMContext,
-) -> None:
+async def source_create_start(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
         await callback.answer(admin_texts.DENIED, show_alert=True)
         return
-
     await state.set_state(SourceCreate.waiting_name)
     if callback.message:
-        await callback.message.answer(
-            admin_texts.SOURCE_NAME_PROMPT,
-            reply_markup=cancel_source_keyboard(),
-        )
+        await delete_message_quietly(callback.message)
+        await callback.message.answer(admin_texts.SOURCE_NAME_PROMPT, reply_markup=cancel_source_keyboard())
     await callback.answer()
 
 
@@ -51,7 +54,6 @@ async def source_name(message: Message, state: FSMContext) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         await state.clear()
         return
-
     name = " ".join((message.text or "").strip().split())
     if not name:
         await message.answer(admin_texts.SOURCE_NAME_EMPTY)
@@ -61,10 +63,8 @@ async def source_name(message: Message, state: FSMContext) -> None:
         return
     await state.update_data(name=name)
     await state.set_state(SourceCreate.waiting_url)
-    await message.answer(
-        admin_texts.SOURCE_URL_PROMPT,
-        reply_markup=cancel_source_keyboard(),
-    )
+    await delete_message_quietly(message)
+    await message.answer(admin_texts.SOURCE_URL_PROMPT, reply_markup=cancel_source_keyboard())
 
 
 @router.message(SourceCreate.waiting_url)
@@ -72,7 +72,6 @@ async def source_url(message: Message, state: FSMContext) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         await state.clear()
         return
-
     value = (message.text or "").strip()
     parsed = urlparse(value)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
@@ -83,23 +82,15 @@ async def source_url(message: Message, state: FSMContext) -> None:
         return
     await state.update_data(source_url=value)
     await state.set_state(SourceCreate.waiting_spend)
-    await message.answer(
-        admin_texts.SOURCE_SPEND_PROMPT,
-        reply_markup=cancel_source_keyboard(),
-    )
+    await delete_message_quietly(message)
+    await message.answer(admin_texts.SOURCE_SPEND_PROMPT, reply_markup=cancel_source_keyboard())
 
 
 @router.message(SourceCreate.waiting_spend)
-async def source_spend(
-    message: Message,
-    state: FSMContext,
-    session: AsyncSession,
-    bot: Bot,
-) -> None:
+async def source_spend(message: Message, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         await state.clear()
         return
-
     raw = (message.text or "").replace(" ", "").replace(",", ".")
     try:
         rubles = Decimal(raw)
@@ -112,7 +103,6 @@ async def source_spend(
     if rubles > Decimal("1000000000"):
         await message.answer(admin_texts.SOURCE_SPEND_LARGE)
         return
-
     data = await state.get_data()
     name = data.get("name")
     source_url_value = data.get("source_url")
@@ -134,15 +124,14 @@ async def source_spend(
     )
     await session.commit()
     await state.clear()
-
     me = await bot.get_me()
     link = f"https://t.me/{me.username}?start=src_{source.code}"
+    await delete_message_quietly(message)
     await message.answer(
-        f"{admin_texts.SOURCE_CREATED}\n\n"
-        f"Название: {escape(source.name)}\n"
-        f"Рекламная ссылка:\n<code>{escape(link)}</code>",
+        f"{admin_texts.SOURCE_CREATED}\n\nНазвание: {escape(source.name)}\nРекламная ссылка:\n<code>{escape(link)}</code>",
         parse_mode="HTML",
         reply_markup=referral_back_keyboard(),
+        disable_web_page_preview=True,
     )
 
 
@@ -151,7 +140,6 @@ async def broadcast_text(message: Message, state: FSMContext) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         await state.clear()
         return
-
     text = (message.text or "").strip()
     if not text:
         await message.answer(admin_texts.BROADCAST_TEXT_EMPTY)
@@ -159,47 +147,30 @@ async def broadcast_text(message: Message, state: FSMContext) -> None:
     if len(text) > 4000:
         await message.answer(admin_texts.BROADCAST_TEXT_LONG)
         return
-
     await state.update_data(text=text)
     await state.set_state(BroadcastCreate.waiting_confirm)
-    await message.answer(
-        texts.NEW_QUESTION.format(text=text),
-        reply_markup=broadcast_preview_keyboard(),
-    )
-
+    await delete_message_quietly(message)
+    await message.answer(texts.NEW_QUESTION.format(text=text), reply_markup=broadcast_preview_keyboard())
 
 
 @router.callback_query(F.data == "adminm:broadcast:preview")
 async def broadcast_preview_button(callback: CallbackQuery) -> None:
-    await callback.answer(
-        admin_texts.BROADCAST_PREVIEW_NOTE,
-        show_alert=True,
-    )
+    await callback.answer(admin_texts.BROADCAST_PREVIEW_NOTE, show_alert=True)
 
 
 @router.callback_query(F.data == "adminm:broadcast:confirm")
-async def broadcast_confirm(
-    callback: CallbackQuery,
-    state: FSMContext,
-    session: AsyncSession,
-) -> None:
+async def broadcast_confirm(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
         await callback.answer(admin_texts.DENIED, show_alert=True)
         return
-
     data = await state.get_data()
     kind = data.get("kind")
     audience = data.get("audience")
     text = data.get("text")
-    if (
-        kind != "anonymous"
-        or audience not in {"all", "vip", "non_vip"}
-        or not isinstance(text, str)
-    ):
+    if kind != "anonymous" or audience not in {"all", "vip", "non_vip"} or not isinstance(text, str):
         await state.clear()
         await callback.answer(admin_texts.SESSION_EXPIRED, show_alert=True)
         return
-
     item = await MarketingRepository(session).create_broadcast(
         kind=kind,
         audience=audience,
@@ -214,24 +185,18 @@ async def broadcast_confirm(
     )
     await session.commit()
     await state.clear()
-
     if callback.message:
-        await callback.message.edit_text(
-            admin_texts.BROADCAST_QUEUED.format(item_id=item.id)
-        )
+        await delete_message_quietly(callback.message)
+        await callback.message.answer(admin_texts.BROADCAST_QUEUED.format(item_id=item.id))
     await callback.answer()
 
 
 @router.callback_query(F.data == "adminm:broadcast:cancel")
-async def broadcast_cancel(
-    callback: CallbackQuery,
-    state: FSMContext,
-) -> None:
+async def broadcast_cancel(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
         await callback.answer(admin_texts.DENIED, show_alert=True)
         return
-
     await state.clear()
     if callback.message:
-        await callback.message.edit_text(admin_texts.BROADCAST_CANCELLED)
+        await delete_message_quietly(callback.message)
     await callback.answer()
