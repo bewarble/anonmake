@@ -86,7 +86,7 @@ async def command_start(
     await state.set_state(AskQuestion.waiting_for_text)
     await state.update_data(recipient_id=recipient.id)
     await message.answer(
-        f"{texts.QUESTION_PROMPT}\n\n{texts.QUESTION_HINT}",
+        texts.QUESTION_PROMPT,
         reply_markup=cancel_keyboard(),
     )
 
