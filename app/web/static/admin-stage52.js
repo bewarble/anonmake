@@ -43,12 +43,24 @@
     error.textContent = messageFor(field);
   }
 
+  function centerInvalidBlock(field, behavior = 'smooth') {
+    const block = containerFor(field) || field;
+    block.scrollIntoView({ behavior, block: 'center', inline: 'nearest' });
+  }
+
   function focusFirstInvalid(form) {
     const invalid = [...form.querySelectorAll(fieldSelector)].find((field) => !field.validity.valid);
     if (!invalid) return;
     showError(invalid);
+
+    // First position the complete field block, including the inline error.
+    centerInvalidBlock(invalid);
     invalid.focus({ preventScroll: true });
-    invalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Mobile browsers resize the visual viewport after focus/keyboard opening.
+    // Re-center after that resize so the error text remains visible as well.
+    setTimeout(() => centerInvalidBlock(invalid), 180);
+    setTimeout(() => centerInvalidBlock(invalid, 'auto'), 420);
   }
 
   document.querySelectorAll('form').forEach((form) => {
