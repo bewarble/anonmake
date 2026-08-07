@@ -25,17 +25,13 @@ async def track_start_source(
     args = (message.text or "").split(maxsplit=1)
     payload = args[1].strip() if len(args) > 1 else ""
 
-    # Personal-link payloads belong entirely to the question flow. Avoid touching
-    # attribution here so opening another user's link cannot become a source start.
-    if payload and not payload.startswith("src_"):
-        raise SkipHandler
-
     user, is_new_user = await UserRepository(session).get_or_create_from_telegram(
         message.from_user
     )
 
     source = None
     attributed = False
+    # Personal-link payloads are real bot starts but are not marketing sources.
     if is_new_user and payload.startswith("src_"):
         source = await MarketingRepository(session).source_by_code(
             payload.removeprefix("src_")
@@ -57,6 +53,6 @@ async def track_start_source(
 
     await session.commit()
 
-    # One handler owns all /start UX. This keeps ordinary starts and marketing
-    # starts identical: welcome, persistent menu, personal link and share button.
+    # One handler owns all /start UX. This keeps ordinary starts, personal links
+    # and marketing starts on one canonical Telegram user experience.
     raise SkipHandler
