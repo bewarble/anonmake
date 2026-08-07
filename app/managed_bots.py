@@ -4,12 +4,12 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
-from aiogram.fsm.storage.memory import MemoryStorage
 from sqlalchemy import select
 
 from app.bot.handlers import build_router
 from app.bot.middlewares import DatabaseMiddleware, PerformanceMiddleware
 from app.bot.middlewares.request_context import RequestContextMiddleware
+from app.bot.storage import build_fsm_storage
 from app.core.bot_context import CurrentBot
 from app.core.config import load_settings
 from app.core.error_diagnostics import new_error_id, record_bot_error
@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 
 async def run_instance(instance: BotInstance, token: str, settings) -> None:
     bot = Bot(token=token)
-    dispatcher = Dispatcher(storage=MemoryStorage())
+    storage = build_fsm_storage(settings.redis_url)
+    dispatcher = Dispatcher(storage=storage)
     dispatcher.update.outer_middleware(RequestContextMiddleware())
     dispatcher.update.outer_middleware(PerformanceMiddleware(settings))
     current = CurrentBot(instance.id, instance.code, instance.username, instance.display_name)
@@ -36,6 +37,7 @@ async def run_instance(instance: BotInstance, token: str, settings) -> None:
         await bot.delete_webhook(drop_pending_updates=False)
         await dispatcher.start_polling(bot)
     finally:
+        await storage.close()
         await bot.session.close()
 
 
