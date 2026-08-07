@@ -4,17 +4,17 @@ Stage 58 gives the Telegram bot a predictable home/navigation layer without chan
 
 ## User-facing behavior
 
-- Ordinary `/start` shows a short welcome and installs the main reply keyboard.
-- The personal link is still shown with its existing share button.
+- `/start` is the single home command.
+- Ordinary `/start` clears an active FSM flow, shows the personal link, and installs the main reply keyboard.
+- The personal link keeps its existing inline share button.
 - The user menu contains `🔗 Моя ссылка` and `❓ Помощь`.
-- `/menu` clears an active FSM flow and returns to the main menu.
-- `/help` and the Help button show the same product help copy.
+- Help is opened from the reply keyboard, without advertising extra slash commands.
 - Unsupported input outside functional flows receives a short fallback and the main menu instead of silence.
-- Existing `/cancel` behavior remains the explicit cancellation action inside question/answer flows.
+- `/cancel` is reserved for subscription auto-renew cancellation; question/answer flows use their inline cancel action instead.
 
 ## Routing safety
 
-Navigation commands are registered before FSM content handlers so `/menu` can interrupt a flow. The catch-all fallback router is registered after all functional handlers so it does not swallow questions, answers, payments, reveals, or admin actions.
+`/start` is registered before FSM content handlers so it can always return the user home. The catch-all fallback router is registered after all functional handlers so it does not swallow questions, answers, payments, reveals, or admin actions.
 
 ## Storage
 
