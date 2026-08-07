@@ -51,6 +51,11 @@ async def command_start(
     current_user = await users.upsert_from_telegram(message.from_user)
 
     code = (command.args or "").strip()
+    # Marketing source payloads are consumed by start_marketing; once attribution
+    # is recorded they must render the exact same UI as a plain /start.
+    if code.startswith("src_"):
+        code = ""
+
     if not code:
         await message.answer(
             texts.WELCOME,
@@ -96,7 +101,6 @@ async def show_personal_link(
     if message.from_user is None:
         return
 
-    # The persistent menu is navigation, not content for a previous FSM flow.
     await state.clear()
     user = await UserRepository(session).upsert_from_telegram(message.from_user)
     await show_personal_link_message(
