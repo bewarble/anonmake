@@ -45,11 +45,22 @@ def main() -> None:
     reject("app/bot/keyboards/main_menu.py", "USER_HELP")
     require(
         "app/models/user.py",
-        "PUBLIC_CODE_LENGTH = 8",
+        "PUBLIC_CODE_MIN_LENGTH = 5",
+        "PUBLIC_CODE_MAX_LENGTH = 6",
+        "secrets.choice((PUBLIC_CODE_MIN_LENGTH, PUBLIC_CODE_MAX_LENGTH))",
         "PUBLIC_CODE_ALPHABET",
-        "secrets.choice(PUBLIC_CODE_ALPHABET)",
         "is_blocked: Mapped[bool]",
         "blocked_at: Mapped[datetime | None]",
+    )
+    require(
+        "app/repositories/users.py",
+        "PUBLIC_CODE_CREATE_ATTEMPTS = 20",
+        "public_code=generate_public_code()",
+        "for _ in range(PUBLIC_CODE_CREATE_ATTEMPTS):",
+        'raise RuntimeError("Could not allocate a unique public code")',
+        "user.is_blocked = False",
+        "async def set_block_state(",
+        "user.is_blocked = is_blocked",
     )
     require(
         "migrations/versions/20260807_0021_short_public_codes.py",
@@ -66,23 +77,30 @@ def main() -> None:
         "latest_failure",
     )
     require(
+        "migrations/versions/20260808_0023_random_short_public_codes.py",
+        'revision = "20260808_0023"',
+        'down_revision = "20260808_0022"',
+        "_regenerate(5, 6)",
+        "_regenerate(8, 8)",
+    )
+    require(
         "app/bot/keyboards/questions.py",
-        "CopyTextButton",
         'text="✍️ Написать ещё"',
-        'text="🔗 Скопировать ссылку"',
-        'text="📤 Выложить в каналы / чаты"',
         'callback_data=f"ask_again:{recipient_id}"',
-        "CopyTextButton(text=full_link)",
         "text=QUESTION_ANSWER",
         "text=QUESTION_REVEAL",
+        "return personal_link_share_keyboard(link)",
     )
     require(
         "app/bot/keyboards/personal_link.py",
+        'SHARE_TEXT = "По этой ссылке можно мне прислать анонимное сообщение:\\n👉 {link}"',
         'text="🔗 Скопировать ссылку"',
         'text="📤 Выложить в каналы / чаты"',
         "CopyTextButton(text=full_link)",
-        '"https://t.me/share/url/?"',
+        'short_link = full_link.removeprefix("https://")',
+        'f"url=&text={encoded_text}"',
     )
+    reject("app/bot/keyboards/personal_link.py", 'f"url=%20&text={encoded_text}"', "encoded_link =")
     require(
         "app/bot/handlers/start.py",
         "texts.START_PROMO.format",
@@ -127,12 +145,6 @@ def main() -> None:
         "texts.ANSWER_SENT",
         "texts.ANSWER_RECEIVED.format(answer=html.escape(text))",
         'payload={"parse_mode": "HTML"}',
-    )
-    require(
-        "app/repositories/users.py",
-        "user.is_blocked = False",
-        "async def set_block_state(",
-        "user.is_blocked = is_blocked",
     )
     require(
         "app/bot/handlers/chat_members.py",
@@ -204,10 +216,7 @@ def main() -> None:
         "async def delete_message_quietly",
         "await delete_message_quietly(callback.message)",
     )
-    reject(
-        "app/bot/handlers/admin_marketing.py",
-        "edit_text(admin_texts.BROADCAST_CANCELLED)",
-    )
+    reject("app/bot/handlers/admin_marketing.py", "edit_text(admin_texts.BROADCAST_CANCELLED)")
     require(
         "app/delivery_worker.py",
         'parse_mode = payload.get("parse_mode")',
@@ -216,10 +225,10 @@ def main() -> None:
         "user.is_blocked = True",
     )
     print("Stage 63 check: OK")
-    print("Public codes: shortened to 8 characters")
+    print("Public codes: random 5-6 characters with collision retry")
     print("Public menu: one persistent action")
     print("/start: single promo message without inline actions")
-    print("All other promo cards: native copy/share actions")
+    print("All other promo cards: native copy/share actions with canonical text")
     print("Anonymous question/answer actions: 💬 Ответить + 👁️ Узнать кто это")
     print("/cancel command label: Отключить подписку")
     print("Telegram admin statistics/export/profit/sources/broadcasts: scoped to current bot")
@@ -228,7 +237,7 @@ def main() -> None:
     print("Admin charts: labeled daily users/blocked and turnover series")
     print("Reveal consent: Mooncloud terms/privacy/pricing links")
     print("Question and answer UX: final")
-    print("Stage 63 migrations: short public codes + live block state")
+    print("Stage 63 migrations: short public codes + live block state + random 5-6-char codes")
 
 
 if __name__ == "__main__":
