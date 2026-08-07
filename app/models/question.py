@@ -39,10 +39,10 @@ class Question(Base):
         back_populates="received_questions",
         foreign_keys=[recipient_id],
     )
-    answer: Mapped["Answer | None"] = relationship(
+    answers: Mapped[list["Answer"]] = relationship(
         back_populates="question",
-        uselist=False,
         cascade="all, delete-orphan",
+        order_by="Answer.created_at",
     )
 
 
