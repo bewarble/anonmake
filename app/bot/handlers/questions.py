@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 
 from aiogram import Router
-from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,17 +45,6 @@ async def cancel_callback(callback: CallbackQuery, state: FSMContext) -> None:
             texts.CANCELLED,
             reply_markup=main_menu_for(callback.from_user.id),
         )
-
-
-@router.message(Command("cancel"))
-async def cancel_command(message: Message, state: FSMContext) -> None:
-    await state.clear()
-    await message.answer(
-        texts.CANCELLED,
-        reply_markup=main_menu_for(
-            message.from_user.id if message.from_user else None
-        ),
-    )
 
 
 @router.message(AskQuestion.waiting_for_text)
