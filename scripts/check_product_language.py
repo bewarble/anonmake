@@ -38,10 +38,12 @@ FORBIDDEN = {
 ALLOWED_OFFER = "1 ₽ — 1 день VIP статуса"
 
 ALLOWED_CONSENT_FRAGMENTS = (
-    "Стоимость пробной VIP подписки — 1 ₽ за 1 день VIP статуса",
-    "автоматической пролонгацией 299 ₽ каждые 3 дня",
-    "частичное списание 99 ₽ за 1 день VIP статуса",
+    "Стоимость пробной подписки 1₽ за 1 день доступа",
+    "автоматической пролонгацией 299₽ каждые 3 дня",
+    "частичное списание 99₽ за 1 день доступа",
     "условиями пользования",
+    "политикой конфиденциальности",
+    "тарифами",
 )
 
 
@@ -72,10 +74,7 @@ def is_allowed_consent_text(path: Path, value: str) -> bool:
     if path.relative_to(ROOT).as_posix() != "app/core/texts.py":
         return False
 
-    return any(
-        fragment in value
-        for fragment in ALLOWED_CONSENT_FRAGMENTS
-    )
+    return any(fragment in value for fragment in ALLOWED_CONSENT_FRAGMENTS)
 
 
 def check() -> None:
@@ -87,39 +86,38 @@ def check() -> None:
                 if not pattern.search(value):
                     continue
 
-                if (
-                    name == "renewal_amounts"
-                    and is_allowed_consent_text(path, value)
-                ):
+                if name == "renewal_amounts" and is_allowed_consent_text(path, value):
                     continue
 
-                violations.append(
-                    f"{path.relative_to(ROOT)}:{line_no}: {name}"
-                )
+                violations.append(f"{path.relative_to(ROOT)}:{line_no}: {name}")
 
     texts_path = ROOT / "app/core/texts.py"
     texts = texts_path.read_text(encoding="utf-8")
 
     if ALLOWED_OFFER not in texts:
-        violations.append(
-            "app/core/texts.py: public offer missing"
-        )
+        violations.append("app/core/texts.py: public offer missing")
 
     for fragment in ALLOWED_CONSENT_FRAGMENTS:
         if fragment not in texts:
-            violations.append(
-                f"app/core/texts.py: consent fragment missing: {fragment}"
-            )
+            violations.append(f"app/core/texts.py: consent fragment missing: {fragment}")
+
+    for url in (
+        "https://sms.mooncloud.ltd/terms",
+        "https://sms.mooncloud.ltd/privacy",
+        "https://sms.mooncloud.ltd/pricing",
+    ):
+        if url not in texts:
+            violations.append(f"app/core/texts.py: consent URL missing: {url}")
 
     if violations:
         raise AssertionError(
-            "Product language violations:\n- "
-            + "\n- ".join(sorted(set(violations)))
+            "Product language violations:\n- " + "\n- ".join(sorted(set(violations)))
         )
 
     print("Product language audit: OK")
     print("Public offer: 1 ₽ / 1 day of VIP status")
     print("Renewal amounts: allowed only in payment consent")
+    print("Terms, privacy and pricing links: present")
     print("Billing internals and technical errors: hidden")
     print("Access dates: hidden")
 
