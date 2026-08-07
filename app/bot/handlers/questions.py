@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import answer_question_keyboard, main_menu_for
 from app.bot.keyboards.questions import cancel_keyboard, write_more_keyboard
-from app.bot.states import AskQuestion
+from app.bot.states import AnswerQuestion, AskQuestion
 from app.core import texts
 from app.core.bot_context import require_current_bot
 from app.core.config import load_settings
@@ -30,29 +30,26 @@ MAX_QUESTION_LENGTH = 1500
 
 def build_guard() -> AbuseGuard:
     settings = load_settings()
-    return AbuseGuard(
-        get_redis(settings.redis_url),
-        burst_limit=settings.question_burst_limit,
-        burst_window_seconds=settings.question_burst_window_seconds,
-        minute_limit=settings.question_minute_limit,
-        duplicate_window_seconds=settings.question_duplicate_window_seconds,
-    )
+    return AbuseGuard(get_redis(settings.redis_url), burst_limit=settings.question_burst_limit, burst_window_seconds=settings.question_burst_window_seconds, minute_limit=settings.question_minute_limit, duplicate_window_seconds=settings.question_duplicate_window_seconds)
 
 
 @router.callback_query(lambda callback: callback.data == "cancel")
-async def cancel_callback(
-    callback: CallbackQuery,
-    state: FSMContext,
-    session: AsyncSession,
-    bot: Bot,
-) -> None:
+async def cancel_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession, bot: Bot) -> None:
     current_state = await state.get_state()
+    data = await state.get_data()
+    reply_mode = bool(data.get("reply_mode"))
     await state.clear()
     await callback.answer()
-
     if callback.message is None:
         return
-
+    if current_state == AnswerQuestion.waiting_for_text.state or reply_mode:
+        try:
+            await callback.message.delete()
+        except TelegramBadRequest as exc:
+            lowered = str(exc).lower()
+            if "message to delete not found" not in lowered and "message can't be deleted" not in lowered:
+                raise
+        return
     if current_state == AskQuestion.waiting_for_text.state:
         try:
             await callback.message.delete()
@@ -60,205 +57,82 @@ async def cancel_callback(
             lowered = str(exc).lower()
             if "message to delete not found" not in lowered and "message can't be deleted" not in lowered:
                 raise
-
         user = await UserRepository(session).upsert_from_telegram(callback.from_user)
         bot_user = await bot.get_me()
         personal_link = f"t.me/{bot_user.username}?start={user.public_code}"
-        await bot.send_message(
-            callback.message.chat.id,
-            texts.QUESTION_PROMO.format(link=personal_link),
-            reply_markup=main_menu_for(callback.from_user.id),
-        )
+        await bot.send_message(callback.message.chat.id, texts.QUESTION_PROMO.format(link=personal_link), reply_markup=main_menu_for(callback.from_user.id), disable_web_page_preview=True)
         return
-
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
     except TelegramBadRequest as exc:
         if "message is not modified" not in str(exc).lower():
             raise
-    await callback.message.answer(
-        texts.CANCELLED,
-        reply_markup=main_menu_for(callback.from_user.id),
-    )
+    await callback.message.answer(texts.CANCELLED, reply_markup=main_menu_for(callback.from_user.id))
 
 
 @router.callback_query(F.data.startswith("ask_again:"))
-async def ask_again(
-    callback: CallbackQuery,
-    state: FSMContext,
-    session: AsyncSession,
-) -> None:
+async def ask_again(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     if callback.from_user is None or callback.data is None:
         return
-
     try:
         recipient_id = int(callback.data.split(":", maxsplit=1)[1])
     except (ValueError, IndexError):
-        await state.clear()
-        await callback.answer(texts.INVALID_LINK, show_alert=True)
-        return
-
+        await state.clear(); await callback.answer(texts.INVALID_LINK, show_alert=True); return
     users = UserRepository(session)
     sender = await users.upsert_from_telegram(callback.from_user)
     recipient = await users.get_by_id(recipient_id)
     if recipient is None:
-        await state.clear()
-        await callback.answer(texts.QUESTION_RECIPIENT_MISSING, show_alert=True)
-        return
+        await state.clear(); await callback.answer(texts.QUESTION_RECIPIENT_MISSING, show_alert=True); return
     if recipient.id == sender.id:
-        await state.clear()
-        await callback.answer(texts.SELF_MESSAGE, show_alert=True)
-        return
-
+        await state.clear(); await callback.answer(texts.SELF_MESSAGE, show_alert=True); return
     await state.set_state(AskQuestion.waiting_for_text)
     await state.update_data(recipient_id=recipient.id)
     await callback.answer()
     if callback.message:
-        await callback.message.answer(
-            texts.QUESTION_PROMPT,
-            reply_markup=cancel_keyboard(),
-        )
+        await callback.message.answer(texts.QUESTION_PROMPT, reply_markup=cancel_keyboard())
 
 
 @router.message(AskQuestion.waiting_for_text)
-async def receive_question(
-    message: Message,
-    state: FSMContext,
-    session: AsyncSession,
-) -> None:
-    if message.from_user is None:
-        return
-
+async def receive_question(message: Message, state: FSMContext, session: AsyncSession) -> None:
+    if message.from_user is None: return
     content = extract_content(message)
     if content is None:
-        await message.answer(texts.TEXT_ONLY)
-        return
-
+        await message.answer(texts.TEXT_ONLY); return
     if len(content.text) > MAX_QUESTION_LENGTH:
-        await message.answer(
-            texts.QUESTION_TOO_LONG.format(limit=MAX_QUESTION_LENGTH)
-        )
-        return
-
-    data = await state.get_data()
-    recipient_id = data.get("recipient_id")
+        await message.answer(texts.QUESTION_TOO_LONG.format(limit=MAX_QUESTION_LENGTH)); return
+    data = await state.get_data(); recipient_id = data.get("recipient_id")
     if not isinstance(recipient_id, int):
-        await state.clear()
-        await message.answer(
-            texts.QUESTION_SESSION_EXPIRED,
-            reply_markup=main_menu_for(message.from_user.id),
-        )
-        return
-
-    settings = load_settings()
-    guard: AbuseGuard | None = None
-
+        await state.clear(); await message.answer(texts.QUESTION_SESSION_EXPIRED, reply_markup=main_menu_for(message.from_user.id)); return
+    settings = load_settings(); guard: AbuseGuard | None = None
     if settings.abuse_guard_enabled:
         guard = build_guard()
         try:
-            decision = await guard.check_question(
-                sender_telegram_id=message.from_user.id,
-                recipient_user_id=recipient_id,
-                text=content.duplicate_key,
-            )
+            decision = await guard.check_question(sender_telegram_id=message.from_user.id, recipient_user_id=recipient_id, text=content.duplicate_key)
         except Exception:
             logger.exception("Question abuse guard is unavailable")
         else:
             if not decision.allowed:
-                await message.answer(
-                    texts.QUESTION_DUPLICATE
-                    if decision.reason == "duplicate"
-                    else texts.QUESTION_TOO_FAST
-                )
-                return
-
-    users = UserRepository(session)
-    sender = await users.upsert_from_telegram(message.from_user)
-    recipient = await users.get_by_id(recipient_id)
-
+                await message.answer(texts.QUESTION_DUPLICATE if decision.reason == "duplicate" else texts.QUESTION_TOO_FAST); return
+    users = UserRepository(session); sender = await users.upsert_from_telegram(message.from_user); recipient = await users.get_by_id(recipient_id)
     if recipient is None:
-        await state.clear()
-        await message.answer(
-            texts.QUESTION_RECIPIENT_MISSING,
-            reply_markup=main_menu_for(message.from_user.id),
-        )
-        return
-
+        await state.clear(); await message.answer(texts.QUESTION_RECIPIENT_MISSING, reply_markup=main_menu_for(message.from_user.id)); return
     if sender.id == recipient.id:
-        await state.clear()
-        await message.answer(
-            texts.SELF_MESSAGE,
-            reply_markup=main_menu_for(message.from_user.id),
-        )
-        return
-
+        await state.clear(); await message.answer(texts.SELF_MESSAGE, reply_markup=main_menu_for(message.from_user.id)); return
     try:
-        question = await QuestionRepository(session).create(
-            sender_id=sender.id,
-            recipient_id=recipient.id,
-            text=content.text,
-            content_type=content.content_type,
-            media_file_id=content.file_id,
-            media_caption=content.caption,
-        )
-        question.status = "queued"
-
-        markup = answer_question_keyboard(question.id)
-        escaped_text = html.escape(question.text)
-        delivery_text = (
-            texts.NEW_QUESTION.format(text=escaped_text)
-            if content.content_type == "text"
-            else texts.NEW_QUESTION_HEADER
-        )
-        payload = delivery_payload(content) or {}
-        payload["parse_mode"] = "HTML"
+        question = await QuestionRepository(session).create(sender_id=sender.id, recipient_id=recipient.id, text=content.text, content_type=content.content_type, media_file_id=content.file_id, media_caption=content.caption)
+        question.status = "queued"; markup = answer_question_keyboard(question.id); escaped_text = html.escape(question.text)
+        delivery_text = texts.NEW_QUESTION.format(text=escaped_text) if content.content_type == "text" else texts.NEW_QUESTION_HEADER
+        payload = delivery_payload(content) or {}; payload["parse_mode"] = "HTML"
         if content.content_type != "text" and content.caption:
-            payload["caption"] = (
-                f"{texts.NEW_QUESTION_HEADER}\n\n{html.escape(content.caption)}"
-            )
-
-        await DeliveryRepository(session).enqueue(
-            kind="question",
-            dedupe_key=f"question:{question.id}",
-            chat_id=recipient.telegram_id,
-            text=delivery_text,
-            reply_markup=serialize_markup(markup),
-            payload=payload,
-        )
-
-        tracking = CrmTrackingService(session)
-        await tracking.question_sent(
-            user_id=sender.id,
-            question_id=question.id,
-        )
-        await tracking.question_received(
-            user_id=recipient.id,
-            question_id=question.id,
-        )
-
-        await session.commit()
+            payload["caption"] = f"{texts.NEW_QUESTION_HEADER}\n\n{html.escape(content.caption)}"
+        await DeliveryRepository(session).enqueue(kind="question", dedupe_key=f"question:{question.id}", chat_id=recipient.telegram_id, text=delivery_text, reply_markup=serialize_markup(markup), payload=payload)
+        tracking = CrmTrackingService(session); await tracking.question_sent(user_id=sender.id, question_id=question.id); await tracking.question_received(user_id=recipient.id, question_id=question.id); await session.commit()
     except Exception:
         await session.rollback()
         if guard is not None:
-            try:
-                await guard.rollback_duplicate(
-                    sender_telegram_id=message.from_user.id,
-                    recipient_user_id=recipient_id,
-                    text=content.duplicate_key,
-                )
-            except Exception:
-                logger.exception("Could not rollback duplicate key")
+            try: await guard.rollback_duplicate(sender_telegram_id=message.from_user.id, recipient_user_id=recipient_id, text=content.duplicate_key)
+            except Exception: logger.exception("Could not rollback duplicate key")
         raise
-
-    await state.clear()
-    await message.answer(
-        texts.QUESTION_SENT,
-        reply_markup=write_more_keyboard(recipient.id),
-    )
-
-    current_bot = require_current_bot()
-    personal_link = f"t.me/{current_bot.username}?start={sender.public_code}"
-    await message.answer(
-        texts.QUESTION_PROMO.format(link=personal_link),
-        reply_markup=main_menu_for(message.from_user.id),
-    )
+    await state.clear(); await message.answer(texts.QUESTION_SENT, reply_markup=write_more_keyboard(recipient.id))
+    current_bot = require_current_bot(); personal_link = f"t.me/{current_bot.username}?start={sender.public_code}"
+    await message.answer(texts.QUESTION_PROMO.format(link=personal_link), reply_markup=main_menu_for(message.from_user.id), disable_web_page_preview=True)
