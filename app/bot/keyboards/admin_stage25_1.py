@@ -50,7 +50,7 @@ def export_choice_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text=EXPORT_ALL, callback_data="admin25:export:all")],
             [InlineKeyboardButton(text=EXPORT_ALIVE, callback_data="admin25:export:alive")],
-            [InlineKeyboardButton(text=ACTION_CANCEL, callback_data="admin25:export:cancel")],
+            [InlineKeyboardButton(text=ACTION_CANCEL, callback_data="admin25:cancel:export")],
         ]
     )
 
