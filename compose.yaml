@@ -11,6 +11,8 @@ x-app-common: &app-common
   environment:
     DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-anonmake}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-anonmake}
     REDIS_URL: redis://redis:6379/0
+  volumes:
+    - runtime_health:/tmp/anonmake-health
   depends_on:
     migrate:
       condition: service_completed_successfully
@@ -148,6 +150,7 @@ services:
   web:
     <<: *app-common
     volumes:
+      - runtime_health:/tmp/anonmake-health:ro
       - ./var:/app/var:ro
       - ./backups/deploy:/app/backups/deploy:ro
     command:
@@ -180,15 +183,16 @@ services:
     <<: *app-common
     command: ["python", "-m", "app.worker"]
     healthcheck:
-      test: ["CMD", "python", "-m", "scripts.healthcheck"]
+      test: ["CMD", "python", "-m", "scripts.worker_healthcheck", "billing-worker", "--max-age", "180"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 45s
 
 volumes:
   postgres_data:
   redis_data:
+  runtime_health:
 
 networks:
   anonmake:
