@@ -106,7 +106,8 @@ class SubscriptionCheckoutService:
     async def finalize(
         self,
         operation_id: str,
-    ) -> tuple[bool, PaymentAttempt | None]:
+    ) -> tuple[bool, PaymentAttempt | None, bool]:
+        current_bot = require_current_bot()
         attempt = await self.repo.attempt_by_operation_id(
             operation_id,
             for_update=True,
@@ -114,14 +115,11 @@ class SubscriptionCheckoutService:
         if attempt is None:
             return False, None, False
 
-        # Повторный return/webhook не должен повторно начислять доступ
-        # и отправлять Telegram-уведомление.
+        # Repeated return/webhook calls must not grant access twice.
         if attempt.status == "success":
             return True, attempt, False
 
-        result = await self.client.state(
-            customer_operation_id=operation_id
-        )
+        result = await self.client.state(customer_operation_id=operation_id)
         transaction = result.data.get("transaction") or {}
         state = str(
             transaction.get("state")
@@ -155,14 +153,8 @@ class SubscriptionCheckoutService:
             await self.session.commit()
             return False, attempt, False
 
-        reported_amount = (
-            transaction.get("amount")
-            or result.data.get("amount")
-        )
-        if (
-            reported_amount is not None
-            and int(reported_amount) != attempt.amount_kopecks
-        ):
+        reported_amount = transaction.get("amount") or result.data.get("amount")
+        if reported_amount is not None and int(reported_amount) != attempt.amount_kopecks:
             attempt.status = "failed"
             attempt.error_code = "AMOUNT_MISMATCH"
             attempt.error_message = (
@@ -172,54 +164,38 @@ class SubscriptionCheckoutService:
             await self.session.commit()
             return False, attempt, False
 
-        subscription = await self.session.get(
-            Subscription,
-            attempt.subscription_id,
-        )
-        if subscription is None:
+        subscription = await self.session.get(Subscription, attempt.subscription_id)
+        if subscription is None or subscription.bot_id != current_bot.id:
             return False, attempt, False
 
-        method = await self.repo.payment_method_for_user(
-            subscription.user_id
-        )
+        method = await self.repo.payment_method_for_user(subscription.user_id)
         binding = result.data.get("binding") or {}
         payment_option = result.data.get("payment_option") or {}
         card = payment_option.get("card") or {}
 
         if method is None:
             method = PaymentMethod(
+                bot_id=current_bot.id,
                 user_id=subscription.user_id,
                 merchant_user_id=(
                     binding.get("merchant_user_id")
-                    or f"anonmake_{subscription.user_id}"
+                    or f"{current_bot.code}_anonmake_{subscription.user_id}"
                 ),
             )
             self.session.add(method)
 
         binding_id = binding.get("binding_id") or binding.get("id")
-        impaya_user_id = (
-            binding.get("user_id")
-            or binding.get("impaya_user_id")
-        )
+        impaya_user_id = binding.get("user_id") or binding.get("impaya_user_id")
         if not binding_id or not impaya_user_id:
             attempt.error_code = "BINDING_NOT_RETURNED"
-            attempt.error_message = (
-                "Successful payment has no recurrent binding"
-            )
+            attempt.error_message = "Successful payment has no recurrent binding"
             await self.session.commit()
             return False, attempt, False
 
         method.binding_id = str(binding_id)
         method.impaya_user_id = str(impaya_user_id)
-        method.merchant_user_id = (
-            binding.get("merchant_user_id")
-            or method.merchant_user_id
-        )
-        method.masked_pan = (
-            card.get("masked_pan")
-            or card.get("pan_mask")
-            or method.masked_pan
-        )
+        method.merchant_user_id = binding.get("merchant_user_id") or method.merchant_user_id
+        method.masked_pan = card.get("masked_pan") or card.get("pan_mask") or method.masked_pan
         method.card_brand = card.get("brand") or method.card_brand
         method.is_active = True
         method.is_recurrent = True
@@ -240,5 +216,4 @@ class SubscriptionCheckoutService:
         attempt.error_message = None
 
         await self.session.commit()
-        # Только этот вызов впервые перевёл попытку в success.
         return True, attempt, True
