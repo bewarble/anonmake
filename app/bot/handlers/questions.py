@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 import logging
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -40,19 +40,46 @@ def build_guard() -> AbuseGuard:
 
 
 @router.callback_query(lambda callback: callback.data == "cancel")
-async def cancel_callback(callback: CallbackQuery, state: FSMContext) -> None:
+async def cancel_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+    bot: Bot,
+) -> None:
+    current_state = await state.get_state()
     await state.clear()
-    await callback.answer(texts.CANCELLED)
-    if callback.message:
+    await callback.answer()
+
+    if callback.message is None:
+        return
+
+    if current_state == AskQuestion.waiting_for_text.state:
         try:
-            await callback.message.edit_reply_markup(reply_markup=None)
+            await callback.message.delete()
         except TelegramBadRequest as exc:
-            if "message is not modified" not in str(exc).lower():
+            lowered = str(exc).lower()
+            if "message to delete not found" not in lowered and "message can't be deleted" not in lowered:
                 raise
-        await callback.message.answer(
-            texts.CANCELLED,
+
+        user = await UserRepository(session).upsert_from_telegram(callback.from_user)
+        bot_user = await bot.get_me()
+        personal_link = f"t.me/{bot_user.username}?start={user.public_code}"
+        await bot.send_message(
+            callback.message.chat.id,
+            texts.QUESTION_PROMO.format(link=personal_link),
             reply_markup=main_menu_for(callback.from_user.id),
         )
+        return
+
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except TelegramBadRequest as exc:
+        if "message is not modified" not in str(exc).lower():
+            raise
+    await callback.message.answer(
+        texts.CANCELLED,
+        reply_markup=main_menu_for(callback.from_user.id),
+    )
 
 
 @router.callback_query(F.data.startswith("ask_again:"))
