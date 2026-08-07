@@ -29,8 +29,15 @@ def main() -> None:
     )
     require(
         "app/bot/keyboards/personal_link.py",
-        'SHARE_TEXT = "Отправь мне анонимное сообщение 👉"',
+        'SHARE_TEXT = "Отправь мне анонимное сообщение 👉 {link}"',
+        'short_link = link.removeprefix("https://")',
+        "quote(share_text, safe=\"\")",
         'text="Поделиться ссылкой"',
+        'url=f"https://t.me/share/url?text={encoded_text}"',
+    )
+    reject(
+        "app/bot/keyboards/personal_link.py",
+        '"url": link',
         'url=f"https://t.me/share/url?{query}"',
     )
     require(
@@ -91,6 +98,7 @@ def main() -> None:
     assert not list((ROOT / "migrations/versions").glob("*stage_58*"))
     print("Stage 58 check: OK")
     print("/start installs the reply keyboard and personal-link messages own their inline share button")
+    print("Share action sends one encoded text payload with the personal link in the requested order")
     print("Help and unknown-input guidance are button-driven without command mentions")
     print("/cancel remains reserved for subscription auto-renew cancellation")
     print("No Stage 58 migration required")
