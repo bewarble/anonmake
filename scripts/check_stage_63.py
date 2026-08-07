@@ -33,6 +33,10 @@ def main() -> None:
         "https://sms.mooncloud.ltd/pricing",
     )
     require(
+        "app/bot/commands.py",
+        'BotCommand(command="cancel", description="Отключить подписку")',
+    )
+    require(
         "app/bot/ui.py",
         'USER_PERSONAL_LINK = "💬 Начать получать сообщения"',
         'ACTION_CANCEL = "✖️ Отменить"',
@@ -122,6 +126,13 @@ def main() -> None:
         'payload={"parse_mode": "HTML"}',
     )
     require(
+        "app/services/admin_statistics_stage25.py",
+        "bot_id = require_current_bot().id",
+        "User.bot_id == bot_id",
+        "DeliveryOutbox.bot_id == bot_id",
+        "PaymentMethod.bot_id == bot_id",
+    )
+    require(
         "app/delivery_worker.py",
         'parse_mode = payload.get("parse_mode")',
         "parse_mode=parse_mode",
@@ -132,6 +143,8 @@ def main() -> None:
     print("/start: single promo message without inline actions")
     print("All other promo cards: native copy/share actions")
     print("Anonymous question/answer actions: 💬 Ответить + 👁️ Узнать кто это")
+    print("/cancel command label: Отключить подписку")
+    print("Bot statistics: scoped to current project/bot")
     print("/cancel: immediate auto-renew disable with final copy")
     print("Reveal consent: Mooncloud terms/privacy/pricing links")
     print("Question and answer UX: final")
