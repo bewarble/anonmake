@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import logging
 import os
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
 HEARTBEAT_DIR = Path(os.getenv("WORKER_HEARTBEAT_DIR", "/tmp/anonmake-health"))
 
 
@@ -16,7 +18,6 @@ def heartbeat_path(service: str) -> Path:
 
 
 def mark_worker_heartbeat(service: str, **details: object) -> None:
-    HEARTBEAT_DIR.mkdir(parents=True, exist_ok=True)
     path = heartbeat_path(service)
     payload = {
         "service": service,
@@ -24,9 +25,18 @@ def mark_worker_heartbeat(service: str, **details: object) -> None:
         "pid": os.getpid(),
         **details,
     }
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    temporary.replace(path)
+    try:
+        HEARTBEAT_DIR.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(path)
+    except OSError as exc:
+        logger.warning(
+            "Worker heartbeat write failed service=%s path=%s error=%s",
+            service,
+            path,
+            type(exc).__name__,
+        )
 
 
 def read_worker_heartbeat(service: str) -> dict:
