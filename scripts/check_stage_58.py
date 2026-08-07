@@ -19,20 +19,20 @@ def main() -> None:
     require(
         "app/bot/ui.py",
         "USER_PERSONAL_LINK",
-        "USER_HELP",
     )
+    reject("app/bot/ui.py", "USER_HELP")
     require(
         "app/bot/keyboards/main_menu.py",
-        "USER_HELP",
         "KeyboardButton(text=USER_PERSONAL_LINK)",
-        "KeyboardButton(text=USER_HELP)",
+        "is_persistent=True",
     )
+    reject("app/bot/keyboards/main_menu.py", "USER_HELP")
     require(
         "app/bot/keyboards/personal_link.py",
         'SHARE_TEXT = "Отправь мне анонимное сообщение 👉 {link}"',
-        'short_link = link.removeprefix("https://")',
-        'encoded_text = quote(share_text, safe="")',
-        'text="Поделиться ссылкой"',
+        'text="🔗 Скопировать ссылку"',
+        'text="📤 Выложить в каналы / чаты"',
+        "CopyTextButton(text=full_link)",
         '"https://t.me/share/url/?"',
         'f"url=%20&text={encoded_text}"',
     )
@@ -44,7 +44,6 @@ def main() -> None:
     )
     require(
         "app/bot/handlers/navigation.py",
-        "F.text == USER_HELP",
         "texts.UNKNOWN_INPUT",
         "fallback_router",
     )
@@ -52,6 +51,7 @@ def main() -> None:
         "app/bot/handlers/navigation.py",
         'Command("menu")',
         'Command("help")',
+        "USER_HELP",
     )
     require(
         "app/bot/handlers/start.py",
@@ -111,7 +111,6 @@ def main() -> None:
     require(
         "app/core/texts.py",
         "UNKNOWN_INPUT",
-        "HELP",
     )
     reject(
         "app/core/texts.py",
@@ -122,11 +121,10 @@ def main() -> None:
     )
     assert not list((ROOT / "migrations/versions").glob("*stage_58*"))
     print("Stage 58 check: OK")
-    print("/start installs the reply keyboard and personal-link messages own their inline share button")
-    print("Share action matches the Telegram share URL flow used by the reference implementation")
+    print("/start installs the persistent one-action reply keyboard")
+    print("Personal-link cards expose native copy and Telegram share actions")
     print("Shared router is used by managed bot instances")
     print("Single docker-up path rebuilds all bot services")
-    print("Help and unknown-input guidance are button-driven without command mentions")
     print("/cancel remains reserved for subscription auto-renew cancellation in every FSM state")
     print("No Stage 58 migration required")
 
