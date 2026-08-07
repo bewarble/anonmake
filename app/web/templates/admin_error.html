@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ status_code }} · {{ title }} · AnonMake</title>
+  <link rel="stylesheet" href="/admin/static/admin-ui.css?v=50">
+</head>
+<body class="admin-error-body">
+  <main class="admin-error-shell">
+    <a class="admin-error-brand" href="/admin/business"><span class="brand-orb">A</span><span>AnonMake</span></a>
+    <section class="admin-error-card" role="alert">
+      <span class="admin-error-code">{{ status_code }}</span>
+      <h1>{{ title }}</h1>
+      <p>{{ message }}</p>
+      {% if show_error_id %}
+      <div class="admin-error-id-row">
+        <div><small>Идентификатор ошибки</small><code data-error-id>{{ error_id }}</code></div>
+        <button class="button-secondary" type="button" data-copy-error-id>Копировать ID</button>
+      </div>
+      {% endif %}
+      <div class="admin-error-actions">
+        <a class="button-primary" href="/admin/business">В панель управления</a>
+        <button class="button-secondary" type="button" onclick="history.back()">Назад</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const button = document.querySelector('[data-copy-error-id]');
+      const value = document.querySelector('[data-error-id]');
+      if (!button || !value) return;
+      button.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(value.textContent.trim());
+          button.textContent = 'Скопировано';
+        } catch (_) {
+          button.textContent = value.textContent.trim();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
