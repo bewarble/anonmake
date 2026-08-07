@@ -18,7 +18,7 @@
       <div><span class="section-kicker">Новый пользователь</span><h2>Создать аккаунт</h2></div>
       <span class="panel-icon">＋</span>
     </div>
-    <form method="post" class="platform-form">
+    <form method="post" class="platform-form" data-loading-label="Создаём…">
       <div class="form-field full">
         <label for="admin-email">Электронная почта</label>
         <input id="admin-email" name="email" type="email" placeholder="admin@example.ru" autocomplete="email" required>
@@ -93,7 +93,12 @@
       <div class="admin-card-actions">
         <a class="button secondary" href="/admin/platform/admins/{{ admin.id }}/edit">Редактировать</a>
         {% if not current_admin or current_admin.admin_id != admin.id %}
-        <form method="post" action="/admin/platform/admins/{{ admin.id }}/delete" onsubmit="return confirm('Удалить аккаунт «{{ admin.display_name }}» без возможности восстановления?')">
+        <form method="post" action="/admin/platform/admins/{{ admin.id }}/delete"
+              data-confirm-title="Удалить аккаунт?"
+              data-confirm="Аккаунт «{{ admin.display_name }}» будет удалён без возможности восстановления."
+              data-confirm-label="Удалить аккаунт"
+              data-confirm-tone="danger"
+              data-loading-label="Удаляем…">
           <button class="button danger" type="submit">Удалить</button>
         </form>
         {% endif %}
