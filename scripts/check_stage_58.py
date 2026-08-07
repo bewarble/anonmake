@@ -77,6 +77,11 @@ def main() -> None:
     require(
         "app/bot/handlers/subscriptions.py",
         'Command("cancel")',
+        "FSMContext",
+        "await state.clear()",
+    )
+    reject(
+        "app/bot/handlers/subscriptions.py",
         "StateFilter(None)",
     )
     require(
@@ -123,7 +128,7 @@ def main() -> None:
     print("Shared router is used by managed bot instances")
     print("Single docker-up path rebuilds all bot services")
     print("Help and unknown-input guidance are button-driven without command mentions")
-    print("/cancel remains reserved for subscription auto-renew cancellation")
+    print("/cancel remains reserved for subscription auto-renew cancellation in every FSM state")
     print("No Stage 58 migration required")
 
 
