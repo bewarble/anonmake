@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "app/web/templates"
 STATIC = ROOT / "app/web/static"
+ACTIVE_ASSETS = {"admin-ui.css", "admin-ui.js", "admin-stage50.css"}
 
 
 def referenced_assets() -> set[str]:
@@ -21,7 +22,10 @@ def main() -> None:
     missing = [name for name in sorted(references) if not (STATIC / name).is_file()]
     assert not missing, missing
 
-    assert references == {"admin-ui.css", "admin-ui.js"}, references
+    unexpected = references - ACTIVE_ASSETS
+    missing_active = ACTIVE_ASSETS - references
+    assert not unexpected, unexpected
+    assert not missing_active, missing_active
 
     legacy = sorted(
         path.name
