@@ -74,7 +74,7 @@ ANSWER_SESSION_EXPIRED = "⚠️ Время ответа истекло."
 ANSWER_NOT_FOUND = "⚠️ Сообщение не найдено."
 ANSWER_ALREADY_SENT = "ℹ️ Вы уже ответили на это сообщение."
 ANSWER_DELIVERY_FAILED = "ℹ️ Ответ сохранён.\n\nМы доставим его автоматически."
-ANSWER_RECEIVED = "💬 Вам ответили\n\n{answer}"
+ANSWER_RECEIVED = "<b>📨 Вам отправили новое анонимное сообщение</b>\n\n{answer}"
 
 # Access and payment
 ACCESS_OFFER = (
