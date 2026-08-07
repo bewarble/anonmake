@@ -39,7 +39,8 @@ def main() -> None:
 
     for stage in range(50, 57):
         assert (ROOT / f"scripts/check_stage_{stage}.py").is_file(), stage
-        assert (ROOT / f"docs/STAGE_{stage}_" ).parent.is_dir()
+        docs = list((ROOT / "docs").glob(f"STAGE_{stage}_*.md"))
+        assert docs, f"Stage {stage} documentation is missing"
 
     required_assets = [
         "admin-stage50.css",
@@ -56,7 +57,7 @@ def main() -> None:
     print("Stage 57 release audit: OK")
     print("stage-38-multibot is an ancestor of the release branch")
     print("No migration changes detected from Stage 38 through Stage 57")
-    print("Stage 50-56 checkers and active UX assets are present")
+    print("Stage 50-56 checkers, docs and active UX assets are present")
 
 
 if __name__ == "__main__":
