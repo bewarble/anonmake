@@ -19,7 +19,7 @@ def main() -> None:
     require(
         "app/bot/commands.py",
         'BotCommand(command="start", description="Главное меню")',
-        'BotCommand(command="cancel", description="Отключить автопродление")',
+        'BotCommand(command="cancel", description="Отключить подписку")',
         "sync_public_commands",
     )
     reject("app/bot/commands.py", 'command="menu"', 'command="help"', "testpay", "testcharge")
@@ -117,7 +117,7 @@ def main() -> None:
     print("Public Telegram command list: /start and /cancel only")
     print("Stale callbacks and repeat taps: safe")
     print("Reveal checkout and payment finalization: hardened")
-    print("/cancel is reserved for auto-renewal in every FSM state")
+    print("/cancel is reserved for subscription cancellation in every FSM state")
     print("Test payment commands remain launch-gated")
     print("Unlimited replies from Stage 61 remain active")
     print("No Stage 62 migration required")
