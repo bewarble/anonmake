@@ -12,6 +12,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       BROADCAST_BATCH_SIZE: ${BROADCAST_BATCH_SIZE:-500}
       BROADCAST_POLL_INTERVAL_SECONDS: ${BROADCAST_POLL_INTERVAL_SECONDS:-3}
+    volumes:
+      - runtime_health:/tmp/anonmake-health
     command: ["python", "-m", "app.broadcast_worker"]
     depends_on:
       migrate:
