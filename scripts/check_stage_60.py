@@ -13,6 +13,7 @@ def main() -> None:
     require(
         "app/core/platform_health.py",
         "RUNTIME_SERVICES",
+        '"managed-bots"',
         '"delivery-worker"',
         '"broadcast-worker"',
         '"billing-worker"',
@@ -21,15 +22,23 @@ def main() -> None:
     )
     require(
         "app/services/billing_worker.py",
-        'mark_worker_heartbeat("billing-worker"',
+        '"billing-worker"',
+        "mark_worker_heartbeat(",
         'state="processing"',
         'state="idle"',
         'state="error"',
     )
     require(
+        "app/managed_bots.py",
+        'mark_worker_heartbeat("managed-bots"',
+        "configured_count=len(instances)",
+        "active_count=len(tasks)",
+    )
+    require(
         "compose.yaml",
         "runtime_health:/tmp/anonmake-health",
         "runtime_health:/tmp/anonmake-health:ro",
+        '"scripts.worker_healthcheck", "managed-bots"',
         '"scripts.worker_healthcheck", "billing-worker"',
         "runtime_health:",
     )
@@ -60,7 +69,7 @@ def main() -> None:
     assert not list((ROOT / "migrations/versions").glob("*stage_60*"))
     print("Stage 60 check: OK")
     print("Shared runtime heartbeat volume: ready")
-    print("Delivery, broadcast and billing worker health: visible")
+    print("Managed bots, delivery, broadcast and billing health: visible")
     print("Platform incident summary: ready")
     print("No Docker socket exposure required")
     print("No Stage 60 migration required")
