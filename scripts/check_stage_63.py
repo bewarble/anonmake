@@ -36,6 +36,8 @@ def main() -> None:
         "app/bot/ui.py",
         'USER_PERSONAL_LINK = "💬 Начать получать сообщения"',
         'ACTION_CANCEL = "✖️ Отменить"',
+        'QUESTION_ANSWER = "💬 Ответить"',
+        'QUESTION_REVEAL = "👁️ Узнать кто это"',
     )
     reject("app/bot/ui.py", "USER_HELP")
     require(
@@ -64,6 +66,8 @@ def main() -> None:
         'text="📤 Выложить в каналы / чаты"',
         'callback_data=f"ask_again:{recipient_id}"',
         "CopyTextButton(text=full_link)",
+        "text=QUESTION_ANSWER",
+        "text=QUESTION_REVEAL",
     )
     require(
         "app/bot/keyboards/personal_link.py",
@@ -79,6 +83,7 @@ def main() -> None:
         "texts.SELF_MESSAGE",
         "personal_link_share_keyboard(link)",
         "reply_markup=main_menu_for(message.from_user.id)",
+        "disable_web_page_preview=True",
     )
     reject("app/bot/handlers/start.py", 'await message.answer(\n            "💬",')
     reject("app/bot/handlers/navigation.py", "USER_HELP", "show_help")
@@ -100,18 +105,21 @@ def main() -> None:
         "app/bot/handlers/questions.py",
         '@router.callback_query(F.data.startswith("ask_again:"))',
         "write_more_keyboard(recipient.id)",
-        "texts.QUESTION_PROMO.format(link=personal_link)",
+        'texts.QUESTION_PROMO.format(link=personal_link.removeprefix("https://"))',
+        "personal_link_share_keyboard(personal_link)",
         'payload["parse_mode"] = "HTML"',
         "html.escape(question.text)",
         "current_state == AskQuestion.waiting_for_text.state",
         "await callback.message.delete()",
-        "await bot.send_message(",
+        "disable_web_page_preview=True",
     )
     require(
         "app/bot/handlers/answers.py",
         "answer_share_keyboard(personal_link)",
         "texts.ANSWER_PROMPT",
         "texts.ANSWER_SENT",
+        "texts.ANSWER_RECEIVED.format(answer=html.escape(text))",
+        'payload={"parse_mode": "HTML"}',
     )
     require(
         "app/delivery_worker.py",
@@ -122,7 +130,8 @@ def main() -> None:
     print("Public codes: shortened to 8 characters")
     print("Public menu: one persistent action")
     print("/start: single promo message without inline actions")
-    print("Personal-link action: native copy/share buttons")
+    print("All other promo cards: native copy/share actions")
+    print("Anonymous question/answer actions: 💬 Ответить + 👁️ Узнать кто это")
     print("/cancel: immediate auto-renew disable with final copy")
     print("Reveal consent: Mooncloud terms/privacy/pricing links")
     print("Question and answer UX: final")
