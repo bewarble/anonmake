@@ -6,7 +6,11 @@
     <h2>Наблюдаемость и ошибки</h2>
     <p>Ошибки админки, очереди, неудачные доставки, платежи и история развёртываний.</p>
   </div>
-  <form method="post" action="/admin/platform/observability/delivery/unlock-stale">
+  <form method="post" action="/admin/platform/observability/delivery/unlock-stale"
+        data-confirm-title="Освободить зависшие доставки?"
+        data-confirm="Все delivery-lock старше пяти минут будут сняты, а задания возвращены в очередь."
+        data-confirm-label="Освободить доставки"
+        data-loading-label="Освобождаем…">
     <button class="button-secondary" type="submit">Освободить зависшие доставки</button>
   </form>
 </section>
@@ -74,7 +78,7 @@
           <td class="observability-error-cell">{{ item.last_error or 'Без текста ошибки' }}</td>
           <td>{{ item.updated_at|date_time }}</td>
           <td>
-            <form method="post" action="/admin/platform/observability/delivery/{{ item.id }}/retry">
+            <form method="post" action="/admin/platform/observability/delivery/{{ item.id }}/retry" data-loading-label="Повторяем…">
               <button class="button-secondary compact" type="submit">Повторить</button>
             </form>
           </td>
