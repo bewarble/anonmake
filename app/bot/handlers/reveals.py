@@ -4,6 +4,7 @@ import logging
 from datetime import timedelta
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,11 +17,11 @@ from app.core.config import load_settings
 from app.repositories import QuestionRepository, UserRepository
 from app.repositories.billing import BillingRepository
 from app.repositories.reveals import RevealRepository
+from app.services.crm_tracking import CrmTrackingService
 from app.services.impaya import ImpayaClient
 from app.services.reveal_checkout import RevealCheckoutService
 from app.services.sender_identity import resolve_current_sender
 from app.services.vip import has_active_vip
-from app.services.crm_tracking import CrmTrackingService
 
 router = Router(name="reveals")
 logger = logging.getLogger(__name__)
@@ -30,10 +31,7 @@ def build_client(settings) -> ImpayaClient:
     return ImpayaClient(
         settings.impaya_api_url,
         settings.impaya_api_token,
-        (
-            settings.impaya_binding_terminal_name
-            or settings.impaya_terminal_name
-        ),
+        settings.impaya_binding_terminal_name or settings.impaya_terminal_name,
         auth_header=settings.impaya_auth_header,
         auth_prefix=settings.impaya_auth_prefix,
         protocol_version=settings.impaya_protocol_version,
@@ -51,20 +49,36 @@ async def _load_reveal_context(
     question_id: int,
     context: str,
 ):
-    buyer = await UserRepository(session).upsert_from_telegram(
-        callback.from_user
-    )
+    buyer = await UserRepository(session).upsert_from_telegram(callback.from_user)
     question = await QuestionRepository(session).get_with_users(question_id)
 
     if question is None:
         return buyer, None, None
-
     if context == "question" and question.recipient_id == buyer.id:
         return buyer, question, question.sender
     if context == "answer" and question.sender_id == buyer.id:
         return buyer, question, question.recipient
-
     return buyer, None, None
+
+
+async def _deliver_identity(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    bot: Bot,
+    *,
+    buyer,
+    question,
+    target,
+) -> None:
+    identity = await resolve_current_sender(bot, target)
+    await CrmTrackingService(session).sender_revealed(
+        user_id=buyer.id,
+        question_id=question.id,
+    )
+    await session.commit()
+    await callback.answer()
+    if callback.message:
+        await callback.message.answer(texts.VIP_SENDER.format(sender=identity.label))
 
 
 async def _show_or_reveal(
@@ -85,21 +99,16 @@ async def _show_or_reveal(
         await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
         return
 
-    subscription = await BillingRepository(session).subscription_for_user(
-        buyer.id
-    )
+    subscription = await BillingRepository(session).subscription_for_user(buyer.id)
     if has_active_vip(subscription):
-        identity = await resolve_current_sender(bot, target)
-        await CrmTrackingService(session).sender_revealed(
-            user_id=buyer.id,
-            question_id=question.id,
+        await _deliver_identity(
+            callback,
+            session,
+            bot,
+            buyer=buyer,
+            question=question,
+            target=target,
         )
-        await session.commit()
-        await callback.answer()
-        if callback.message:
-            await callback.message.answer(
-                texts.VIP_SENDER.format(sender=identity.label)
-            )
         return
 
     await callback.answer()
@@ -159,7 +168,11 @@ async def reveal_answerer(
 async def close_reveal(callback: CallbackQuery) -> None:
     await callback.answer()
     if callback.message:
-        await callback.message.delete()
+        try:
+            await callback.message.delete()
+        except TelegramBadRequest:
+            # Repeated taps / old messages are normal user behavior, not incidents.
+            pass
 
 
 @router.callback_query(F.data.startswith("reveal_confirm:"))
@@ -169,7 +182,7 @@ async def confirm_reveal(
     bot: Bot,
 ) -> None:
     parts = (callback.data or "").split(":")
-    if len(parts) != 3:
+    if len(parts) != 3 or parts[1] not in {"question", "answer"}:
         await callback.answer(texts.INVALID_LINK, show_alert=True)
         return
 
@@ -190,11 +203,24 @@ async def confirm_reveal(
         await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
         return
 
+    # The user may return to an old consent button after payment already finished.
+    # In that case reveal immediately instead of attempting another checkout.
+    subscription = await BillingRepository(session).subscription_for_user(buyer.id)
+    if has_active_vip(subscription):
+        await _deliver_identity(
+            callback,
+            session,
+            bot,
+            buyer=buyer,
+            question=question,
+            target=target,
+        )
+        return
+
     settings = load_settings()
     if not settings.billing_enabled:
         await callback.answer(texts.VIP_PAYMENT_UNAVAILABLE, show_alert=True)
         return
-
     if (
         not settings.impaya_api_token.strip()
         or not settings.impaya_payment_form_url_template.strip()
@@ -237,7 +263,13 @@ async def confirm_reveal(
 
     await callback.answer()
     if callback.message:
-        await callback.message.edit_text(
-            texts.REVEAL_PAYMENT_READY,
-            reply_markup=reveal_checkout_keyboard(payment_url=payment_url),
-        )
+        try:
+            await callback.message.edit_text(
+                texts.REVEAL_PAYMENT_READY,
+                reply_markup=reveal_checkout_keyboard(payment_url=payment_url),
+            )
+        except TelegramBadRequest as exc:
+            # "message is not modified" after a double tap is benign. Other edit
+            # failures should still be visible in logs and global diagnostics.
+            if "message is not modified" not in str(exc).lower():
+                raise
