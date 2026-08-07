@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import html
 import logging
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import answer_question_keyboard, main_menu_for
+from app.bot.keyboards.questions import cancel_keyboard, write_more_keyboard
 from app.bot.states import AskQuestion
 from app.core import texts
+from app.core.bot_context import require_current_bot
 from app.core.config import load_settings
 from app.repositories import QuestionRepository, UserRepository
 from app.repositories.delivery import DeliveryRepository
@@ -49,6 +52,44 @@ async def cancel_callback(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.message.answer(
             texts.CANCELLED,
             reply_markup=main_menu_for(callback.from_user.id),
+        )
+
+
+@router.callback_query(F.data.startswith("ask_again:"))
+async def ask_again(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    if callback.from_user is None or callback.data is None:
+        return
+
+    try:
+        recipient_id = int(callback.data.split(":", maxsplit=1)[1])
+    except (ValueError, IndexError):
+        await state.clear()
+        await callback.answer(texts.INVALID_LINK, show_alert=True)
+        return
+
+    users = UserRepository(session)
+    sender = await users.upsert_from_telegram(callback.from_user)
+    recipient = await users.get_by_id(recipient_id)
+    if recipient is None:
+        await state.clear()
+        await callback.answer(texts.QUESTION_RECIPIENT_MISSING, show_alert=True)
+        return
+    if recipient.id == sender.id:
+        await state.clear()
+        await callback.answer(texts.SELF_MESSAGE, show_alert=True)
+        return
+
+    await state.set_state(AskQuestion.waiting_for_text)
+    await state.update_data(recipient_id=recipient.id)
+    await callback.answer()
+    if callback.message:
+        await callback.message.answer(
+            texts.QUESTION_PROMPT,
+            reply_markup=cancel_keyboard(),
         )
 
 
@@ -136,18 +177,26 @@ async def receive_question(
         question.status = "queued"
 
         markup = answer_question_keyboard(question.id)
+        escaped_text = html.escape(question.text)
         delivery_text = (
-            texts.NEW_QUESTION.format(text=question.text)
+            texts.NEW_QUESTION.format(text=escaped_text)
             if content.content_type == "text"
-            else "💌 Новое анонимное сообщение"
+            else texts.NEW_QUESTION_HEADER
         )
+        payload = delivery_payload(content) or {}
+        payload["parse_mode"] = "HTML"
+        if content.content_type != "text" and content.caption:
+            payload["caption"] = (
+                f"{texts.NEW_QUESTION_HEADER}\n\n{html.escape(content.caption)}"
+            )
+
         await DeliveryRepository(session).enqueue(
             kind="question",
             dedupe_key=f"question:{question.id}",
             chat_id=recipient.telegram_id,
             text=delivery_text,
             reply_markup=serialize_markup(markup),
-            payload=delivery_payload(content),
+            payload=payload,
         )
 
         tracking = CrmTrackingService(session)
@@ -177,5 +226,12 @@ async def receive_question(
     await state.clear()
     await message.answer(
         texts.QUESTION_SENT,
+        reply_markup=write_more_keyboard(recipient.id),
+    )
+
+    current_bot = require_current_bot()
+    personal_link = f"t.me/{current_bot.username}?start={sender.public_code}"
+    await message.answer(
+        texts.QUESTION_PROMO.format(link=personal_link),
         reply_markup=main_menu_for(message.from_user.id),
     )
