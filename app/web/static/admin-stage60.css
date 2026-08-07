@@ -1,0 +1,19 @@
+/* Stage 60 — platform runtime health and incident control. */
+.runtime-health-panel{overflow:hidden}
+.runtime-health-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.runtime-health-card{min-width:0;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);display:grid;gap:8px}
+.runtime-health-card.healthy{border-color:rgba(82,211,167,.24)}
+.runtime-health-card.degraded,.runtime-health-card.unknown{border-color:rgba(255,184,77,.3)}
+.runtime-health-card.down{border-color:rgba(255,113,133,.36);background:rgba(255,113,133,.04)}
+.runtime-health-title{display:flex;align-items:center;gap:9px;min-width:0}
+.runtime-health-title strong{font-size:16px;overflow-wrap:anywhere}
+.runtime-health-card p{margin:0;color:var(--text);font-weight:700}
+.runtime-health-card>small{color:var(--muted)}
+.runtime-health-details{display:flex;gap:6px;flex-wrap:wrap;padding-top:4px}
+.runtime-health-details span{max-width:100%;padding:4px 7px;border-radius:8px;background:rgba(255,255,255,.04);color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+.runtime-health-details b{color:var(--text)}
+.incident-summary{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025)}
+.incident-summary.healthy{border-color:rgba(82,211,167,.22)}
+.incident-summary.warning{border-color:rgba(255,184,77,.26)}
+.incident-summary span{color:var(--muted);font-size:12px;text-align:right}
+@media(max-width:900px){.runtime-health-grid{grid-template-columns:1fr}.incident-summary{align-items:flex-start;flex-direction:column}.incident-summary span{text-align:left}}
