@@ -8,7 +8,7 @@ def require(path, *needles):
 
 def main():
     require('app/web/static/admin-stage55.css',
-            'overflow-x:hidden', 'viewport-fit=cover', 'safe-area-inset-bottom',
+            'overflow-x:hidden', 'safe-area-inset-bottom',
             'grid-template-columns:minmax(0,1fr)!important', 'table-wrap',
             'period-tabs', 'admin-action-dialog', '@media(max-width:390px)')
     require('app/web/templates/base.html',
