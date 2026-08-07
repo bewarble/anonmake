@@ -4,16 +4,12 @@
   <div>
     <span class="eyebrow">Стабильность платформы</span>
     <h2>Наблюдаемость и ошибки</h2>
-    <p>Очереди, неудачные доставки, ошибки платежей и история неудачных развёртываний.</p>
+    <p>Ошибки админки, очереди, неудачные доставки, платежи и история развёртываний.</p>
   </div>
   <form method="post" action="/admin/platform/observability/delivery/unlock-stale">
     <button class="button-secondary" type="submit">Освободить зависшие доставки</button>
   </form>
 </section>
-
-{% if notice %}
-<section class="notice success">Операция выполнена: {{ notice }}</section>
-{% endif %}
 
 <section class="system-status-grid observability-summary-grid">
   <article class="system-status-card {{ 'warning' if delivery_counts.get('pending', 0) else 'healthy' }}">
@@ -32,6 +28,32 @@
     <span class="system-status-dot"></span>
     <div><small>Самое старое ожидание</small><strong>{{ oldest_pending|date_time if oldest_pending else 'Очередь пуста' }}</strong></div>
   </article>
+</section>
+
+<section class="panel system-panel">
+  <div class="panel-heading">
+    <div><span class="eyebrow">Stage 50</span><h3>Последние ошибки админки</h3><p>Без traceback, секретов и текста исключений. Для диагностики используйте идентификатор ошибки.</p></div>
+    <span class="status-badge {{ 'warning' if recent_admin_errors else 'healthy' }}">{{ recent_admin_errors|length }} показано</span>
+  </div>
+  <div class="observability-table-wrap">
+    <table class="observability-table">
+      <thead><tr><th>Ошибка</th><th>Статус</th><th>Маршрут</th><th>Администратор</th><th>Проект</th><th>Время</th></tr></thead>
+      <tbody>
+      {% for item in recent_admin_errors %}
+        <tr>
+          <td><code>{{ item.error_id }}</code></td>
+          <td><span class="status-badge {{ 'danger' if item.status and item.status >= 500 else 'warning' }}">{{ item.status or '—' }}</span></td>
+          <td><code>{{ item.method }} {{ item.route }}</code></td>
+          <td>{{ item.admin }}</td>
+          <td>{{ item.project }}</td>
+          <td>{{ item.created_at|date_time }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="empty">Ошибок админки в журнале пока нет.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
 
 <section class="panel system-panel">
