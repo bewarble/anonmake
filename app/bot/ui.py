@@ -6,7 +6,6 @@ duplicating visible text. This keeps emoji and wording changes safe.
 
 # User menu
 USER_PERSONAL_LINK = "💬 Начать получать сообщения"
-USER_HELP = "❓ Как получать сообщения?"
 
 # Admin menu
 ADMIN_STATISTICS = "📊 Статистика"
