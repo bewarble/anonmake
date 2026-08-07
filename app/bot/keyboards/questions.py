@@ -61,7 +61,8 @@ def write_more_keyboard(recipient_id: int) -> InlineKeyboardMarkup:
 
 
 def answer_share_keyboard(link: str) -> InlineKeyboardMarkup:
-    short_link = link.removeprefix("https://")
+    full_link = link if link.startswith("https://") else f"https://{link}"
+    short_link = full_link.removeprefix("https://")
     share_text = f"Отправь мне анонимное сообщение 👉 {short_link}"
     encoded_text = quote(share_text, safe="")
     return InlineKeyboardMarkup(
@@ -69,7 +70,7 @@ def answer_share_keyboard(link: str) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="🔗 Скопировать ссылку",
-                    copy_text=CopyTextButton(text=short_link),
+                    copy_text=CopyTextButton(text=full_link),
                 )
             ],
             [
