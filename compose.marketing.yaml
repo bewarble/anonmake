@@ -19,6 +19,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      runtime-health-init:
+        condition: service_completed_successfully
     networks:
       - anonmake
     stop_grace_period: 30s
