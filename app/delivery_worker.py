@@ -17,6 +17,7 @@ from aiogram.exceptions import (
 from app.core.config import load_settings
 from app.core.logging import configure_logging
 from app.core.performance import WORKER_BATCHES, WORKER_BATCH_SIZE, WORKER_IDLE_SECONDS, next_idle_delay
+from app.core.worker_health import mark_worker_heartbeat
 from app.database.session import SessionFactory, close_database, init_database
 from app.models.bot_instance import BotInstance
 from app.repositories.delivery import DeliveryRepository
@@ -28,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 def retry_delay(attempt: int) -> int:
     return min(300, 2 ** min(attempt + 1, 8))
-
 
 
 async def send_delivery(bot: Bot, job):
@@ -45,10 +45,7 @@ async def send_delivery(bot: Bot, job):
             reply_markup=markup,
         )
 
-    common = {
-        "chat_id": job.chat_id,
-        "reply_markup": markup,
-    }
+    common = {"chat_id": job.chat_id, "reply_markup": markup}
     if content_type == "photo":
         return await bot.send_photo(photo=file_id, caption=caption, **common)
     if content_type == "video":
@@ -101,15 +98,9 @@ async def main() -> None:
     settings = load_settings()
     configure_logging(settings.log_level, settings.json_logs)
 
-    worker_id = (
-        os.getenv("DELIVERY_WORKER_ID")
-        or f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
-    )
+    worker_id = os.getenv("DELIVERY_WORKER_ID") or f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
     interval = float(os.getenv("DELIVERY_POLL_INTERVAL_SECONDS", "1"))
-    idle_max = float(os.getenv(
-        "DELIVERY_IDLE_MAX_SECONDS",
-        str(settings.worker_idle_max_seconds),
-    ))
+    idle_max = float(os.getenv("DELIVERY_IDLE_MAX_SECONDS", str(settings.worker_idle_max_seconds)))
     idle_delay = interval
     batch_size = int(os.getenv("DELIVERY_BATCH_SIZE", "100"))
     max_attempts = int(os.getenv("DELIVERY_MAX_ATTEMPTS", "10"))
@@ -117,14 +108,13 @@ async def main() -> None:
 
     bot_pool = BotPool(settings)
     await init_database()
+    mark_worker_heartbeat("delivery-worker", state="started", worker_id=worker_id)
 
-    logger.info(
-        "Delivery worker started",
-        extra={"worker_id": worker_id},
-    )
+    logger.info("Delivery worker started", extra={"worker_id": worker_id})
 
     try:
         while True:
+            mark_worker_heartbeat("delivery-worker", state="polling", worker_id=worker_id)
             async with SessionFactory() as session:
                 repository = DeliveryRepository(session)
                 jobs = await repository.claim_batch(
@@ -137,6 +127,12 @@ async def main() -> None:
             if not jobs:
                 WORKER_BATCHES.labels("delivery", "empty").inc()
                 WORKER_IDLE_SECONDS.labels("delivery").set(idle_delay)
+                mark_worker_heartbeat(
+                    "delivery-worker",
+                    state="idle",
+                    worker_id=worker_id,
+                    idle_seconds=idle_delay,
+                )
                 await asyncio.sleep(idle_delay)
                 idle_delay = next_idle_delay(idle_delay, interval, idle_max)
                 continue
@@ -145,6 +141,12 @@ async def main() -> None:
             WORKER_BATCH_SIZE.labels("delivery").observe(len(jobs))
             idle_delay = interval
             WORKER_IDLE_SECONDS.labels("delivery").set(idle_delay)
+            mark_worker_heartbeat(
+                "delivery-worker",
+                state="processing",
+                worker_id=worker_id,
+                batch_size=len(jobs),
+            )
 
             for claimed in jobs:
                 async with SessionFactory() as session:
@@ -155,10 +157,7 @@ async def main() -> None:
                     instance = await session.get(BotInstance, job.bot_id)
                     if instance is None:
                         repository = DeliveryRepository(session)
-                        await repository.mark_failed(
-                            job,
-                            error=f"Unknown bot instance: {job.bot_id}",
-                        )
+                        await repository.mark_failed(job, error=f"Unknown bot instance: {job.bot_id}")
                         await session.commit()
                         continue
 
@@ -170,18 +169,11 @@ async def main() -> None:
                         await session.commit()
                         continue
 
-                    status, value, error = await deliver_job(
-                        bot,
-                        job,
-                        max_attempts,
-                    )
+                    status, value, error = await deliver_job(bot, job, max_attempts)
 
                     repository = DeliveryRepository(session)
                     if status == "delivered":
-                        await repository.mark_delivered(
-                            job,
-                            telegram_message_id=int(value),
-                        )
+                        await repository.mark_delivered(job, telegram_message_id=int(value))
                     elif status == "retry" and job.attempts + 1 < max_attempts:
                         await repository.mark_retry(
                             job,
@@ -189,12 +181,16 @@ async def main() -> None:
                             delay_seconds=int(value),
                         )
                     else:
-                        await repository.mark_failed(
-                            job,
-                            error=str(value),
-                        )
+                        await repository.mark_failed(job, error=str(value))
 
                     await session.commit()
+                    mark_worker_heartbeat(
+                        "delivery-worker",
+                        state="processing",
+                        worker_id=worker_id,
+                        last_job_id=job.id,
+                        last_job_status=status,
+                    )
     finally:
         await bot_pool.close()
         await close_database()

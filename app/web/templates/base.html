@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ title }} · AnonMake</title>
-  <link rel="stylesheet" href="/admin/static/admin-ui.css?v=47">
+  <link rel="stylesheet" href="/admin/static/admin-ui.css?v=48">
 </head>
 <body>
   <div class="app-shell">
@@ -40,9 +40,11 @@
         <a class="{{ 'active' if section == 'performance' else '' }}" href="/admin/performance"><i>⚡</i><span>Производительность</span></a>
 
         {% if current_admin and current_admin.is_superadmin %}
+        <span class="nav-section">Управление платформой</span>
         <a href="/admin/platform/admins" class="{% if section == 'platform_admins' %}active{% endif %}">Администраторы</a>
         <a href="/admin/platform/payments" class="{% if section == 'platform_payments' %}active{% endif %}">Платёжные системы</a>
         <a href="/admin/platform/system" class="{% if section == 'platform_system' %}active{% endif %}">Система</a>
+        <a href="/admin/platform/observability" class="{% if section == 'platform_observability' %}active{% endif %}">Наблюдаемость</a>
         {% endif %}
 </nav>
 
@@ -106,9 +108,10 @@
         <a href="/admin/delivery">Доставка <kbd>D</kbd></a>
         <a href="/admin/performance">Производительность <kbd>F</kbd></a>
         <a href="/admin/platform/system">Система</a>
+        <a href="/admin/platform/observability">Наблюдаемость</a>
       </div>
     </div>
   </div>
-  <script src="/admin/static/admin-ui.js?v=47" defer></script>
+  <script src="/admin/static/admin-ui.js?v=48" defer></script>
 </body>
 </html>

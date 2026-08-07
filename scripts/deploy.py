@@ -9,6 +9,7 @@ import shlex
 import subprocess
 import sys
 import time
+from typing import Callable, TypeVar
 
 ROOT = Path(__file__).resolve().parents[1]
 VAR_DIR = ROOT / "var"
@@ -28,6 +29,7 @@ DEFAULT_SERVICES = (
     "broadcast-worker",
     "managed-bots",
 )
+T = TypeVar("T")
 
 
 class DeployError(RuntimeError):
@@ -106,6 +108,27 @@ def backup_database(timestamp: str) -> Path:
     return destination
 
 
+def cleanup_backups(retain: int) -> list[str]:
+    if retain <= 0:
+        return []
+    try:
+        backups = sorted(
+            BACKUP_DIR.glob("anonmake-before-*.dump"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError:
+        return []
+    removed: list[str] = []
+    for path in backups[retain:]:
+        try:
+            path.unlink()
+            removed.append(path.name)
+        except OSError:
+            continue
+    return removed
+
+
 def alembic_head_from_source() -> str:
     return output([
         sys.executable,
@@ -178,6 +201,39 @@ def service_snapshot(services: tuple[str, ...]) -> dict[str, dict[str, str]]:
     return snapshot
 
 
+def wait_for_services(services: tuple[str, ...], timeout_seconds: int) -> dict[str, dict[str, str]]:
+    deadline = time.monotonic() + timeout_seconds
+    last_snapshot: dict[str, dict[str, str]] = {}
+    while time.monotonic() < deadline:
+        last_snapshot = service_snapshot(services)
+        if all(
+            info.get("state") == "running" and info.get("health") == "healthy"
+            for info in last_snapshot.values()
+        ):
+            print("Healthcheck сервисов: OK")
+            return last_snapshot
+        if any(info.get("health") == "unhealthy" for info in last_snapshot.values()):
+            break
+        time.sleep(3)
+    details = ", ".join(
+        f"{name}={info.get('state')}/{info.get('health') or '-'}"
+        for name, info in last_snapshot.items()
+    )
+    raise DeployError(f"Не все сервисы стали healthy: {details or 'нет данных'}")
+
+
+def run_migrations() -> None:
+    result = compose("run", "--rm", "migrate", capture=True, check=False)
+    if result.stdout.strip():
+        print(result.stdout.strip())
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        raise DeployError(
+            "Миграции завершились с ошибкой"
+            + (f": {stderr[-4000:]}" if stderr else ".")
+        )
+
+
 def write_state(payload: dict) -> None:
     VAR_DIR.mkdir(parents=True, exist_ok=True)
     temporary = STATE_FILE.with_suffix(".tmp")
@@ -196,6 +252,7 @@ def main() -> None:
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--skip-backup", action="store_true")
     parser.add_argument("--health-timeout", type=int, default=120)
+    parser.add_argument("--backup-retain", type=int, default=10)
     parser.add_argument(
         "--services",
         nargs="+",
@@ -212,31 +269,58 @@ def main() -> None:
     backup_path: Path | None = None
     source_head = ""
     database_head_before = ""
+    current_step = "инициализация"
+    step_durations: dict[str, float] = {}
+    service_state: dict[str, dict[str, str]] = {}
+
+    def step(name: str, function: Callable[[], T]) -> T:
+        nonlocal current_step
+        current_step = name
+        print(f"\n--- {name} ---", flush=True)
+        started = time.monotonic()
+        try:
+            return function()
+        finally:
+            step_durations[name] = round(time.monotonic() - started, 2)
 
     try:
-        ensure_clean_git(args.allow_dirty)
-        run([sys.executable, "-m", "scripts.release_check"])
-        compose("config", "--quiet")
-        source_head = alembic_head_from_source()
-        database_head_before = current_database_head()
+        step("Проверка Git", lambda: ensure_clean_git(args.allow_dirty))
+        step("Статические проверки", lambda: run([sys.executable, "-m", "scripts.release_check"]))
+        step("Проверка Compose", lambda: compose("config", "--quiet"))
+        source_head = step("Чтение Alembic head", alembic_head_from_source)
+        database_head_before = step("Чтение версии БД", current_database_head)
 
         if not args.skip_backup:
-            backup_path = backup_database(timestamp)
+            backup_path = step("Резервная копия PostgreSQL", lambda: backup_database(timestamp))
 
         if not args.skip_build:
-            compose("build", *services)
+            step("Сборка образов", lambda: compose("build", *services))
 
-        compose("run", "--rm", "migrate")
-        compose("up", "-d", "--force-recreate", "--no-deps", *services)
-        wait_for_web(args.health_timeout)
-        compose("exec", "-T", "web", "python", "-m", "scripts.release_check", "--runtime-only")
+        step("Миграции", run_migrations)
+        step(
+            "Пересоздание сервисов",
+            lambda: compose("up", "-d", "--force-recreate", "--no-deps", *services),
+        )
+        step("Web healthcheck", lambda: wait_for_web(args.health_timeout))
+        service_state = step(
+            "Healthcheck сервисов",
+            lambda: wait_for_services(services, args.health_timeout),
+        )
+        step(
+            "Runtime проверки",
+            lambda: compose("exec", "-T", "web", "python", "-m", "scripts.release_check", "--runtime-only"),
+        )
 
-        database_head_after = current_database_head()
+        database_head_after = step("Финальная версия БД", current_database_head)
         if database_head_after != source_head:
             raise DeployError(
                 f"Версия БД {database_head_after!r} не совпадает с Alembic head {source_head!r}."
             )
 
+        removed_backups = step(
+            "Ротация резервных копий",
+            lambda: cleanup_backups(args.backup_retain),
+        )
         completed_at = datetime.now(timezone.utc)
         payload = {
             "status": "success",
@@ -248,7 +332,10 @@ def main() -> None:
             "alembic_head": database_head_after,
             "previous_alembic_head": database_head_before,
             "backup_path": str(backup_path.relative_to(ROOT)) if backup_path else None,
-            "services": service_snapshot(services),
+            "backup_retention": args.backup_retain,
+            "removed_backups": removed_backups,
+            "steps": step_durations,
+            "services": service_state or service_snapshot(services),
         }
         write_state(payload)
         print("\nДеплой успешно завершён.")
@@ -262,6 +349,8 @@ def main() -> None:
             "started_at": started_at.isoformat(),
             "completed_at": failed_at.isoformat(),
             "duration_seconds": round((failed_at - started_at).total_seconds(), 2),
+            "failed_step": current_step,
+            "steps": step_durations,
             "alembic_head": source_head or None,
             "previous_alembic_head": database_head_before or None,
             "backup_path": str(backup_path.relative_to(ROOT)) if backup_path else None,
@@ -269,8 +358,11 @@ def main() -> None:
             "services": service_snapshot(services),
         }
         write_state(payload)
-        print(f"\nДеплой остановлен: {exc}", file=sys.stderr)
-        print("Предыдущие контейнеры не удаляются автоматически; резервная копия сохранена.", file=sys.stderr)
+        print(f"\nДеплой остановлен на шаге «{current_step}»: {exc}", file=sys.stderr)
+        print(
+            "Предыдущие контейнеры не удаляются автоматически; резервная копия сохранена.",
+            file=sys.stderr,
+        )
         raise SystemExit(1) from exc
 
 

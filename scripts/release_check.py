@@ -22,6 +22,7 @@ STATIC_CHECKS = (
     "scripts.check_stage_45",
     "scripts.check_stage_46",
     "scripts.check_stage_47",
+    "scripts.check_stage_48",
     "scripts.check_full_audit",
     "scripts.check_stage_36",
     "scripts.check_project",
@@ -58,9 +59,7 @@ def run_module(module: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="AnonMake release readiness checks"
-    )
+    parser = argparse.ArgumentParser(description="AnonMake release readiness checks")
     parser.add_argument(
         "--runtime",
         action="store_true",

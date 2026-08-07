@@ -12,6 +12,7 @@ from app.core import texts
 from app.core.config import load_settings
 from app.core.logging import configure_logging
 from app.core.performance import WORKER_BATCHES, WORKER_BATCH_SIZE, WORKER_IDLE_SECONDS, next_idle_delay
+from app.core.worker_health import mark_worker_heartbeat
 from app.database.session import SessionFactory, close_database, init_database
 from app.models.billing import Subscription
 from app.models.question import Question
@@ -26,10 +27,7 @@ logger = logging.getLogger(__name__)
 async def audience_users(session, item, batch_size: int) -> list[User]:
     query = (
         select(User)
-        .where(
-            User.bot_id == item.bot_id,
-            User.id > item.cursor_user_id,
-        )
+        .where(User.bot_id == item.bot_id, User.id > item.cursor_user_id)
         .order_by(User.id)
         .limit(batch_size)
     )
@@ -55,15 +53,10 @@ async def audience_users(session, item, batch_size: int) -> list[User]:
 
 async def configured_sender(session, telegram_id: int, bot_id: int) -> User:
     sender = await session.scalar(
-        select(User).where(
-            User.bot_id == bot_id,
-            User.telegram_id == telegram_id,
-        )
+        select(User).where(User.bot_id == bot_id, User.telegram_id == telegram_id)
     )
     if sender is None:
-        raise RuntimeError(
-            "BROADCAST_SENDER_TELEGRAM_ID does not belong to this bot"
-        )
+        raise RuntimeError("BROADCAST_SENDER_TELEGRAM_ID does not belong to this bot")
     return sender
 
 
@@ -81,7 +74,6 @@ async def enqueue_broadcast_batch(session, *, item, users: list[User], sender: U
         await session.flush()
 
         markup = answer_question_keyboard(question.id)
-
         await delivery.enqueue(
             kind="broadcast_question",
             dedupe_key=f"broadcast:{item.id}:user:{recipient.id}",
@@ -103,16 +95,15 @@ async def main() -> None:
 
     interval = float(os.getenv("BROADCAST_POLL_INTERVAL_SECONDS", "3"))
     batch_size = int(os.getenv("BROADCAST_BATCH_SIZE", "500"))
-    idle_max = float(os.getenv(
-        "BROADCAST_IDLE_MAX_SECONDS",
-        str(settings.worker_idle_max_seconds),
-    ))
+    idle_max = float(os.getenv("BROADCAST_IDLE_MAX_SECONDS", str(settings.worker_idle_max_seconds)))
     idle_delay = interval
 
+    mark_worker_heartbeat("broadcast-worker", state="started")
     logger.info("Broadcast worker started")
 
     try:
         while True:
+            mark_worker_heartbeat("broadcast-worker", state="polling")
             async with SessionFactory() as session:
                 repository = MarketingRepository(session)
                 item = await repository.next_broadcast()
@@ -121,38 +112,51 @@ async def main() -> None:
                     await session.rollback()
                     WORKER_BATCHES.labels("broadcast", "empty").inc()
                     WORKER_IDLE_SECONDS.labels("broadcast").set(idle_delay)
+                    mark_worker_heartbeat(
+                        "broadcast-worker",
+                        state="idle",
+                        idle_seconds=idle_delay,
+                    )
                     await asyncio.sleep(idle_delay)
                     idle_delay = next_idle_delay(idle_delay, interval, idle_max)
                     continue
 
                 idle_delay = interval
                 WORKER_IDLE_SECONDS.labels("broadcast").set(idle_delay)
-
-                sender = await configured_sender(
-                    session,
-                    sender_telegram_id,
-                    item.bot_id,
+                mark_worker_heartbeat(
+                    "broadcast-worker",
+                    state="processing",
+                    broadcast_id=item.id,
+                    bot_id=item.bot_id,
                 )
+
+                sender = await configured_sender(session, sender_telegram_id, item.bot_id)
                 await repository.mark_broadcast_started(item)
                 users = await audience_users(session, item, batch_size)
 
                 if not users:
                     await repository.mark_broadcast_completed(item)
                     await session.commit()
+                    mark_worker_heartbeat(
+                        "broadcast-worker",
+                        state="completed",
+                        broadcast_id=item.id,
+                    )
                     continue
 
-                await enqueue_broadcast_batch(
-                    session,
-                    item=item,
-                    users=users,
-                    sender=sender,
-                )
+                await enqueue_broadcast_batch(session, item=item, users=users, sender=sender)
                 WORKER_BATCHES.labels("broadcast", "queued").inc()
                 WORKER_BATCH_SIZE.labels("broadcast").observe(len(users))
 
                 item.cursor_user_id = users[-1].id
                 item.queued_count += len(users)
                 await session.commit()
+                mark_worker_heartbeat(
+                    "broadcast-worker",
+                    state="processing",
+                    broadcast_id=item.id,
+                    queued_count=item.queued_count,
+                )
     finally:
         await close_database()
 

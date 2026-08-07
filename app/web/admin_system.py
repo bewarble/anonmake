@@ -42,7 +42,11 @@ def _source_head() -> str:
 
 def _last_backup() -> dict | None:
     try:
-        files = sorted(BACKUP_DIR.glob("*.dump"), key=lambda path: path.stat().st_mtime, reverse=True)
+        files = sorted(
+            BACKUP_DIR.glob("*.dump"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
     except OSError:
         return None
     if not files:
@@ -71,20 +75,34 @@ async def system_page(request: Request):
     try:
         async with SessionFactory() as session:
             postgres_ok = bool(await session.scalar(text("SELECT TRUE")))
-            database_head = str(await session.scalar(text("SELECT version_num FROM alembic_version")) or "Не определена")
-            queues["delivery"] = int(await session.scalar(
-                select(func.count(DeliveryOutbox.id)).where(
-                    DeliveryOutbox.status.in_(("pending", "processing"))
+            database_head = str(
+                await session.scalar(text("SELECT version_num FROM alembic_version"))
+                or "Не определена"
+            )
+            queues["delivery"] = int(
+                await session.scalar(
+                    select(func.count(DeliveryOutbox.id)).where(
+                        DeliveryOutbox.status.in_(("pending", "processing"))
+                    )
                 )
-            ) or 0)
-            queues["broadcasts"] = int(await session.scalar(
-                select(func.count(Broadcast.id)).where(
-                    Broadcast.status.in_(("scheduled", "processing"))
+                or 0
+            )
+            queues["broadcasts"] = int(
+                await session.scalar(
+                    select(func.count(Broadcast.id)).where(
+                        Broadcast.status.in_(("scheduled", "processing"))
+                    )
                 )
-            ) or 0)
-            queues["payments"] = int(await session.scalar(
-                select(func.count(PaymentAttempt.id)).where(PaymentAttempt.status == "pending")
-            ) or 0)
+                or 0
+            )
+            queues["payments"] = int(
+                await session.scalar(
+                    select(func.count(PaymentAttempt.id)).where(
+                        PaymentAttempt.status == "pending"
+                    )
+                )
+                or 0
+            )
     except Exception:
         postgres_ok = False
 
@@ -112,3 +130,15 @@ async def system_page(request: Request):
             last_backup=_last_backup(),
         ),
     )
+
+
+# Stage 48 observability routes share the platform operations registration point.
+from app.web import admin_observability as admin_observability_module  # noqa: E402
+
+for observability_route in admin_observability_module.router.routes:
+    if not any(
+        getattr(existing, "path", None) == getattr(observability_route, "path", None)
+        and getattr(existing, "methods", None) == getattr(observability_route, "methods", None)
+        for existing in router.routes
+    ):
+        router.routes.append(observability_route)
