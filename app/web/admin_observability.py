@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select, update
 
 from app.core.error_diagnostics import decode_bot_error_event
+from app.core.platform_health import overall_runtime_status, runtime_health_snapshot
 from app.database.session import SessionFactory
 from app.models.admin import AdminAuditLog
 from app.models.billing import PaymentAttempt
@@ -57,6 +58,9 @@ def _failed_deploys(limit: int = 20) -> list[dict]:
 async def observability_page(request: Request):
     if require_superadmin(request) is None:
         return login_redirect(request)
+
+    runtime_health = runtime_health_snapshot()
+    runtime_status = overall_runtime_status(runtime_health)
 
     async with SessionFactory() as session:
         bots = list((await session.execute(select(BotInstance).order_by(BotInstance.id))).scalars())
@@ -121,6 +125,10 @@ async def observability_page(request: Request):
         )
         recent_bot_errors = [decode_bot_error_event(row) for row in bot_error_rows]
 
+    incident_count = sum(row.status != "healthy" for row in runtime_health)
+    incident_count += int(delivery_counts.get("failed", 0) > 0)
+    incident_count += int(bool(recent_bot_errors))
+
     return templates.TemplateResponse(
         request=request,
         name="platform_observability.html",
@@ -128,6 +136,9 @@ async def observability_page(request: Request):
             request,
             title="Наблюдаемость",
             section="platform_observability",
+            runtime_health=runtime_health,
+            runtime_status=runtime_status,
+            incident_count=incident_count,
             delivery_counts=delivery_counts,
             oldest_pending=oldest_pending,
             failed_deliveries=failed_deliveries,
