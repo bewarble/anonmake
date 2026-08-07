@@ -14,10 +14,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_constraint("answers_question_id_key", "answers", type_="unique")
+    op.drop_index("ix_answers_question_id", table_name="answers")
+    op.drop_constraint("uq_answers_question_id", "answers", type_="unique")
+    op.create_index("ix_answers_question_id", "answers", ["question_id"], unique=False)
 
 
 def downgrade() -> None:
-    # Downgrade is intentionally guarded by PostgreSQL: if multiple replies were
-    # already created for one question, restoring uniqueness would be lossy.
-    op.create_unique_constraint("answers_question_id_key", "answers", ["question_id"])
+    # PostgreSQL will refuse this downgrade rather than silently discard replies
+    # if a question already has more than one answer.
+    op.drop_index("ix_answers_question_id", table_name="answers")
+    op.create_unique_constraint("uq_answers_question_id", "answers", ["question_id"])
+    op.create_index("ix_answers_question_id", "answers", ["question_id"], unique=True)
