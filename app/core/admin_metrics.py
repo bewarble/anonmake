@@ -79,20 +79,40 @@ class AdminMetricsRepository:
             points.append(RevenuePoint(label=left.strftime("%d.%m"), revenue_kopecks=revenue))
         return points
 
+    def _latest_permanent_failures(self):
+        return (
+            select(
+                User.id.label("user_id"),
+                func.max(DeliveryOutbox.updated_at).label("blocked_at"),
+            )
+            .join(
+                DeliveryOutbox,
+                (DeliveryOutbox.chat_id == User.telegram_id)
+                & (DeliveryOutbox.bot_id == User.bot_id),
+            )
+            .where(
+                User.bot_id == self.bot_id,
+                DeliveryOutbox.bot_id == self.bot_id,
+                DeliveryOutbox.status == "failed",
+                or_(*(DeliveryOutbox.last_error.ilike(pattern) for pattern in PERMANENT_ERRORS)),
+            )
+            .group_by(User.id)
+            .subquery()
+        )
+
     async def export_user_ids(self, *, alive_only: bool) -> bytes:
         query = select(User.telegram_id).where(User.bot_id == self.bot_id).order_by(User.id)
         if alive_only:
-            dead_users = (
+            latest_failure = self._latest_permanent_failures()
+            currently_dead = (
                 select(User.id)
-                .join(DeliveryOutbox, DeliveryOutbox.chat_id == User.telegram_id)
+                .join(latest_failure, latest_failure.c.user_id == User.id)
                 .where(
                     User.bot_id == self.bot_id,
-                    DeliveryOutbox.bot_id == self.bot_id,
-                    DeliveryOutbox.status == "failed",
-                    or_(*(DeliveryOutbox.last_error.ilike(pattern) for pattern in PERMANENT_ERRORS)),
+                    latest_failure.c.blocked_at > User.updated_at,
                 )
             )
-            query = query.where(User.id.not_in(dead_users))
+            query = query.where(User.id.not_in(currently_dead))
         result = await self.session.execute(query)
         values = [str(value) for value in result.scalars()]
         return ("\n".join(values) + ("\n" if values else "")).encode("utf-8")
