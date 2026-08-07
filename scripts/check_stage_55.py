@@ -13,7 +13,7 @@ def main():
             'period-tabs', 'admin-action-dialog', '@media(max-width:390px)',
             '.header-search{display:none!important}', '.command-overlay{display:none!important}')
     require('app/web/templates/base.html',
-            'viewport-fit=cover', 'admin-stage55.css?v=55')
+            'viewport-fit=cover', 'admin-stage55.css?v=')
     require('scripts/audit_active_web_assets.py', '"admin-stage55.css"')
     assert not list((ROOT / 'migrations/versions').glob('*stage_55*'))
     print('Stage 55 check: OK')
