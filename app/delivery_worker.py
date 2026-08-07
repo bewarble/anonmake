@@ -38,15 +38,21 @@ async def send_delivery(bot: Bot, job):
     content_type = payload.get("content_type", "text")
     file_id = payload.get("file_id")
     caption = payload.get("caption") or job.text
+    parse_mode = payload.get("parse_mode")
 
     if content_type == "text" or not file_id:
         return await bot.send_message(
             chat_id=job.chat_id,
             text=job.text,
             reply_markup=markup,
+            parse_mode=parse_mode,
         )
 
-    common = {"chat_id": job.chat_id, "reply_markup": markup}
+    common = {
+        "chat_id": job.chat_id,
+        "reply_markup": markup,
+        "parse_mode": parse_mode,
+    }
     if content_type == "photo":
         return await bot.send_photo(photo=file_id, caption=caption, **common)
     if content_type == "video":
@@ -60,7 +66,11 @@ async def send_delivery(bot: Bot, job):
     if content_type == "voice":
         return await bot.send_voice(voice=file_id, caption=caption, **common)
     if content_type == "video_note":
-        return await bot.send_video_note(video_note=file_id, **common)
+        return await bot.send_video_note(
+            chat_id=job.chat_id,
+            video_note=file_id,
+            reply_markup=markup,
+        )
     if content_type == "sticker":
         return await bot.send_sticker(
             chat_id=job.chat_id,
@@ -72,6 +82,7 @@ async def send_delivery(bot: Bot, job):
         chat_id=job.chat_id,
         text=job.text,
         reply_markup=markup,
+        parse_mode=parse_mode,
     )
 
 
