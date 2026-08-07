@@ -20,7 +20,7 @@ def main():
         '.filter-actions',
         '@media(max-width:700px)',
     )
-    require('app/web/templates/base.html', 'admin-stage56.css?v=56')
+    require('app/web/templates/base.html', 'admin-stage56.css?v=')
     require('scripts/audit_active_web_assets.py', '"admin-stage56.css"')
     assert not list((ROOT / 'migrations/versions').glob('*stage_56*'))
     print('Stage 56 check: OK')
