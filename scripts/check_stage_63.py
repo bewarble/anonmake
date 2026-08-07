@@ -114,11 +114,17 @@ def main() -> None:
         'payload={"parse_mode": "HTML"}',
     )
     require(
+        "app/repositories/users.py",
+        "user.updated_at = datetime.now(timezone.utc)",
+    )
+    require(
         "app/services/admin_statistics_stage25.py",
         "bot_id = require_current_bot().id",
         "User.bot_id == bot_id",
         "DeliveryOutbox.bot_id == bot_id",
         "PaymentMethod.bot_id == bot_id",
+        "func.max(DeliveryOutbox.updated_at)",
+        "latest_failure.c.blocked_at > User.updated_at",
     )
     require(
         "app/core/admin_metrics.py",
@@ -126,6 +132,7 @@ def main() -> None:
         "User.bot_id == self.bot_id",
         "DeliveryOutbox.bot_id == self.bot_id",
         "PaymentAttempt.bot_id == self.bot_id",
+        "latest_failure.c.blocked_at > User.updated_at",
     )
     require(
         "app/repositories/marketing.py",
@@ -156,6 +163,7 @@ def main() -> None:
     print("Anonymous question/answer actions: 💬 Ответить + 👁️ Узнать кто это")
     print("/cancel command label: Отключить подписку")
     print("Telegram admin statistics/export/profit/sources/broadcasts: scoped to current bot")
+    print("Alive/dead users: return-aware state based on last activity vs last permanent block")
     print("Reveal consent: Mooncloud terms/privacy/pricing links")
     print("Question and answer UX: final")
     print("Stage 63 migration: 20260807_0021_short_public_codes")
