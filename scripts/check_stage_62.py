@@ -99,6 +99,14 @@ def main() -> None:
 
     require(
         "app/bot/keyboards/personal_link.py",
+        'SHARE_TEXT = "Отправь мне анонимное сообщение 👇"',
+        'full_link = link if link.startswith("https://") else f"https://{link}"',
+        "encoded_link = quote(full_link, safe=\"\")",
+        "encoded_text = quote(SHARE_TEXT, safe=\"\")",
+        'f"url={encoded_link}&text={encoded_text}"',
+    )
+    reject(
+        "app/bot/keyboards/personal_link.py",
         'SHARE_TEXT = "Отправь мне анонимное сообщение 👉 {link}"',
         'f"url=%20&text={encoded_text}"',
     )
