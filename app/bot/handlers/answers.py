@@ -6,9 +6,10 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import cancel_keyboard, main_menu_for
-from app.bot.keyboards.questions import answer_received_keyboard
+from app.bot.keyboards.questions import answer_received_keyboard, answer_share_keyboard
 from app.bot.states import AnswerQuestion, AskQuestion
 from app.core import texts
+from app.core.bot_context import require_current_bot
 from app.repositories import AnswerRepository, QuestionRepository, UserRepository
 from app.repositories.delivery import DeliveryRepository
 from app.services.crm_tracking import CrmTrackingService
@@ -124,7 +125,12 @@ async def receive_answer(
     await session.commit()
 
     await state.clear()
-    await message.answer(texts.ANSWER_SENT, reply_markup=main_menu_for(message.from_user.id))
+    current_bot = require_current_bot()
+    personal_link = f"https://t.me/{current_bot.username}?start={current_user.public_code}"
+    await message.answer(
+        texts.ANSWER_SENT,
+        reply_markup=answer_share_keyboard(personal_link),
+    )
 
 
 @router.message(AnswerQuestion.waiting_for_text)
