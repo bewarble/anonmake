@@ -16,6 +16,7 @@ TEMPORARY_ERROR_WITH_ID = (
 )
 TEXT_ONLY = "ℹ️ Этот тип сообщения пока не поддерживается."
 UNKNOWN_INPUT = "ℹ️ Выберите действие в меню ниже."
+BUTTON_EXPIRED = "ℹ️ Эта кнопка больше не актуальна.\n\nОткройте нужное действие заново."
 
 # Start and personal link
 WELCOME = (
