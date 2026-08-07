@@ -29,18 +29,18 @@ def main() -> None:
     reject("app/bot/keyboards/main_menu.py", "USER_HELP")
     require(
         "app/bot/keyboards/personal_link.py",
-        'SHARE_TEXT = "Отправь мне анонимное сообщение 👉 {link}"',
+        'SHARE_TEXT = "Отправь мне анонимное сообщение 👇\\n{link}"',
         'text="🔗 Скопировать ссылку"',
         'text="📤 Выложить в каналы / чаты"',
         "CopyTextButton(text=full_link)",
         '"https://t.me/share/url/?"',
-        'f"url=%20&text={encoded_text}"',
+        'f"url={encoded_url}&text={encoded_text}"',
     )
     reject(
         "app/bot/keyboards/personal_link.py",
         "tg://msg_url",
-        '"url": link',
-        "urlencode(",
+        'f"url=%20&text={encoded_text}"',
+        "short_link =",
     )
     require(
         "app/bot/handlers/navigation.py",
@@ -122,7 +122,7 @@ def main() -> None:
     assert not list((ROOT / "migrations/versions").glob("*stage_58*"))
     print("Stage 58 check: OK")
     print("/start installs the persistent one-action reply keyboard")
-    print("Personal-link cards expose native copy and Telegram share actions")
+    print("Personal-link cards expose native copy and clean Telegram share actions")
     print("Shared router is used by managed bot instances")
     print("Single docker-up path rebuilds all bot services")
     print("/cancel remains reserved for subscription auto-renew cancellation in every FSM state")
