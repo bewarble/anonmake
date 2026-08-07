@@ -23,8 +23,8 @@ ACTION_CREATE = "➕ Создать"
 ACTION_DELETE = "🗑 Удалить"
 
 # Question actions
-QUESTION_ANSWER = "✍️ Ответить"
-QUESTION_REVEAL = "👁️ Кто это?"
+QUESTION_ANSWER = "💬 Ответить"
+QUESTION_REVEAL = "👁️ Узнать кто это"
 
 # Admin broadcast
 BROADCAST_ALL = "👥 Все пользователи"
