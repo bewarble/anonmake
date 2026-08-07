@@ -77,6 +77,25 @@ services:
     networks:
       - anonmake
 
+  runtime-health-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "0:0"
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        chown anonmake:anonmake /tmp/anonmake-health
+        chmod 0775 /tmp/anonmake-health
+    volumes:
+      - runtime_health:/tmp/anonmake-health
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - anonmake
+
   bot:
     <<: *app-common
     command: ["python", "-m", "app.main"]
@@ -143,6 +162,11 @@ services:
 
   managed-bots:
     <<: *app-common
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      runtime-health-init:
+        condition: service_completed_successfully
     command: ["python", "-m", "app.managed_bots"]
     healthcheck:
       test: ["CMD", "python", "-m", "scripts.worker_healthcheck", "managed-bots", "--max-age", "75"]
@@ -189,6 +213,11 @@ services:
 
   worker:
     <<: *app-common
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      runtime-health-init:
+        condition: service_completed_successfully
     command: ["python", "-m", "app.worker"]
     healthcheck:
       test: ["CMD", "python", "-m", "scripts.worker_healthcheck", "billing-worker", "--max-age", "180"]
