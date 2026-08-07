@@ -4,6 +4,7 @@ import asyncio
 
 from aiogram import Bot, Dispatcher
 
+from app.bot.commands import sync_public_commands
 from app.bot.handlers import build_router
 from app.bot.middlewares import DatabaseMiddleware, PerformanceMiddleware
 from app.bot.middlewares.request_context import RequestContextMiddleware
@@ -32,6 +33,7 @@ async def main() -> None:
     await init_database()
     try:
         await bot.delete_webhook(drop_pending_updates=False)
+        await sync_public_commands(bot)
         await dispatcher.start_polling(bot)
     finally:
         await storage.close()
