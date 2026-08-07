@@ -59,30 +59,15 @@
     <main class="pro-content">
       <header class="pro-header">
         <div class="mobile-header-group">
-          <button
-            class="mobile-menu-button"
-            type="button"
-            data-sidebar-toggle
-            aria-label="Открыть меню"
-          >
-            ☰
-          </button>
-
-          <div>
-            <span class="header-eyebrow">Панель управления AnonMake</span>
-            <h1>{{ title }}</h1>
-          </div>
+          <button class="mobile-menu-button" type="button" data-sidebar-toggle aria-label="Открыть меню">☰</button>
+          <div><span class="header-eyebrow">Панель управления AnonMake</span><h1>{{ title }}</h1></div>
         </div>
         <div class="header-actions">
           <label class="project-selector">
             <span>Проект</span>
             <select data-project-selector aria-label="Выбрать проект">
-              {% if not current_admin or current_admin.is_superadmin %}
-              <option value="all" {{ 'selected' if selected_bot_code == 'all' else '' }}>Все проекты</option>
-              {% endif %}
-              {% for bot in admin_bots %}
-                <option value="{{ bot.code }}" {{ 'selected' if selected_bot_code == bot.code else '' }}>{{ bot.display_name }} · @{{ bot.username }}</option>
-              {% endfor %}
+              {% if not current_admin or current_admin.is_superadmin %}<option value="all" {{ 'selected' if selected_bot_code == 'all' else '' }}>Все проекты</option>{% endif %}
+              {% for bot in admin_bots %}<option value="{{ bot.code }}" {{ 'selected' if selected_bot_code == bot.code else '' }}>{{ bot.display_name }} · @{{ bot.username }}</option>{% endfor %}
             </select>
           </label>
           <button class="header-search" type="button" data-command-open>🔍 Поиск и действия <kbd>Ctrl K</kbd></button>
@@ -90,7 +75,9 @@
         </div>
       </header>
 
-      {% set flash_message = request.query_params.get('flash') or request.query_params.get('notice') %}
+      {# `notice` is a legacy symbolic status handled by individual templates. Only
+         human-readable `flash` belongs in the shared Stage 50 flash component. #}
+      {% set flash_message = request.query_params.get('flash') %}
       {% set flash_tone = request.query_params.get('flash_tone', 'success') %}
       {% if flash_message %}
       <section class="admin-flash {{ flash_tone if flash_tone in ['success', 'warning', 'danger', 'info'] else 'info' }}" role="status">
@@ -107,29 +94,12 @@
     <div class="command-box">
       <div class="command-input"><span>⌕</span><input placeholder="Перейти в раздел..." data-command-input></div>
       <div class="command-items">
-        <a href="/admin/projects">Проекты <kbd>R</kbd></a>
-        <a href="/admin/business">Главная <kbd>G</kbd></a>
-        <a href="/admin/business/analytics">Аналитика <kbd>A</kbd></a>
-        <a href="/admin/business/users">Пользователи <kbd>U</kbd></a>
-        <a href="/admin/business/sources">Источники <kbd>S</kbd></a>
-        <a href="/admin/sources/new">Создать источник <kbd>N</kbd></a>
-        <a href="/admin/business/broadcasts">Рассылки <kbd>B</kbd></a>
-        <a href="/admin/subscriptions">Подписки <kbd>V</kbd></a>
-        <a href="/admin/payments">Платежи <kbd>P</kbd></a>
-        <a href="/admin/delivery">Доставка <kbd>D</kbd></a>
-        <a href="/admin/performance">Производительность <kbd>F</kbd></a>
-        <a href="/admin/platform/system">Система</a>
-        <a href="/admin/platform/observability">Наблюдаемость</a>
+        <a href="/admin/projects">Проекты <kbd>R</kbd></a><a href="/admin/business">Главная <kbd>G</kbd></a><a href="/admin/business/analytics">Аналитика <kbd>A</kbd></a><a href="/admin/business/users">Пользователи <kbd>U</kbd></a><a href="/admin/business/sources">Источники <kbd>S</kbd></a><a href="/admin/sources/new">Создать источник <kbd>N</kbd></a><a href="/admin/business/broadcasts">Рассылки <kbd>B</kbd></a><a href="/admin/subscriptions">Подписки <kbd>V</kbd></a><a href="/admin/payments">Платежи <kbd>P</kbd></a><a href="/admin/delivery">Доставка <kbd>D</kbd></a><a href="/admin/performance">Производительность <kbd>F</kbd></a><a href="/admin/platform/system">Система</a><a href="/admin/platform/observability">Наблюдаемость</a>
       </div>
     </div>
   </div>
   <script src="/admin/static/admin-ui.js?v=51" defer></script>
   <script src="/admin/static/admin-stage51.js?v=51" defer></script>
-  <script>
-    document.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-flash-dismiss]');
-      if (button) button.closest('.admin-flash')?.remove();
-    });
-  </script>
+  <script>document.addEventListener('click', (event) => { const button = event.target.closest('[data-flash-dismiss]'); if (button) button.closest('.admin-flash')?.remove(); });</script>
 </body>
 </html>
