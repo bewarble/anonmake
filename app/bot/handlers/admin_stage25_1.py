@@ -3,7 +3,7 @@ from __future__ import annotations
 from html import escape
 
 from aiogram import Bot, F, Router
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,11 +46,21 @@ def money(kopecks: int) -> str:
     return f"{kopecks / 100:,.2f}".replace(",", " ").replace(".", ",")
 
 
+async def delete_message_quietly(message: Message | None) -> None:
+    if message is None:
+        return
+    try:
+        await message.delete()
+    except Exception:
+        return
+
+
 @router.message(F.text.in_({ADMIN_STATISTICS, "Статистика"}))
 async def statistics(message: Message, session: AsyncSession) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         return
     data = await AdminStatisticsStage25Repository(session).snapshot()
+    await delete_message_quietly(message)
     await message.answer_photo(
         BufferedInputFile(statistics_chart(data.points), filename="statistics.png"),
         caption=(
@@ -85,6 +95,7 @@ async def profit(message: Message, session: AsyncSession) -> None:
     def row(title: str, item) -> str:
         return f"• {title} — {money(item.revenue_kopecks)} ₽ ({money(item.partner_kopecks)} ₽) +{number(item.trials)} пдп"
 
+    await delete_message_quietly(message)
     await message.answer_photo(
         BufferedInputFile(revenue_chart(revenue_points), filename="revenue.png"),
         caption=(
@@ -101,6 +112,7 @@ async def profit(message: Message, session: AsyncSession) -> None:
 async def export_prompt(message: Message) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         return
+    await delete_message_quietly(message)
     await message.answer(admin_texts.EXPORT_PROMPT, reply_markup=export_choice_keyboard())
 
 
@@ -118,18 +130,9 @@ async def export_users(callback: CallbackQuery, session: AsyncSession) -> None:
     filename = "anonmake-users-alive.txt" if alive_only else "anonmake-users-all.txt"
     title = admin_texts.EXPORT_READY_ALIVE if alive_only else admin_texts.EXPORT_READY_ALL
     if callback.message:
+        await delete_message_quietly(callback.message)
         await callback.message.answer_document(BufferedInputFile(payload, filename=filename), caption=title)
     await callback.answer()
-
-
-@router.callback_query(F.data == "admin25:export:cancel")
-async def export_cancel(callback: CallbackQuery) -> None:
-    if callback.from_user is None or not is_admin(callback.from_user.id):
-        await callback.answer(admin_texts.DENIED, show_alert=True)
-        return
-    if callback.message:
-        await callback.message.delete()
-    await callback.answer(admin_texts.CANCELLED)
 
 
 @router.message(F.text.in_({ADMIN_SOURCES, "Источники"}))
@@ -139,6 +142,7 @@ async def referrals(message: Message, session: AsyncSession) -> None:
     repository = MarketingRepository(session)
     sources = await repository.sources()
     summary = await repository.sources_summary()
+    await delete_message_quietly(message)
     await message.answer(
         (
             "🔗 Источники\n\n"
@@ -161,7 +165,8 @@ async def referrals_callback(callback: CallbackQuery, session: AsyncSession) -> 
     sources = await repository.sources()
     summary = await repository.sources_summary()
     if callback.message:
-        await callback.message.edit_text(
+        await delete_message_quietly(callback.message)
+        await callback.message.answer(
             (
                 "🔗 Источники\n\n"
                 f"• Активных источников — {number(len(sources))}\n"
@@ -194,7 +199,8 @@ async def referral_details(callback: CallbackQuery, session: AsyncSession, bot: 
     link = f"https://t.me/{me.username}?start=src_{source.code}"
     attributed = int(stats["attributed"])
     if callback.message:
-        await callback.message.edit_text(
+        await delete_message_quietly(callback.message)
+        await callback.message.answer(
             (
                 f"🔗 <b>{escape(source.name)}</b>\n\n"
                 f"• Бюджет — {money(int(stats['spend_kopecks']))} ₽\n"
@@ -208,6 +214,7 @@ async def referral_details(callback: CallbackQuery, session: AsyncSession, bot: 
             ),
             parse_mode="HTML",
             reply_markup=referral_card_keyboard(source.id),
+            disable_web_page_preview=True,
         )
     await callback.answer()
 
@@ -218,6 +225,7 @@ async def broadcast_start(message: Message, state: FSMContext) -> None:
         return
     await state.clear()
     await state.set_state(BroadcastCreate.waiting_audience)
+    await delete_message_quietly(message)
     await message.answer(admin_texts.BROADCAST_AUDIENCE_PROMPT, reply_markup=broadcast_audience_keyboard())
 
 
@@ -233,6 +241,7 @@ async def broadcast_audience(callback: CallbackQuery, state: FSMContext) -> None
     await state.update_data(kind="anonymous", audience=audience)
     await state.set_state(BroadcastCreate.waiting_text)
     if callback.message:
+        await delete_message_quietly(callback.message)
         await callback.message.answer(admin_texts.BROADCAST_TEXT_PROMPT, reply_markup=broadcast_text_cancel_keyboard())
     await callback.answer()
 
@@ -242,7 +251,7 @@ async def broadcast_text_cancel_command(message: Message, state: FSMContext) -> 
     if message.from_user is None or not is_admin(message.from_user.id):
         return
     await state.clear()
-    await message.answer(admin_texts.BROADCAST_CANCELLED)
+    await delete_message_quietly(message)
 
 
 @router.callback_query(F.data == "admin25:broadcast:cancel")
@@ -252,5 +261,5 @@ async def broadcast_cancel(callback: CallbackQuery, state: FSMContext) -> None:
         return
     await state.clear()
     if callback.message:
-        await callback.message.edit_text(admin_texts.BROADCAST_CANCELLED)
+        await delete_message_quietly(callback.message)
     await callback.answer()
