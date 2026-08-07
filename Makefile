@@ -7,7 +7,7 @@ COMPOSE = docker compose \
 .PHONY: docker-config docker-build docker-up docker-down docker-restart \
 	docker-status docker-logs docker-logs-all docker-migrate docker-check \
 	docker-check-dependencies docker-shell docker-reset-db stabilize-check \
-	stabilize-apply stage50-check stage51-check stage52-check stage53-check stage54-check stage55-check stage56-check stage57-check stage58-check stage59-check stage60-check stage61-check stage62-check release-check release-check-runtime launch-check deploy
+	stabilize-apply stage50-check stage51-check stage52-check stage53-check stage54-check stage55-check stage56-check stage57-check stage58-check stage59-check stage60-check stage61-check stage62-check stage63-check release-check release-check-runtime launch-check deploy
 
 docker-config:
 	$(COMPOSE) config --quiet
@@ -80,6 +80,8 @@ stage61-check:
 	python3 -m scripts.check_stage_61
 stage62-check:
 	python3 -m scripts.check_stage_62
+stage63-check:
+	python3 -m scripts.check_stage_63
 release-check:
 	python3 -m scripts.release_check
 release-check-runtime:
