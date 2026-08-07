@@ -4,7 +4,7 @@
   <div>
     <span class="eyebrow">Стабильность платформы</span>
     <h2>Наблюдаемость и ошибки</h2>
-    <p>Ошибки админки, очереди, неудачные доставки, платежи и история развёртываний.</p>
+    <p>Ошибки админки и Telegram-ботов, очереди, неудачные доставки, платежи и история развёртываний.</p>
   </div>
   <form method="post" action="/admin/platform/observability/delivery/unlock-stale"
         data-confirm-title="Освободить зависшие доставки?"
@@ -54,6 +54,33 @@
         </tr>
       {% else %}
         <tr><td colspan="6" class="empty">Ошибок админки в журнале пока нет.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel system-panel">
+  <div class="panel-heading">
+    <div><span class="eyebrow">Stage 59</span><h3>Последние ошибки Telegram-ботов</h3><p>Единый журнал для всех проектов: error_id, источник, тип update, пользователь, чат и request_id без traceback и секретов.</p></div>
+    <span class="status-badge {{ 'danger' if recent_bot_errors else 'healthy' }}">{{ recent_bot_errors|length }} показано</span>
+  </div>
+  <div class="observability-table-wrap">
+    <table class="observability-table">
+      <thead><tr><th>Ошибка</th><th>Проект</th><th>Источник</th><th>Update</th><th>Пользователь / чат</th><th>Request ID</th><th>Время</th></tr></thead>
+      <tbody>
+      {% for item in recent_bot_errors %}
+        <tr>
+          <td><code>{{ item.error_id }}</code><br><small>{{ item.exception_type }}</small></td>
+          <td>{{ bot_names.get(item.bot_id, item.bot_code) if item.bot_id else item.bot_code }}</td>
+          <td><code>{{ item.source }}</code></td>
+          <td>{{ item.update_type }}{% if item.update_id %} #{{ item.update_id }}{% endif %}</td>
+          <td>{% if item.telegram_user_id %}user {{ item.telegram_user_id }}{% else %}—{% endif %}{% if item.telegram_chat_id %}<br><small>chat {{ item.telegram_chat_id }}</small>{% endif %}</td>
+          <td><code>{{ item.request_id }}</code></td>
+          <td>{{ item.created_at|date_time }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty">Ошибок Telegram-ботов в журнале пока нет.</td></tr>
       {% endfor %}
       </tbody>
     </table>
