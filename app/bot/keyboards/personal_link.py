@@ -3,13 +3,14 @@ from urllib.parse import quote
 from aiogram.types import CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
 
 
-SHARE_TEXT = "Отправь мне анонимное сообщение 👇"
+SHARE_TEXT = "Отправь мне анонимное сообщение 👉 {link}"
 
 
 def personal_link_share_keyboard(link: str) -> InlineKeyboardMarkup:
     full_link = link if link.startswith("https://") else f"https://{link}"
-    encoded_link = quote(full_link, safe="")
-    encoded_text = quote(SHARE_TEXT, safe="")
+    short_link = full_link.removeprefix("https://")
+    share_text = SHARE_TEXT.format(link=short_link)
+    encoded_text = quote(share_text, safe="")
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -23,7 +24,7 @@ def personal_link_share_keyboard(link: str) -> InlineKeyboardMarkup:
                     text="📤 Выложить в каналы / чаты",
                     url=(
                         "https://t.me/share/url/?"
-                        f"url={encoded_link}&text={encoded_text}"
+                        f"url=%20&text={encoded_text}"
                     ),
                 )
             ],
