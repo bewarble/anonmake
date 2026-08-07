@@ -14,6 +14,7 @@ from app.core.bot_context import CurrentBot
 from app.core.config import load_settings
 from app.core.error_diagnostics import new_error_id, record_bot_error
 from app.core.logging import configure_logging
+from app.core.worker_health import mark_worker_heartbeat
 from app.database.session import SessionFactory, close_database, init_database
 from app.models.bot_instance import BotInstance
 from app.services.bot_credentials import resolve_bot_token
@@ -64,6 +65,7 @@ async def main() -> None:
     await init_database()
     tasks: dict[int, asyncio.Task] = {}
     known_instances: dict[int, BotInstance] = {}
+    mark_worker_heartbeat("managed-bots", state="started", active_count=0)
     try:
         while True:
             async with SessionFactory() as session:
@@ -76,12 +78,14 @@ async def main() -> None:
                 )).scalars())
                 known_instances.update({item.id: item for item in instances})
                 active_ids = {item.id for item in instances}
+                crash_count = 0
                 for bot_id, task in list(tasks.items()):
                     if task.done():
                         if not task.cancelled():
                             exc = task.exception()
                             instance = known_instances.get(bot_id)
                             if exc is not None and instance is not None:
+                                crash_count += 1
                                 await record_runtime_crash(instance, exc)
                         tasks.pop(bot_id, None)
                         continue
@@ -96,8 +100,16 @@ async def main() -> None:
                             name=f"managed-bot-{item.code}",
                         )
                         logger.info("Managed project started", extra={"bot_code": item.code})
+                mark_worker_heartbeat(
+                    "managed-bots",
+                    state="polling",
+                    configured_count=len(instances),
+                    active_count=len(tasks),
+                    crash_count=crash_count,
+                )
             await asyncio.sleep(20)
     finally:
+        mark_worker_heartbeat("managed-bots", state="stopping", active_count=len(tasks))
         for task in tasks.values():
             task.cancel()
         await asyncio.gather(*tasks.values(), return_exceptions=True)
