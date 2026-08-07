@@ -16,68 +16,31 @@ from app.bot.ui import (
 def broadcast_audience_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [InlineKeyboardButton(text=BROADCAST_ALL, callback_data="admin25:broadcast:audience:all")],
             [
-                InlineKeyboardButton(
-                    text=BROADCAST_ALL,
-                    callback_data="admin25:broadcast:audience:all",
-                )
+                InlineKeyboardButton(text=BROADCAST_WITH_ACCESS, callback_data="admin25:broadcast:audience:vip"),
+                InlineKeyboardButton(text=BROADCAST_WITHOUT_ACCESS, callback_data="admin25:broadcast:audience:non_vip"),
             ],
-            [
-                InlineKeyboardButton(
-                    text=BROADCAST_WITH_ACCESS,
-                    callback_data="admin25:broadcast:audience:vip",
-                ),
-                InlineKeyboardButton(
-                    text=BROADCAST_WITHOUT_ACCESS,
-                    callback_data="admin25:broadcast:audience:non_vip",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text=ACTION_CANCEL,
-                    callback_data="admin25:broadcast:cancel",
-                )
-            ],
+            [InlineKeyboardButton(text=ACTION_CANCEL, callback_data="admin25:broadcast:cancel")],
         ]
     )
 
 
 def referrals_keyboard(sources) -> InlineKeyboardMarkup:
     rows = [
-        [
-            InlineKeyboardButton(
-                text=f"🔗 {source.name}",
-                callback_data=f"adminm:source:{source.id}",
-            )
-        ]
+        [InlineKeyboardButton(text=f"🔗 {source.name}", callback_data=f"adminm:source:{source.id}")]
         for source in sources
     ]
-    rows.append(
-        [
-            InlineKeyboardButton(
-                text=SOURCE_CREATE,
-                callback_data="adminm:source:create",
-            )
-        ]
-    )
+    rows.append([InlineKeyboardButton(text=SOURCE_CREATE, callback_data="adminm:source:create")])
+    rows.append([InlineKeyboardButton(text=ACTION_CANCEL, callback_data="admin25:referrals:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def referral_card_keyboard(source_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=ACTION_BACK_TO_LIST,
-                    callback_data="admin25:referrals",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=ACTION_DELETE,
-                    callback_data=f"source:delete:{source_id}",
-                )
-            ],
+            [InlineKeyboardButton(text=ACTION_BACK_TO_LIST, callback_data="admin25:referrals")],
+            [InlineKeyboardButton(text=ACTION_DELETE, callback_data=f"source:delete:{source_id}")],
         ]
     )
 
@@ -85,24 +48,9 @@ def referral_card_keyboard(source_id: int) -> InlineKeyboardMarkup:
 def export_choice_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=EXPORT_ALL,
-                    callback_data="admin25:export:all",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=EXPORT_ALIVE,
-                    callback_data="admin25:export:alive",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=ACTION_CANCEL,
-                    callback_data="admin25:export:cancel",
-                )
-            ],
+            [InlineKeyboardButton(text=EXPORT_ALL, callback_data="admin25:export:all")],
+            [InlineKeyboardButton(text=EXPORT_ALIVE, callback_data="admin25:export:alive")],
+            [InlineKeyboardButton(text=ACTION_CANCEL, callback_data="admin25:export:cancel")],
         ]
     )
 
@@ -110,11 +58,6 @@ def export_choice_keyboard() -> InlineKeyboardMarkup:
 def referral_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=ACTION_BACK_TO_LIST,
-                    callback_data="admin25:referrals",
-                )
-            ]
+            [InlineKeyboardButton(text=ACTION_BACK_TO_LIST, callback_data="admin25:referrals")]
         ]
     )
