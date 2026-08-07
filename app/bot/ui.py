@@ -5,8 +5,8 @@ duplicating visible text. This keeps emoji and wording changes safe.
 """
 
 # User menu
-USER_PERSONAL_LINK = "🔗 Моя ссылка"
-USER_HELP = "❓ Помощь"
+USER_PERSONAL_LINK = "💬 Начать получать сообщения"
+USER_HELP = "❓ Как получать сообщения?"
 
 # Admin menu
 ADMIN_STATISTICS = "📊 Статистика"
@@ -16,7 +16,7 @@ ADMIN_EXPORT = "📦 Выгрузка"
 ADMIN_SOURCES = "🔗 Источники"
 
 # Common actions
-ACTION_CANCEL = "⬅️ Отмена"
+ACTION_CANCEL = "✖️ Отменить"
 ACTION_BACK = "⬅️ Назад"
 ACTION_BACK_TO_LIST = "⬅️ К списку"
 ACTION_CONFIRM = "✅ Подтвердить"
