@@ -4,7 +4,7 @@
   <div>
     <span class="eyebrow">Эксплуатация платформы</span>
     <h2>Состояние системы</h2>
-    <p>Версии, очереди, последнее развёртывание и снимок состояния сервисов.</p>
+    <p>Версии, очереди, развёртывание, резервные копии и готовность к восстановлению.</p>
   </div>
   <span class="status-badge {{ 'healthy' if deploy.status == 'success' else 'warning' }}">
     {{ 'Последний деплой успешен' if deploy.status == 'success' else 'Нет успешного отчёта о деплое' }}
@@ -21,8 +21,8 @@
   <article class="system-status-card {{ 'healthy' if source_head == database_head else 'warning' }}">
     <span class="system-status-dot"></span><div><small>Миграции</small><strong>{{ database_head }}</strong><span>Код: {{ source_head }}</span></div>
   </article>
-  <article class="system-status-card {{ 'healthy' if deploy.status == 'success' else 'warning' }}">
-    <span class="system-status-dot"></span><div><small>Версия приложения</small><strong>{{ deploy.commit or 'Не определена' }}</strong><span>{{ deploy.branch or '' }}</span></div>
+  <article class="system-status-card {{ 'healthy' if last_backup and last_backup.valid else 'warning' }}">
+    <span class="system-status-dot"></span><div><small>Резервная копия</small><strong>{{ 'Проверена' if last_backup and last_backup.valid else 'Требует внимания' }}</strong><span>{{ last_backup.name if last_backup else 'Копии отсутствуют' }}</span></div>
   </article>
 </section>
 
@@ -36,6 +36,7 @@
       <div><dt>Завершён</dt><dd>{{ deploy.completed_at or '—' }}</dd></div>
       <div><dt>Длительность</dt><dd>{{ deploy.duration_seconds or 0 }} сек.</dd></div>
       <div><dt>Резервная копия</dt><dd>{{ deploy.backup_path or 'Не создавалась' }}</dd></div>
+      {% if deploy.failed_step %}<div><dt>Этап ошибки</dt><dd class="danger-text">{{ deploy.failed_step }}</dd></div>{% endif %}
       {% if deploy.error %}<div><dt>Ошибка</dt><dd class="danger-text">{{ deploy.error }}</dd></div>{% endif %}
     </dl>
     {% else %}
@@ -52,10 +53,32 @@
     </div>
     <div class="backup-summary">
       <span>Последняя локальная копия</span>
-      {% if last_backup %}<strong>{{ last_backup.name }}</strong><small>{{ last_backup.size }} байт · {{ last_backup.modified_at|date_time }}</small>
+      {% if last_backup %}<strong>{{ last_backup.name }}</strong><small>{{ last_backup.size }} байт · {{ last_backup.modified_at|date_time }} · {{ 'формат PostgreSQL подтверждён' if last_backup.valid else 'формат не подтверждён' }}</small>
       {% else %}<strong>Пока отсутствует</strong>{% endif %}
     </div>
   </article>
+</section>
+
+<section class="panel system-panel">
+  <div class="panel-heading"><div><span class="eyebrow">Восстановление</span><h3>Резервные копии</h3><p>Последние локальные dump-файлы. Проверка подтверждает сигнатуру PostgreSQL custom format без чтения содержимого базы.</p></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Файл</th><th>Создан</th><th>Размер</th><th>Целостность формата</th></tr></thead>
+      <tbody>
+      {% for backup in backups %}
+        <tr>
+          <td><code>{{ backup.name }}</code></td>
+          <td>{{ backup.modified_at|date_time }}</td>
+          <td>{{ backup.size }} байт</td>
+          <td><span class="status-badge {{ 'healthy' if backup.valid else 'danger' }}">{{ 'Проверена' if backup.valid else 'Некорректный файл' }}</span></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="empty">Резервные копии пока отсутствуют.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Для проверки и подготовки восстановления на сервере используйте <code>python3 -m scripts.backup_recovery list</code> и <code>python3 -m scripts.backup_recovery plan &lt;имя.dump&gt;</code>.</p>
 </section>
 
 <section class="panel system-panel">
