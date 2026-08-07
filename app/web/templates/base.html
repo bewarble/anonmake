@@ -89,7 +89,7 @@
         </div>
       </header>
 
-      {% set flash_message = request.query_params.get('flash') %}
+      {% set flash_message = request.query_params.get('flash') or request.query_params.get('notice') %}
       {% set flash_tone = request.query_params.get('flash_tone', 'success') %}
       {% if flash_message %}
       <section class="admin-flash {{ flash_tone if flash_tone in ['success', 'warning', 'danger', 'info'] else 'info' }}" role="status">
