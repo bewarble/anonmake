@@ -33,8 +33,13 @@ class QuestionRepository:
         await self.session.flush()
         return question
 
-    async def get_with_users(self, question_id: int) -> Question | None:
-        result = await self.session.execute(
+    async def get_with_users(
+        self,
+        question_id: int,
+        *,
+        for_update: bool = False,
+    ) -> Question | None:
+        statement = (
             select(Question)
             .where(Question.id == question_id)
             .options(
@@ -43,4 +48,7 @@ class QuestionRepository:
                 selectinload(Question.answer),
             )
         )
+        if for_update:
+            statement = statement.with_for_update()
+        result = await self.session.execute(statement)
         return result.scalar_one_or_none()
