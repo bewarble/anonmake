@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, StateFilter
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,16 @@ from app.repositories.billing import BillingRepository
 from app.repositories.users import UserRepository
 
 router = Router(name="subscriptions")
+
+
+async def _safe_edit(callback: CallbackQuery, text: str) -> None:
+    if callback.message is None:
+        return
+    try:
+        await callback.message.edit_text(text)
+    except TelegramBadRequest as exc:
+        if "message is not modified" not in str(exc).lower():
+            raise
 
 
 @router.message(StateFilter(None), Command("cancel"))
@@ -81,16 +92,18 @@ async def cancel_subscription_confirm(
         await callback.answer(texts.NO_ACTIVE_ACCESS, show_alert=True)
         return
 
+    if not subscription.auto_renew:
+        await _safe_edit(callback, texts.AUTO_RENEW_OFF)
+        await callback.answer(texts.AUTO_RENEW_ALREADY_OFF)
+        return
+
     await repository.cancel_auto_renew(subscription, cancelled_at=now)
     await session.commit()
-
-    if callback.message:
-        await callback.message.edit_text(texts.AUTO_RENEW_OFF)
+    await _safe_edit(callback, texts.AUTO_RENEW_OFF)
     await callback.answer()
 
 
 @router.callback_query(F.data == "subscription:cancel:keep")
 async def cancel_subscription_keep(callback: CallbackQuery) -> None:
-    if callback.message:
-        await callback.message.edit_text(texts.AUTO_RENEW_KEEP)
+    await _safe_edit(callback, texts.AUTO_RENEW_KEEP)
     await callback.answer()
