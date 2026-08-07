@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -48,7 +48,7 @@ def is_admin_request(request: Request) -> bool:
 
 
 def flash_from_request(request: Request) -> dict[str, str] | None:
-    message = request.query_params.get("flash")
+    message = request.query_params.get("flash") or request.query_params.get("notice")
     if not message:
         return None
     tone = request.query_params.get("flash_tone", "success")
@@ -95,7 +95,7 @@ async def record_admin_error(request: Request, *, error_id: str, status_code: in
         async with SessionFactory() as session:
             session.add(
                 AdminAuditLog(
-                    admin_telegram_id=(principal.admin_id if principal and principal.admin_id else 0),
+                    admin_telegram_id=0,
                     action="web_error",
                     target=error_id,
                     details=json.dumps(details, ensure_ascii=False, separators=(",", ":")),
@@ -145,9 +145,6 @@ async def admin_validation_exception_handler(request: Request, exc: RequestValid
 
 
 async def admin_unhandled_exception_handler(request: Request, exc: Exception):
-    if not is_admin_request(request):
-        logger.exception("Unhandled web error", exc_info=exc)
-        return JSONResponse({"detail": "Internal Server Error"}, status_code=500)
     error_id = new_error_id()
     logger.exception("Unhandled admin error error_id=%s path=%s", error_id, request.url.path, exc_info=exc)
     return await render_admin_error(request, status_code=500, error_id=error_id)
@@ -176,5 +173,4 @@ async def admin_error_middleware(request: Request, call_next):
 def install_admin_error_ux(app: FastAPI) -> None:
     app.add_exception_handler(HTTPException, admin_http_exception_handler)
     app.add_exception_handler(RequestValidationError, admin_validation_exception_handler)
-    app.add_exception_handler(Exception, admin_unhandled_exception_handler)
     app.add_middleware(BaseHTTPMiddleware, dispatch=admin_error_middleware)
