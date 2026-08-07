@@ -10,14 +10,16 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 
 
-PUBLIC_CODE_LENGTH = 8
+PUBLIC_CODE_MIN_LENGTH = 5
+PUBLIC_CODE_MAX_LENGTH = 6
 PUBLIC_CODE_ALPHABET = string.ascii_letters + string.digits
 
 
 def generate_public_code() -> str:
+    length = secrets.choice((PUBLIC_CODE_MIN_LENGTH, PUBLIC_CODE_MAX_LENGTH))
     return "".join(
         secrets.choice(PUBLIC_CODE_ALPHABET)
-        for _ in range(PUBLIC_CODE_LENGTH)
+        for _ in range(length)
     )
 
 
