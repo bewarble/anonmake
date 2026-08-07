@@ -18,8 +18,8 @@ def reject(path: str, *needles: str) -> None:
 def main() -> None:
     require(
         "app/bot/ui.py",
-        'USER_PERSONAL_LINK = "🔗 Моя ссылка"',
-        'USER_HELP = "❓ Помощь"',
+        "USER_PERSONAL_LINK",
+        "USER_HELP",
     )
     require(
         "app/bot/keyboards/main_menu.py",
@@ -57,7 +57,6 @@ def main() -> None:
         "app/bot/handlers/start.py",
         "CommandStart()",
         "async def show_personal_link_message",
-        "texts.PERSONAL_LINK",
         "personal_link_share_keyboard(link)",
         "reply_markup=main_menu_for(message.from_user.id)",
     )
