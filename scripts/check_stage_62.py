@@ -70,7 +70,6 @@ def main() -> None:
         "current_bot = require_current_bot()",
         "def payment_url",
     )
-    # The accidental duplicate assignment found during launch audit must stay gone.
     text = (ROOT / "app/services/reveal_checkout.py").read_text(encoding="utf-8")
     assert "current_bot = require_current_bot()\n        current_bot = require_current_bot()" not in text
 
@@ -81,6 +80,34 @@ def main() -> None:
         "_deliver_identity",
         "RevealCheckoutService(",
     )
+    require(
+        "app/services/payment_notifications.py",
+        "buyer_row.bot_id",
+        "resolve_bot_token",
+        "set_current_bot(",
+        "runtime_bot = Bot(token=token)",
+        "reset_current_bot(context_token)",
+    )
+    require(
+        "app/web/subscription_payments.py",
+        "PaymentAttempt.customer_operation_id == operation_id",
+        "seed_attempt.bot_id",
+        "set_current_bot(",
+        "resolve_bot_token",
+        "texts.ACCESS_ACTIVE",
+    )
+    reject(
+        "app/web/subscription_payments.py",
+        "Тестовая оплата подтверждена",
+        "VIP активирован на 1 день",
+    )
+    require(
+        "app/services/subscription_checkout.py",
+        "current_bot = require_current_bot()",
+        "bot_id=current_bot.id",
+        "subscription.bot_id != current_bot.id",
+    )
+
     require(
         "app/bot/handlers/questions.py",
         "TelegramBadRequest",
@@ -109,7 +136,13 @@ def main() -> None:
     )
     reject("app/bot/handlers/answers.py", "ANSWER_ALREADY_SENT")
 
-    require("scripts/check_stage_62_runtime.py", "Stage 62 runtime check: OK")
+    require(
+        "scripts/check_stage_62_runtime.py",
+        "Stage 62 runtime check: OK",
+        "BotInstance.is_active.is_(True)",
+        "active bots checked",
+    )
+    require("scripts/check_bot_launch_config.py", "Bot public launch configuration: OK")
     require("docs/STAGE_62_BOT_LAUNCH_READINESS.md", "Bot Launch Readiness")
     assert not list((ROOT / "migrations/versions").glob("*stage_62*"))
 
@@ -118,6 +151,7 @@ def main() -> None:
     print("Public Telegram command list: /start and /cancel only")
     print("Stale callbacks and repeat taps: safe")
     print("Reveal checkout and payment finalization: hardened")
+    print("Payment callbacks restore project ownership across multibot")
     print("/cancel is reserved for auto-renewal in every FSM state")
     print("Test payment commands remain launch-gated")
     print("Unlimited replies from Stage 61 remain active")
