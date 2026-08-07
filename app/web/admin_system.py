@@ -23,6 +23,7 @@ settings = load_settings()
 ROOT = Path(__file__).resolve().parents[2]
 STATE_FILE = ROOT / "var" / "deploy-state.json"
 BACKUP_DIR = ROOT / "backups" / "deploy"
+POSTGRES_CUSTOM_MAGIC = b"PGDMP"
 
 
 def _load_deploy_state() -> dict:
@@ -40,7 +41,17 @@ def _source_head() -> str:
         return "Не определена"
 
 
-def _last_backup() -> dict | None:
+def _backup_is_valid(path: Path) -> bool:
+    try:
+        if path.stat().st_size <= len(POSTGRES_CUSTOM_MAGIC):
+            return False
+        with path.open("rb") as stream:
+            return stream.read(len(POSTGRES_CUSTOM_MAGIC)) == POSTGRES_CUSTOM_MAGIC
+    except OSError:
+        return False
+
+
+def _backups(limit: int = 8) -> list[dict]:
     try:
         files = sorted(
             BACKUP_DIR.glob("*.dump"),
@@ -48,15 +59,28 @@ def _last_backup() -> dict | None:
             reverse=True,
         )
     except OSError:
-        return None
-    if not files:
-        return None
-    path = files[0]
-    return {
-        "name": path.name,
-        "size": path.stat().st_size,
-        "modified_at": datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc),
-    }
+        return []
+
+    result: list[dict] = []
+    for path in files[:limit]:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        result.append(
+            {
+                "name": path.name,
+                "size": stat.st_size,
+                "modified_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+                "valid": _backup_is_valid(path),
+            }
+        )
+    return result
+
+
+def _last_backup() -> dict | None:
+    backups = _backups(limit=1)
+    return backups[0] if backups else None
 
 
 @router.get("/system", response_class=HTMLResponse)
@@ -113,6 +137,7 @@ async def system_page(request: Request):
         redis_ok = False
 
     state = _load_deploy_state()
+    backups = _backups()
     return templates.TemplateResponse(
         request=request,
         name="platform_system.html",
@@ -127,7 +152,9 @@ async def system_page(request: Request):
             deploy=state,
             services=state.get("services", {}),
             queues=queues,
-            last_backup=_last_backup(),
+            last_backup=backups[0] if backups else None,
+            backups=backups,
+            backup_count=len(backups),
         ),
     )
 

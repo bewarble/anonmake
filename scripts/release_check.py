@@ -23,6 +23,7 @@ STATIC_CHECKS = (
     "scripts.check_stage_46",
     "scripts.check_stage_47",
     "scripts.check_stage_48",
+    "scripts.check_stage_49",
     "scripts.check_full_audit",
     "scripts.check_stage_36",
     "scripts.check_project",
@@ -42,6 +43,7 @@ RUNTIME_CHECKS = (
     "scripts.check_dependencies",
     "scripts.check_migration_head",
     "scripts.check_web_admin_runtime",
+    "scripts.check_stage_49_runtime",
 )
 
 
