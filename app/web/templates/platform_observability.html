@@ -3,8 +3,8 @@
 <section class="page-header system-page-header">
   <div>
     <span class="eyebrow">Стабильность платформы</span>
-    <h2>Наблюдаемость и ошибки</h2>
-    <p>Ошибки админки и Telegram-ботов, очереди, неудачные доставки, платежи и история развёртываний.</p>
+    <h2>Наблюдаемость и инциденты</h2>
+    <p>Состояние runtime-сервисов, ошибки админки и Telegram-ботов, очереди, доставки, платежи и развёртывания.</p>
   </div>
   <form method="post" action="/admin/platform/observability/delivery/unlock-stale"
         data-confirm-title="Освободить зависшие доставки?"
@@ -13,6 +13,34 @@
         data-loading-label="Освобождаем…">
     <button class="button-secondary" type="submit">Освободить зависшие доставки</button>
   </form>
+</section>
+
+<section class="panel system-panel runtime-health-panel">
+  <div class="panel-heading">
+    <div>
+      <span class="eyebrow">Stage 60</span>
+      <h3>Состояние runtime</h3>
+      <p>Heartbeat сервисов собирается в общем health-volume и доступен панели без обращения к Docker socket.</p>
+    </div>
+    <span class="status-badge {{ 'healthy' if runtime_status == 'healthy' else ('danger' if runtime_status == 'down' else 'warning') }}">
+      {% if runtime_status == 'healthy' %}Все сервисы работают{% elif runtime_status == 'down' %}Есть недоступные сервисы{% else %}Требуется внимание{% endif %}
+    </span>
+  </div>
+  <div class="runtime-health-grid">
+    {% for item in runtime_health %}
+    <article class="runtime-health-card {{ item.status }}">
+      <div class="runtime-health-title"><span class="system-status-dot"></span><strong>{{ item.label }}</strong></div>
+      <span class="status-badge {{ 'healthy' if item.status == 'healthy' else ('danger' if item.status == 'down' else 'warning') }}">{{ item.status }}</span>
+      <p>{{ item.state }}</p>
+      <small>{% if item.age_seconds is not none %}heartbeat {{ item.age_seconds }} сек. назад{% else %}heartbeat не найден{% endif %}</small>
+      {% if item.details %}<div class="runtime-health-details">{% for key, value in item.details.items() %}<span><b>{{ key }}</b>: {{ value }}</span>{% endfor %}</div>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  <div class="incident-summary {{ 'healthy' if incident_count == 0 else 'warning' }}">
+    <strong>{% if incident_count == 0 %}Активных признаков инцидента нет{% else %}Признаков инцидента: {{ incident_count }}{% endif %}</strong>
+    <span>Учитываются runtime heartbeat, неудачные доставки и зарегистрированные ошибки Telegram-ботов.</span>
+  </div>
 </section>
 
 <section class="system-status-grid observability-summary-grid">
@@ -44,17 +72,8 @@
       <thead><tr><th>Ошибка</th><th>Статус</th><th>Маршрут</th><th>Администратор</th><th>Проект</th><th>Время</th></tr></thead>
       <tbody>
       {% for item in recent_admin_errors %}
-        <tr>
-          <td><code>{{ item.error_id }}</code></td>
-          <td><span class="status-badge {{ 'danger' if item.status and item.status >= 500 else 'warning' }}">{{ item.status or '—' }}</span></td>
-          <td><code>{{ item.method }} {{ item.route }}</code></td>
-          <td>{{ item.admin }}</td>
-          <td>{{ item.project }}</td>
-          <td>{{ item.created_at|date_time }}</td>
-        </tr>
-      {% else %}
-        <tr><td colspan="6" class="empty">Ошибок админки в журнале пока нет.</td></tr>
-      {% endfor %}
+        <tr><td><code>{{ item.error_id }}</code></td><td><span class="status-badge {{ 'danger' if item.status and item.status >= 500 else 'warning' }}">{{ item.status or '—' }}</span></td><td><code>{{ item.method }} {{ item.route }}</code></td><td>{{ item.admin }}</td><td>{{ item.project }}</td><td>{{ item.created_at|date_time }}</td></tr>
+      {% else %}<tr><td colspan="6" class="empty">Ошибок админки в журнале пока нет.</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>
@@ -70,79 +89,22 @@
       <thead><tr><th>Ошибка</th><th>Проект</th><th>Источник</th><th>Update</th><th>Пользователь / чат</th><th>Request ID</th><th>Время</th></tr></thead>
       <tbody>
       {% for item in recent_bot_errors %}
-        <tr>
-          <td><code>{{ item.error_id }}</code><br><small>{{ item.exception_type }}</small></td>
-          <td>{{ bot_names.get(item.bot_id, item.bot_code) if item.bot_id else item.bot_code }}</td>
-          <td><code>{{ item.source }}</code></td>
-          <td>{{ item.update_type }}{% if item.update_id %} #{{ item.update_id }}{% endif %}</td>
-          <td>{% if item.telegram_user_id %}user {{ item.telegram_user_id }}{% else %}—{% endif %}{% if item.telegram_chat_id %}<br><small>chat {{ item.telegram_chat_id }}</small>{% endif %}</td>
-          <td><code>{{ item.request_id }}</code></td>
-          <td>{{ item.created_at|date_time }}</td>
-        </tr>
-      {% else %}
-        <tr><td colspan="7" class="empty">Ошибок Telegram-ботов в журнале пока нет.</td></tr>
-      {% endfor %}
+        <tr><td><code>{{ item.error_id }}</code><br><small>{{ item.exception_type }}</small></td><td>{{ bot_names.get(item.bot_id, item.bot_code) if item.bot_id else item.bot_code }}</td><td><code>{{ item.source }}</code></td><td>{{ item.update_type }}{% if item.update_id %} #{{ item.update_id }}{% endif %}</td><td>{% if item.telegram_user_id %}user {{ item.telegram_user_id }}{% else %}—{% endif %}{% if item.telegram_chat_id %}<br><small>chat {{ item.telegram_chat_id }}</small>{% endif %}</td><td><code>{{ item.request_id }}</code></td><td>{{ item.created_at|date_time }}</td></tr>
+      {% else %}<tr><td colspan="7" class="empty">Ошибок Telegram-ботов в журнале пока нет.</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>
 </section>
 
 <section class="panel system-panel">
-  <div class="panel-heading">
-    <div><span class="eyebrow">Telegram</span><h3>Последние неудачные доставки</h3></div>
-    <span class="status-badge {{ 'danger' if failed_deliveries else 'healthy' }}">{{ failed_deliveries|length }} показано</span>
-  </div>
-  <div class="observability-table-wrap">
-    <table class="observability-table">
-      <thead><tr><th>ID</th><th>Проект</th><th>Тип</th><th>Попытки</th><th>Ошибка</th><th>Обновлено</th><th></th></tr></thead>
-      <tbody>
-      {% for item in failed_deliveries %}
-        <tr>
-          <td>#{{ item.id }}</td>
-          <td>{{ bot_names.get(item.bot_id, 'Проект #' ~ item.bot_id) }}</td>
-          <td>{{ item.kind }}</td>
-          <td>{{ item.attempts }}</td>
-          <td class="observability-error-cell">{{ item.last_error or 'Без текста ошибки' }}</td>
-          <td>{{ item.updated_at|date_time }}</td>
-          <td>
-            <form method="post" action="/admin/platform/observability/delivery/{{ item.id }}/retry" data-loading-label="Повторяем…">
-              <button class="button-secondary compact" type="submit">Повторить</button>
-            </form>
-          </td>
-        </tr>
-      {% else %}
-        <tr><td colspan="7" class="empty">Неудачных доставок нет.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <div class="panel-heading"><div><span class="eyebrow">Telegram</span><h3>Последние неудачные доставки</h3></div><span class="status-badge {{ 'danger' if failed_deliveries else 'healthy' }}">{{ failed_deliveries|length }} показано</span></div>
+  <div class="observability-table-wrap"><table class="observability-table"><thead><tr><th>ID</th><th>Проект</th><th>Тип</th><th>Попытки</th><th>Ошибка</th><th>Обновлено</th><th></th></tr></thead><tbody>
+  {% for item in failed_deliveries %}<tr><td>#{{ item.id }}</td><td>{{ bot_names.get(item.bot_id, 'Проект #' ~ item.bot_id) }}</td><td>{{ item.kind }}</td><td>{{ item.attempts }}</td><td class="observability-error-cell">{{ item.last_error or 'Без текста ошибки' }}</td><td>{{ item.updated_at|date_time }}</td><td><form method="post" action="/admin/platform/observability/delivery/{{ item.id }}/retry" data-loading-label="Повторяем…"><button class="button-secondary compact" type="submit">Повторить</button></form></td></tr>{% else %}<tr><td colspan="7" class="empty">Неудачных доставок нет.</td></tr>{% endfor %}
+  </tbody></table></div>
 </section>
 
 <section class="system-layout-grid">
-  <article class="panel system-panel">
-    <div class="panel-heading"><div><span class="eyebrow">Impaya</span><h3>Ошибки платежей</h3></div></div>
-    <div class="observability-event-list">
-      {% for item in payment_errors %}
-      <article class="observability-event danger">
-        <div><strong>{{ bot_names.get(item.bot_id, 'Проект #' ~ item.bot_id) }}</strong><span>#{{ item.id }} · {{ item.status }}</span></div>
-        <p>{{ item.error_message or item.error_code or 'Платёж завершился с ошибкой' }}</p>
-        <small>{{ item.created_at|date_time }}</small>
-      </article>
-      {% else %}<p class="empty">Ошибок платежей нет.</p>{% endfor %}
-    </div>
-  </article>
-
-  <article class="panel system-panel">
-    <div class="panel-heading"><div><span class="eyebrow">Деплой</span><h3>Неудачные развёртывания</h3></div></div>
-    <div class="observability-event-list">
-      {% for item in failed_deploys %}
-      <article class="observability-event warning">
-        <div><strong>{{ item.commit or 'Без коммита' }}</strong><span>{{ item.branch or '' }}</span></div>
-        <p>{{ item.error or 'Деплой завершился с ошибкой' }}</p>
-        <small>{{ item.completed_at or item.started_at or '—' }}</small>
-      </article>
-      {% else %}<p class="empty">Неудачных развёртываний в журнале нет.</p>{% endfor %}
-    </div>
-  </article>
+  <article class="panel system-panel"><div class="panel-heading"><div><span class="eyebrow">Impaya</span><h3>Ошибки платежей</h3></div></div><div class="observability-event-list">{% for item in payment_errors %}<article class="observability-event danger"><div><strong>{{ bot_names.get(item.bot_id, 'Проект #' ~ item.bot_id) }}</strong><span>#{{ item.id }} · {{ item.status }}</span></div><p>{{ item.error_message or item.error_code or 'Платёж завершился с ошибкой' }}</p><small>{{ item.created_at|date_time }}</small></article>{% else %}<p class="empty">Ошибок платежей нет.</p>{% endfor %}</div></article>
+  <article class="panel system-panel"><div class="panel-heading"><div><span class="eyebrow">Деплой</span><h3>Неудачные развёртывания</h3></div></div><div class="observability-event-list">{% for item in failed_deploys %}<article class="observability-event warning"><div><strong>{{ item.commit or 'Без коммита' }}</strong><span>{{ item.branch or '' }}</span></div><p>{{ item.error or 'Деплой завершился с ошибкой' }}</p><small>{{ item.completed_at or item.started_at or '—' }}</small></article>{% else %}<p class="empty">Неудачных развёртываний в журнале нет.</p>{% endfor %}</div></article>
 </section>
 {% endblock %}
