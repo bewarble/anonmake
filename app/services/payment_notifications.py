@@ -24,12 +24,18 @@ logger = logging.getLogger(__name__)
 
 async def finalize_checkout_and_notify(
     session: AsyncSession,
+    bot: Bot,
     client: ImpayaClient,
     checkout: RevealCheckout,
     *,
     payment_form_url_template: str,
 ) -> str:
-    """Finalize a reveal payment in the bot/project that owns the checkout."""
+    """Finalize a reveal payment in the bot/project that owns the checkout.
+
+    `bot` is kept in the signature for compatibility with the existing web callback
+    layer. Delivery intentionally uses a bot resolved from checkout ownership.
+    """
+    del bot
     settings = load_settings()
 
     buyer_row = await session.get(User, checkout.buyer_id)
@@ -45,7 +51,7 @@ async def finalize_checkout_and_notify(
         return "notification_failed"
 
     token = await resolve_bot_token(session, settings, instance)
-    bot = Bot(token=token)
+    runtime_bot = Bot(token=token)
     context_token = set_current_bot(
         CurrentBot(instance.id, instance.code, instance.username, instance.display_name)
     )
@@ -82,7 +88,7 @@ async def finalize_checkout_and_notify(
             await session.commit()
             return "notification_failed"
 
-        identity = await resolve_current_sender(bot, target_user)
+        identity = await resolve_current_sender(runtime_bot, target_user)
 
         tracking = CrmTrackingService(session)
         await tracking.payment_succeeded(
@@ -99,7 +105,7 @@ async def finalize_checkout_and_notify(
         )
 
         try:
-            await bot.send_message(
+            await runtime_bot.send_message(
                 buyer.telegram_id,
                 texts.VIP_ACTIVATED_WITH_SENDER.format(sender=identity.label),
             )
@@ -118,4 +124,4 @@ async def finalize_checkout_and_notify(
         return "notified"
     finally:
         reset_current_bot(context_token)
-        await bot.session.close()
+        await runtime_bot.session.close()
