@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.bot.keyboards import main_menu_for
@@ -16,7 +17,9 @@ def menu_for(message: Message):
 
 
 @router.message(F.text == USER_HELP)
-async def show_help(message: Message) -> None:
+async def show_help(message: Message, state: FSMContext) -> None:
+    # Main-menu navigation is an explicit exit from any unfinished question/answer.
+    await state.clear()
     await message.answer(texts.HELP, reply_markup=menu_for(message))
 
 
