@@ -29,18 +29,23 @@ def main() -> None:
     reject("app/bot/keyboards/main_menu.py", "USER_HELP")
     require(
         "app/bot/keyboards/personal_link.py",
-        'SHARE_TEXT = "Отправь мне анонимное сообщение 👇\\n{link}"',
+        'SHARE_TEXT = "Отправь мне анонимное сообщение 👇"',
         'text="🔗 Скопировать ссылку"',
         'text="📤 Выложить в каналы / чаты"',
         "CopyTextButton(text=full_link)",
+        'full_link = link if link.startswith("https://") else f"https://{link}"',
+        "encoded_link = quote(full_link, safe=\"\")",
+        "encoded_text = quote(SHARE_TEXT, safe=\"\")",
         '"https://t.me/share/url/?"',
-        'f"url={encoded_url}&text={encoded_text}"',
+        'f"url={encoded_link}&text={encoded_text}"',
     )
     reject(
         "app/bot/keyboards/personal_link.py",
         "tg://msg_url",
         'f"url=%20&text={encoded_text}"',
         "short_link =",
+        'SHARE_TEXT = "Отправь мне анонимное сообщение 👉 {link}"',
+        'SHARE_TEXT = "Отправь мне анонимное сообщение 👇\\n{link}"',
     )
     require(
         "app/bot/handlers/navigation.py",
