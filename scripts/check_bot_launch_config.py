@@ -35,10 +35,19 @@ def main() -> None:
         require_public_https("OFFER_URL", settings.offer_url)
 
     assert settings.impaya_api_token.strip(), "IMPAYA_API_TOKEN is missing"
+    assert settings.impaya_webhook_secret.strip(), "IMPAYA_WEBHOOK_SECRET is missing"
     assert settings.impaya_payment_form_url_template.strip(), (
         "IMPAYA_PAYMENT_FORM_URL_TEMPLATE is missing"
     )
+    require_public_https(
+        "IMPAYA_PAYMENT_FORM_URL_TEMPLATE",
+        settings.impaya_payment_form_url_template.replace("{invoice_id}", "launch-check"),
+    )
     reject_test_value("IMPAYA_API_URL", settings.impaya_api_url)
+    reject_test_value(
+        "IMPAYA_PAYMENT_FORM_URL_TEMPLATE",
+        settings.impaya_payment_form_url_template,
+    )
 
     effective_binding_terminal = (
         settings.impaya_binding_terminal_name or settings.impaya_terminal_name
@@ -63,7 +72,8 @@ def main() -> None:
     print(f"Configured fixed bot identities: {len(identities)}")
     print("Billing and automatic renewal: enabled")
     print("Test payment commands: disabled")
-    print("Public URLs: HTTPS")
+    print("Public URLs and payment form: HTTPS")
+    print("Impaya webhook secret: configured")
     print("Impaya endpoint and terminals: non-test")
     print("Public billing copy matches runtime amounts and durations")
 
