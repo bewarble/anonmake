@@ -31,16 +31,16 @@ async def track_start_source(
 
     source = None
     attributed = False
-    # Personal-link payloads are real bot starts but are not marketing sources.
-    if is_new_user and payload.startswith("src_"):
-        source = await MarketingRepository(session).source_by_code(
-            payload.removeprefix("src_")
-        )
+    if payload.startswith("src_"):
+        marketing = MarketingRepository(session)
+        source = await marketing.source_by_code(payload.removeprefix("src_"))
         if source is not None:
-            attributed = await MarketingRepository(session).register_source_start(
-                source=source,
-                user=user,
-            )
+            await marketing.record_source_click(source)
+            if is_new_user:
+                attributed = await marketing.register_source_start(
+                    source=source,
+                    user=user,
+                )
 
     tracking = CrmTrackingService(session)
     await tracking.bot_started(user_id=user.id)
@@ -53,6 +53,4 @@ async def track_start_source(
 
     await session.commit()
 
-    # One handler owns all /start UX. This keeps ordinary starts, personal links
-    # and marketing starts on one canonical Telegram user experience.
     raise SkipHandler
