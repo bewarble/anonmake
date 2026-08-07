@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from aiogram.types import User as TelegramUser
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -41,6 +43,10 @@ class UserRepository:
         user.username = telegram_user.username
         user.first_name = telegram_user.first_name
         user.last_name = telegram_user.last_name
+        # updated_at doubles as the last confirmed user activity timestamp.
+        # Touch it explicitly even when Telegram profile fields did not change,
+        # so a user who returns after blocking the bot becomes alive again.
+        user.updated_at = datetime.now(timezone.utc)
 
     async def get_or_create_from_telegram(
         self,
@@ -50,6 +56,7 @@ class UserRepository:
 
         The savepoint makes concurrent first /start updates safe: only the
         transaction that inserts the unique telegram_id receives created=True.
+        Every existing-user hit refreshes ``updated_at`` as last activity.
         """
         user = await self.get_by_telegram_id(telegram_user.id)
         if user is not None:
