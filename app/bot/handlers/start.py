@@ -40,6 +40,10 @@ async def command_start(
     if not code:
         link = await personal_link(bot, current_user.public_code)
         await message.answer(
+            texts.WELCOME,
+            reply_markup=main_menu_for(message.from_user.id),
+        )
+        await message.answer(
             f"{texts.PERSONAL_LINK.format(link=link)}\n\n"
             f"{texts.PERSONAL_LINK_HINT}",
             reply_markup=personal_link_share_keyboard(link),
@@ -50,14 +54,14 @@ async def command_start(
     if recipient is None:
         await message.answer(
             texts.INVALID_LINK,
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_for(message.from_user.id),
         )
         return
 
     if recipient.id == current_user.id:
         await message.answer(
             texts.SELF_MESSAGE,
-            reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+            reply_markup=main_menu_for(message.from_user.id),
         )
         return
 
@@ -85,5 +89,3 @@ async def show_personal_link(
         f"{texts.PERSONAL_LINK_HINT}",
         reply_markup=personal_link_share_keyboard(link),
     )
-
-
