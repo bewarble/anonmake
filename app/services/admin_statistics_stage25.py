@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bot_context import require_current_bot
 from app.models.billing import PaymentMethod
 from app.models.delivery import DeliveryOutbox
 from app.models.marketing import SourceAttribution
@@ -47,55 +48,64 @@ class AdminStatisticsStage25Repository:
         self.session = session
 
     async def snapshot(self, *, days: int = 20) -> StatisticsStage25:
+        bot_id = require_current_bot().id
         now = datetime.now(timezone.utc)
         day = now - timedelta(days=1)
         week = now - timedelta(days=7)
         month = now - timedelta(days=30)
 
-        users_total = await self._users_count()
-        users_dead = await self._dead_users_count()
+        users_total = await self._users_count(bot_id)
+        users_dead = await self._dead_users_count(bot_id)
 
         return StatisticsStage25(
             users_total=users_total,
             users_alive=max(users_total - users_dead, 0),
             users_dead=users_dead,
-            today=await self._users_since(day),
-            week=await self._users_since(week),
-            month=await self._users_since(month),
+            today=await self._users_since(bot_id, day),
+            week=await self._users_since(bot_id, week),
+            month=await self._users_since(bot_id, month),
             all_time=users_total,
-            organic_today=await self._organic_since(day),
-            organic_week=await self._organic_since(week),
-            organic_month=await self._organic_since(month),
-            organic_all_time=await self._organic_all_time(),
-            active_cards=await self._active_cards(),
-            points=await self._daily_points(days=days),
+            organic_today=await self._organic_since(bot_id, day),
+            organic_week=await self._organic_since(bot_id, week),
+            organic_month=await self._organic_since(bot_id, month),
+            organic_all_time=await self._organic_all_time(bot_id),
+            active_cards=await self._active_cards(bot_id),
+            points=await self._daily_points(bot_id, days=days),
         )
 
-    async def _users_count(self) -> int:
-        value = await self.session.scalar(select(func.count(User.id)))
-        return int(value or 0)
-
-    async def _users_since(self, since: datetime) -> int:
+    async def _users_count(self, bot_id: int) -> int:
         value = await self.session.scalar(
-            select(func.count(User.id)).where(User.created_at >= since)
+            select(func.count(User.id)).where(User.bot_id == bot_id)
         )
         return int(value or 0)
 
-    async def _dead_users_count(self) -> int:
+    async def _users_since(self, bot_id: int, since: datetime) -> int:
+        value = await self.session.scalar(
+            select(func.count(User.id)).where(
+                User.bot_id == bot_id,
+                User.created_at >= since,
+            )
+        )
+        return int(value or 0)
+
+    async def _dead_users_count(self, bot_id: int) -> int:
         value = await self.session.scalar(
             select(func.count(func.distinct(User.id)))
             .join(
                 DeliveryOutbox,
-                DeliveryOutbox.chat_id == User.telegram_id,
+                (DeliveryOutbox.chat_id == User.telegram_id)
+                & (DeliveryOutbox.bot_id == User.bot_id),
             )
             .where(
+                User.bot_id == bot_id,
+                DeliveryOutbox.bot_id == bot_id,
                 DeliveryOutbox.status == "failed",
                 self._permanent_error_condition(),
             )
         )
         return int(value or 0)
 
-    async def _organic_since(self, since: datetime) -> int:
+    async def _organic_since(self, bot_id: int, since: datetime) -> int:
         value = await self.session.scalar(
             select(func.count(User.id))
             .outerjoin(
@@ -103,26 +113,31 @@ class AdminStatisticsStage25Repository:
                 SourceAttribution.user_id == User.id,
             )
             .where(
+                User.bot_id == bot_id,
                 User.created_at >= since,
                 SourceAttribution.id.is_(None),
             )
         )
         return int(value or 0)
 
-    async def _organic_all_time(self) -> int:
+    async def _organic_all_time(self, bot_id: int) -> int:
         value = await self.session.scalar(
             select(func.count(User.id))
             .outerjoin(
                 SourceAttribution,
                 SourceAttribution.user_id == User.id,
             )
-            .where(SourceAttribution.id.is_(None))
+            .where(
+                User.bot_id == bot_id,
+                SourceAttribution.id.is_(None),
+            )
         )
         return int(value or 0)
 
-    async def _active_cards(self) -> int:
+    async def _active_cards(self, bot_id: int) -> int:
         value = await self.session.scalar(
             select(func.count(PaymentMethod.id)).where(
+                PaymentMethod.bot_id == bot_id,
                 PaymentMethod.is_active.is_(True),
                 PaymentMethod.is_recurrent.is_(True),
                 PaymentMethod.binding_id.is_not(None),
@@ -131,7 +146,7 @@ class AdminStatisticsStage25Repository:
         )
         return int(value or 0)
 
-    async def _daily_points(self, *, days: int) -> list[DailyStatisticsPoint]:
+    async def _daily_points(self, bot_id: int, *, days: int) -> list[DailyStatisticsPoint]:
         now = datetime.now(timezone.utc)
         start = (now - timedelta(days=days - 1)).replace(
             hour=0,
@@ -148,6 +163,7 @@ class AdminStatisticsStage25Repository:
             joined = int(
                 await self.session.scalar(
                     select(func.count(User.id)).where(
+                        User.bot_id == bot_id,
                         User.created_at >= left,
                         User.created_at < right,
                     )
@@ -161,6 +177,7 @@ class AdminStatisticsStage25Repository:
                     func.min(DeliveryOutbox.updated_at).label("blocked_at"),
                 )
                 .where(
+                    DeliveryOutbox.bot_id == bot_id,
                     DeliveryOutbox.status == "failed",
                     self._permanent_error_condition(),
                 )
