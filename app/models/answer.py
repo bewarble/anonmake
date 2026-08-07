@@ -14,7 +14,6 @@ class Answer(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     question_id: Mapped[int] = mapped_column(
         ForeignKey("questions.id", ondelete="CASCADE"),
-        unique=True,
         index=True,
         nullable=False,
     )
@@ -23,7 +22,7 @@ class Answer(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    question: Mapped["Question"] = relationship(back_populates="answer")
+    question: Mapped["Question"] = relationship(back_populates="answers")
 
 
 from app.models.question import Question  # noqa: E402,F401
