@@ -5,6 +5,7 @@ from app.core.config import load_settings
 from app.bot.handlers.admin_marketing import router as admin_marketing_router
 from app.bot.handlers.admin_stage25_1 import router as admin_router
 from app.bot.handlers.answers import router as answers_router
+from app.bot.handlers.chat_members import router as chat_members_router
 from app.bot.handlers.errors import router as errors_router
 from app.bot.handlers.navigation import fallback_router as navigation_fallback_router
 from app.bot.handlers.navigation import router as navigation_router
@@ -20,6 +21,10 @@ from app.bot.handlers.subscriptions import router as subscriptions_router
 
 def build_router() -> Router:
     router = Router(name="root")
+
+    # Membership updates are independent of message/FSM flows and keep
+    # live/dead user state synchronized with Telegram in real time.
+    router.include_router(chat_members_router)
 
     # Operational admin handlers must precede generic FSM handlers.
     router.include_router(admin_router)
