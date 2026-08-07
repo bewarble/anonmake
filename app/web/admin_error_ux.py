@@ -6,11 +6,12 @@ import secrets
 from pathlib import Path
 from urllib.parse import urlencode
 
-from fastapi import HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import load_settings
 from app.database.session import SessionFactory
@@ -150,3 +151,30 @@ async def admin_unhandled_exception_handler(request: Request, exc: Exception):
     error_id = new_error_id()
     logger.exception("Unhandled admin error error_id=%s path=%s", error_id, request.url.path, exc_info=exc)
     return await render_admin_error(request, status_code=500, error_id=error_id)
+
+
+async def admin_error_middleware(request: Request, call_next):
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        if not is_admin_request(request):
+            raise
+        return await admin_unhandled_exception_handler(request, exc)
+
+    if not is_admin_request(request):
+        return response
+
+    content_type = response.headers.get("content-type", "")
+    raw_admin_error = content_type.startswith("application/json") or content_type.startswith("text/plain")
+    if response.status_code in {403, 404, 409, 422} and raw_admin_error:
+        return await render_admin_error(request, status_code=response.status_code)
+    if response.status_code >= 500 and not content_type.startswith("text/html"):
+        return await render_admin_error(request, status_code=500)
+    return response
+
+
+def install_admin_error_ux(app: FastAPI) -> None:
+    app.add_exception_handler(HTTPException, admin_http_exception_handler)
+    app.add_exception_handler(RequestValidationError, admin_validation_exception_handler)
+    app.add_exception_handler(Exception, admin_unhandled_exception_handler)
+    app.add_middleware(BaseHTTPMiddleware, dispatch=admin_error_middleware)
