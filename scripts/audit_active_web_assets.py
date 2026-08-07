@@ -11,6 +11,7 @@ ACTIVE_ASSETS = {
     "admin-stage51.css", "admin-stage51.js",
     "admin-stage52.css", "admin-stage52.js",
     "admin-stage53.css", "admin-stage53.js",
+    "admin-stage54.css", "admin-stage54.js",
 }
 
 
