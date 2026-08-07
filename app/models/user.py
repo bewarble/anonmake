@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import secrets
+import string
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -9,8 +10,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 
 
+PUBLIC_CODE_LENGTH = 8
+PUBLIC_CODE_ALPHABET = string.ascii_letters + string.digits
+
+
 def generate_public_code() -> str:
-    return secrets.token_urlsafe(9)
+    return "".join(
+        secrets.choice(PUBLIC_CODE_ALPHABET)
+        for _ in range(PUBLIC_CODE_LENGTH)
+    )
 
 
 class User(Base):
