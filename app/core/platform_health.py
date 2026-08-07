@@ -18,6 +18,7 @@ class RuntimeHealth:
 
 
 RUNTIME_SERVICES: tuple[tuple[str, str, int], ...] = (
+    ("managed-bots", "Managed bots", 75),
     ("delivery-worker", "Доставка", 90),
     ("broadcast-worker", "Рассылки", 90),
     ("billing-worker", "Биллинг", 180),
