@@ -45,7 +45,7 @@ class QuestionRepository:
             .options(
                 selectinload(Question.sender),
                 selectinload(Question.recipient),
-                selectinload(Question.answer),
+                selectinload(Question.answers),
             )
         )
         if for_update:
