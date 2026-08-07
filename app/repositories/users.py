@@ -8,7 +8,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.bot_context import require_current_bot
-from app.models.user import User
+from app.models.user import User, generate_public_code
+
+
+PUBLIC_CODE_CREATE_ATTEMPTS = 20
 
 
 class UserRepository:
@@ -72,9 +75,8 @@ class UserRepository:
     ) -> tuple[User, bool]:
         """Return a user and whether this call created the database record.
 
-        The savepoint makes concurrent first /start updates safe: only the
-        transaction that inserts the unique telegram_id receives created=True.
-        Every existing-user interaction also marks the user alive.
+        Concurrent first interactions and short public-code collisions are both
+        handled through savepoints. Existing users are always marked alive.
         """
         user = await self.get_by_telegram_id(telegram_user.id)
         if user is not None:
@@ -82,28 +84,33 @@ class UserRepository:
             await self.session.flush()
             return user, False
 
-        user = User(
-            bot_id=require_current_bot().id,
-            telegram_id=telegram_user.id,
-            username=telegram_user.username,
-            first_name=telegram_user.first_name,
-            last_name=telegram_user.last_name,
-            is_blocked=False,
-        )
+        bot_id = require_current_bot().id
+        for _ in range(PUBLIC_CODE_CREATE_ATTEMPTS):
+            user = User(
+                bot_id=bot_id,
+                telegram_id=telegram_user.id,
+                public_code=generate_public_code(),
+                username=telegram_user.username,
+                first_name=telegram_user.first_name,
+                last_name=telegram_user.last_name,
+                is_blocked=False,
+            )
+            try:
+                async with self.session.begin_nested():
+                    self.session.add(user)
+                    await self.session.flush()
+            except IntegrityError:
+                existing = await self.get_by_telegram_id(telegram_user.id)
+                if existing is not None:
+                    self._sync_telegram_fields(existing, telegram_user)
+                    await self.session.flush()
+                    return existing, False
+                # The telegram id is still free, so this was most likely a
+                # public-code collision. Generate another short code.
+                continue
+            return user, True
 
-        try:
-            async with self.session.begin_nested():
-                self.session.add(user)
-                await self.session.flush()
-        except IntegrityError:
-            user = await self.get_by_telegram_id(telegram_user.id)
-            if user is None:
-                raise
-            self._sync_telegram_fields(user, telegram_user)
-            await self.session.flush()
-            return user, False
-
-        return user, True
+        raise RuntimeError("Could not allocate a unique public code")
 
     async def upsert_from_telegram(self, telegram_user: TelegramUser) -> User:
         user, _ = await self.get_or_create_from_telegram(telegram_user)
