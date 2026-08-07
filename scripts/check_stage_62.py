@@ -59,7 +59,7 @@ def main() -> None:
         '@router.message(Command("cancel"))',
         "FSMContext",
         "await state.clear()",
-        "if not subscription.auto_renew",
+        "cancel_auto_renew",
     )
     reject("app/bot/handlers/subscriptions.py", "StateFilter(None)")
     reject("app/bot/handlers/questions.py", 'Command("cancel")')
