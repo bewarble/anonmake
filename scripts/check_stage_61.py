@@ -35,7 +35,15 @@ def main() -> None:
         'unique=False',
     )
     require("app/bot/handlers/start.py", "async def show_personal_link(", "await state.clear()")
-    require("app/bot/handlers/navigation.py", "async def show_help(message: Message, state: FSMContext)", "await state.clear()")
+    # Stage 61's contract is behavioral: opening the help/navigation action must
+    # clear any unfinished FSM flow. Later stages may add session/bot parameters
+    # to render richer help without invalidating this historical guarantee.
+    require(
+        "app/bot/handlers/navigation.py",
+        "async def show_help(",
+        "state: FSMContext",
+        "await state.clear()",
+    )
     require("scripts/check_stage_61_runtime.py", "Stage 61 runtime check: OK")
     print("Stage 61 check: OK")
     print("Restart-safe Redis FSM with bot-id isolation: ready")
