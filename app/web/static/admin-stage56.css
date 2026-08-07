@@ -1,0 +1,44 @@
+/* Stage 56 — final admin UX consistency pass. */
+:root{--admin-control-height:42px;--admin-radius:11px;--admin-section-gap:18px}
+
+/* One button language across legacy and current templates. */
+:is(.button,.button-primary,.button-secondary,.primary){min-height:var(--admin-control-height);display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:var(--admin-radius);font-weight:750;line-height:1.2;text-decoration:none;cursor:pointer}
+:is(.button.primary,.button-primary,.primary){padding:10px 16px;background:var(--purple,var(--accent));color:#fff;border:1px solid transparent}
+:is(.button.secondary,.button-secondary){padding:10px 16px;background:var(--surface);color:var(--text);border:1px solid var(--line)}
+:is(.button.danger,.danger.button){padding:10px 16px;border:1px solid rgba(255,113,133,.35);background:rgba(255,113,133,.1);color:var(--red)}
+:is(.button,.button-primary,.button-secondary,.primary):disabled{opacity:.58;cursor:not-allowed}
+
+/* Page title rhythm. */
+.page-toolbar,.platform-page-header,.page-header{margin-bottom:var(--admin-section-gap)}
+.page-toolbar h2,.platform-page-header h1,.page-header h1{margin-bottom:5px}
+.page-toolbar p,.platform-page-header p,.page-header p{margin-bottom:0;color:var(--muted);max-width:760px;line-height:1.55}
+.section-kicker,.panel-kicker{display:inline-block;margin-bottom:5px;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.11em;text-transform:uppercase}
+
+/* Forms and filters use the same label/control rhythm. */
+:is(.filters,.platform-form) label:not(.project-choice){display:grid;gap:7px;color:var(--muted);font-size:12px;font-weight:700}
+:is(.filters,.platform-form) :is(input,select,textarea){min-height:var(--admin-control-height)}
+.filter-actions,.form-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+
+/* Legacy notices visually match Stage 50 flashes without duplicating behavior. */
+.notice{display:flex;align-items:center;min-height:44px;margin:0 0 var(--admin-section-gap);padding:11px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);font-weight:700}
+.notice.success{border-color:rgba(82,211,167,.25);background:rgba(82,211,167,.08);color:#8be5c5}
+.notice.warning{border-color:rgba(255,184,77,.25);background:rgba(255,184,77,.08)}
+.notice.error,.notice.danger{border-color:rgba(255,113,133,.28);background:rgba(255,113,133,.08);color:#ff9dac}
+
+/* Empty states should never look like a broken table row. */
+.empty-state,.unified-empty{min-height:120px;display:grid;place-items:center;align-content:center;gap:7px;text-align:center;color:var(--muted);padding:24px;border-radius:13px}
+.empty-state strong,.unified-empty strong{color:var(--text)}
+.empty-state p,.unified-empty p{margin:0;max-width:520px}
+
+/* Cards and sections share the same internal spacing. */
+.panel-heading,.section-heading,.admin-card-head,.panel-title-row{margin-bottom:14px}
+.platform-section{margin-top:24px}
+.admin-card-actions{margin-top:16px}
+
+@media(max-width:700px){
+  :root{--admin-section-gap:16px}
+  .filter-actions,.form-actions{display:grid;grid-template-columns:1fr;width:100%}
+  .filter-actions>*,.form-actions>*{width:100%}
+  .notice{font-size:14px}
+  .platform-page-header h1,.page-header h1,.page-toolbar h2{line-height:1.15}
+}
