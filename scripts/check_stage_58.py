@@ -86,6 +86,15 @@ def main() -> None:
         "router.include_router(navigation_fallback_router)",
     )
     require(
+        "app/managed_bots.py",
+        "dispatcher.include_router(build_router())",
+    )
+    require(
+        "Makefile",
+        "docker-up-multibot:",
+        "$(COMPOSE) --profile multibot up -d --build",
+    )
+    require(
         "app/core/texts.py",
         "UNKNOWN_INPUT",
         "HELP",
@@ -101,6 +110,8 @@ def main() -> None:
     print("Stage 58 check: OK")
     print("/start installs the reply keyboard and personal-link messages own their inline share button")
     print("Share action matches the Telegram share URL flow used by the reference implementation")
+    print("Shared router is used by managed bot instances")
+    print("Full multibot rebuild command is ready")
     print("Help and unknown-input guidance are button-driven without command mentions")
     print("/cancel remains reserved for subscription auto-renew cancellation")
     print("No Stage 58 migration required")
