@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import answer_question_keyboard, main_menu_for
+from app.bot.keyboards.personal_link import personal_link_share_keyboard
 from app.bot.keyboards.questions import cancel_keyboard, write_more_keyboard
 from app.bot.states import AnswerQuestion, AskQuestion
 from app.core import texts
@@ -59,8 +60,13 @@ async def cancel_callback(callback: CallbackQuery, state: FSMContext, session: A
                 raise
         user = await UserRepository(session).upsert_from_telegram(callback.from_user)
         bot_user = await bot.get_me()
-        personal_link = f"t.me/{bot_user.username}?start={user.public_code}"
-        await bot.send_message(callback.message.chat.id, texts.QUESTION_PROMO.format(link=personal_link), reply_markup=main_menu_for(callback.from_user.id), disable_web_page_preview=True)
+        personal_link = f"https://t.me/{bot_user.username}?start={user.public_code}"
+        await bot.send_message(
+            callback.message.chat.id,
+            texts.QUESTION_PROMO.format(link=personal_link.removeprefix("https://")),
+            reply_markup=personal_link_share_keyboard(personal_link),
+            disable_web_page_preview=True,
+        )
         return
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
@@ -134,5 +140,9 @@ async def receive_question(message: Message, state: FSMContext, session: AsyncSe
             except Exception: logger.exception("Could not rollback duplicate key")
         raise
     await state.clear(); await message.answer(texts.QUESTION_SENT, reply_markup=write_more_keyboard(recipient.id))
-    current_bot = require_current_bot(); personal_link = f"t.me/{current_bot.username}?start={sender.public_code}"
-    await message.answer(texts.QUESTION_PROMO.format(link=personal_link), reply_markup=main_menu_for(message.from_user.id), disable_web_page_preview=True)
+    current_bot = require_current_bot(); personal_link = f"https://t.me/{current_bot.username}?start={sender.public_code}"
+    await message.answer(
+        texts.QUESTION_PROMO.format(link=personal_link.removeprefix("https://")),
+        reply_markup=personal_link_share_keyboard(personal_link),
+        disable_web_page_preview=True,
+    )
