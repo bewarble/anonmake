@@ -34,13 +34,11 @@ def main() -> None:
         'op.drop_constraint("uq_answers_question_id"',
         'unique=False',
     )
-    require("app/bot/handlers/start.py", "async def show_personal_link(", "await state.clear()")
-    # Stage 61's contract is behavioral: opening the help/navigation action must
-    # clear any unfinished FSM flow. Later stages may add session/bot parameters
-    # to render richer help without invalidating this historical guarantee.
+    # Later UX stages simplified the public menu to one action. The Stage 61
+    # guarantee remains: opening that main-menu action clears unfinished FSM.
     require(
-        "app/bot/handlers/navigation.py",
-        "async def show_help(",
+        "app/bot/handlers/start.py",
+        "async def show_personal_link(",
         "state: FSMContext",
         "await state.clear()",
     )
