@@ -43,10 +43,28 @@ class UserRepository:
         user.username = telegram_user.username
         user.first_name = telegram_user.first_name
         user.last_name = telegram_user.last_name
-        # updated_at doubles as the last confirmed user activity timestamp.
-        # Touch it explicitly even when Telegram profile fields did not change,
-        # so a user who returns after blocking the bot becomes alive again.
+        # Any real interaction proves the user can currently reach the bot.
+        user.is_blocked = False
         user.updated_at = datetime.now(timezone.utc)
+
+    async def set_block_state(
+        self,
+        telegram_id: int,
+        *,
+        is_blocked: bool,
+        changed_at: datetime | None = None,
+    ) -> User | None:
+        user = await self.get_by_telegram_id(telegram_id)
+        if user is None:
+            return None
+        moment = changed_at or datetime.now(timezone.utc)
+        user.is_blocked = is_blocked
+        if is_blocked:
+            user.blocked_at = moment
+        else:
+            user.updated_at = moment
+        await self.session.flush()
+        return user
 
     async def get_or_create_from_telegram(
         self,
@@ -56,7 +74,7 @@ class UserRepository:
 
         The savepoint makes concurrent first /start updates safe: only the
         transaction that inserts the unique telegram_id receives created=True.
-        Every existing-user hit refreshes ``updated_at`` as last activity.
+        Every existing-user interaction also marks the user alive.
         """
         user = await self.get_by_telegram_id(telegram_user.id)
         if user is not None:
@@ -70,6 +88,7 @@ class UserRepository:
             username=telegram_user.username,
             first_name=telegram_user.first_name,
             last_name=telegram_user.last_name,
+            is_blocked=False,
         )
 
         try:
