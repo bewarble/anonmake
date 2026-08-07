@@ -10,6 +10,17 @@
   </div>
 {%- endmacro %}
 
+{% macro data_state(title, hint='', icon='○', tone='', action_href='', action_label='') -%}
+  <div class="admin-data-state {{ tone }}" role="status">
+    <span class="admin-data-state-icon" aria-hidden="true">{{ icon }}</span>
+    <strong>{{ title }}</strong>
+    {% if hint %}<p>{{ hint }}</p>{% endif %}
+    {% if action_href and action_label %}
+    <div class="admin-data-state-actions"><a class="button-secondary" href="{{ action_href }}" data-data-nav>{{ action_label }}</a></div>
+    {% endif %}
+  </div>
+{%- endmacro %}
+
 {% macro page_intro(icon, title, description='', count=none) -%}
   <section class="page-toolbar unified-toolbar">
     <div class="page-title-group">
