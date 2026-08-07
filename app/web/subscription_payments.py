@@ -5,11 +5,16 @@ from datetime import timedelta
 from aiogram import Bot
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
+from sqlalchemy import select
 
+from app.core import texts
+from app.core.bot_context import CurrentBot, reset_current_bot, set_current_bot
 from app.core.config import load_settings
 from app.database.session import SessionFactory
-from app.models.billing import Subscription
+from app.models.billing import PaymentAttempt, Subscription
+from app.models.bot_instance import BotInstance
 from app.repositories.users import UserRepository
+from app.services.bot_credentials import resolve_bot_token
 from app.services.impaya import ImpayaClient
 from app.services.subscription_checkout import SubscriptionCheckoutService
 
@@ -21,10 +26,7 @@ def make_client() -> ImpayaClient:
     return ImpayaClient(
         settings.impaya_api_url,
         settings.impaya_api_token,
-        (
-            settings.impaya_binding_terminal_name
-            or settings.impaya_terminal_name
-        ),
+        settings.impaya_binding_terminal_name or settings.impaya_terminal_name,
         auth_header=settings.impaya_auth_header,
         auth_prefix=settings.impaya_auth_prefix,
         protocol_version=settings.impaya_protocol_version,
@@ -41,26 +43,48 @@ async def finalize_subscription_payment(
     notify: bool,
 ) -> str:
     client = make_client()
-    bot = Bot(token=settings.require_bot_token()) if notify else None
+    bot: Bot | None = None
+    context_token = None
 
     try:
         async with SessionFactory() as session:
+            # Operation IDs are globally unique. Resolve ownership before using the
+            # bot-scoped billing repository inside SubscriptionCheckoutService.
+            seed_attempt = await session.scalar(
+                select(PaymentAttempt).where(
+                    PaymentAttempt.customer_operation_id == operation_id
+                )
+            )
+            if seed_attempt is None:
+                return "pending"
+
+            instance = await session.get(BotInstance, seed_attempt.bot_id)
+            if instance is None:
+                return "pending"
+
+            context_token = set_current_bot(
+                CurrentBot(
+                    instance.id,
+                    instance.code,
+                    instance.username,
+                    instance.display_name,
+                )
+            )
+
             paid, attempt, newly_confirmed = await SubscriptionCheckoutService(
                 session,
                 client,
-                payment_form_url_template=(
-                    settings.impaya_payment_form_url_template
-                ),
+                payment_form_url_template=settings.impaya_payment_form_url_template,
                 trial_amount=settings.trial_price_kopecks,
-                trial_duration=timedelta(
-                    hours=settings.trial_duration_hours
-                ),
+                trial_duration=timedelta(hours=settings.trial_duration_hours),
             ).finalize(operation_id)
 
             if not paid or attempt is None:
                 return "pending"
 
-            if bot is not None and newly_confirmed:
+            if notify and newly_confirmed:
+                token = await resolve_bot_token(session, settings, instance)
+                bot = Bot(token=token)
                 subscription = await session.get(
                     Subscription,
                     attempt.subscription_id,
@@ -72,13 +96,12 @@ async def finalize_subscription_payment(
                     if user is not None:
                         await bot.send_message(
                             user.telegram_id,
-                            "✅ Тестовая оплата подтверждена\n\n"
-                            "VIP активирован на 1 день.\n"
-                            "Карта сохранена для рекуррентных "
-                            "списаний.",
+                            texts.ACCESS_ACTIVE,
                         )
             return "paid"
     finally:
+        if context_token is not None:
+            reset_current_bot(context_token)
         await client.close()
         if bot is not None:
             await bot.session.close()
@@ -89,20 +112,16 @@ async def finalize_subscription_payment(
     response_class=HTMLResponse,
 )
 async def subscription_success(operation_id: str) -> HTMLResponse:
-    result = await finalize_subscription_payment(
-        operation_id,
-        notify=True,
-    )
+    result = await finalize_subscription_payment(operation_id, notify=True)
     if result == "paid":
         body = (
-            "<h1>✅ Всё готово!</h1><p>Вернитесь в Telegram — VIP статус уже активирован.</p>"
-            "<p>Подписка активирована. Можно вернуться в Telegram.</p>"
+            "<h1>✅ Всё готово!</h1>"
+            "<p>Вернитесь в Telegram — VIP статус уже активирован.</p>"
         )
     else:
         body = (
             "<h1>Платёж обрабатывается</h1>"
-            "<p>Результат будет подтверждён через webhook "
-            "или повторную проверку.</p>"
+            "<p>Результат будет подтверждён автоматически.</p>"
         )
 
     return HTMLResponse(
@@ -120,7 +139,7 @@ async def subscription_fail(operation_id: str) -> HTMLResponse:
     return HTMLResponse(
         "<!doctype html><html lang='ru'><meta charset='utf-8'>"
         "<title>AnonMake</title><body>"
-        "<h1>❌ Оплата не завершена</h1><p>Вернитесь в Telegram и попробуйте ещё раз.</p>"
-        "<p>Вернитесь в Telegram и повторите попытку.</p>"
+        "<h1>❌ Оплата не завершена</h1>"
+        "<p>Вернитесь в Telegram и попробуйте ещё раз.</p>"
         "</body></html>"
     )
