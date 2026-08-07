@@ -32,10 +32,7 @@ def main() -> None:
         "https://sms.mooncloud.ltd/privacy",
         "https://sms.mooncloud.ltd/pricing",
     )
-    require(
-        "app/bot/commands.py",
-        'BotCommand(command="cancel", description="Отключить подписку")',
-    )
+    require("app/bot/commands.py", 'BotCommand(command="cancel", description="Отключить подписку")')
     require(
         "app/bot/ui.py",
         'USER_PERSONAL_LINK = "💬 Начать получать сообщения"',
@@ -44,18 +41,9 @@ def main() -> None:
         'QUESTION_REVEAL = "👁️ Узнать кто это"',
     )
     reject("app/bot/ui.py", "USER_HELP")
-    require(
-        "app/bot/keyboards/main_menu.py",
-        "KeyboardButton(text=USER_PERSONAL_LINK)",
-        "is_persistent=True",
-    )
+    require("app/bot/keyboards/main_menu.py", "KeyboardButton(text=USER_PERSONAL_LINK)", "is_persistent=True")
     reject("app/bot/keyboards/main_menu.py", "USER_HELP")
-    require(
-        "app/models/user.py",
-        "PUBLIC_CODE_LENGTH = 8",
-        "PUBLIC_CODE_ALPHABET",
-        "secrets.choice(PUBLIC_CODE_ALPHABET)",
-    )
+    require("app/models/user.py", "PUBLIC_CODE_LENGTH = 8", "PUBLIC_CODE_ALPHABET", "secrets.choice(PUBLIC_CODE_ALPHABET)")
     require(
         "migrations/versions/20260807_0021_short_public_codes.py",
         'revision = "20260807_0021"',
@@ -133,10 +121,33 @@ def main() -> None:
         "PaymentMethod.bot_id == bot_id",
     )
     require(
-        "app/delivery_worker.py",
-        'parse_mode = payload.get("parse_mode")',
-        "parse_mode=parse_mode",
+        "app/core/admin_metrics.py",
+        "return require_current_bot().id",
+        "User.bot_id == self.bot_id",
+        "DeliveryOutbox.bot_id == self.bot_id",
+        "PaymentAttempt.bot_id == self.bot_id",
     )
+    require(
+        "app/repositories/marketing.py",
+        "TrafficSource.bot_id == bot_id",
+        "Broadcast.bot_id == require_current_bot().id",
+        "User.bot_id == bot_id",
+        "Subscription.bot_id == bot_id",
+    )
+    require(
+        "app/broadcast_worker.py",
+        "User.bot_id == item.bot_id",
+        "Subscription.bot_id == item.bot_id",
+        "bot_id=item.bot_id",
+    )
+    require(
+        "app/bot/handlers/admin_stage25_1.py",
+        "• Живые —",
+        "• Мертвые —",
+        "♻️ <b>Прирост</b>",
+        "📈 <b>Саморост</b>",
+    )
+    require("app/delivery_worker.py", 'parse_mode = payload.get("parse_mode")', "parse_mode=parse_mode")
     print("Stage 63 check: OK")
     print("Public codes: shortened to 8 characters")
     print("Public menu: one persistent action")
@@ -144,8 +155,7 @@ def main() -> None:
     print("All other promo cards: native copy/share actions")
     print("Anonymous question/answer actions: 💬 Ответить + 👁️ Узнать кто это")
     print("/cancel command label: Отключить подписку")
-    print("Bot statistics: scoped to current project/bot")
-    print("/cancel: immediate auto-renew disable with final copy")
+    print("Telegram admin statistics/export/profit/sources/broadcasts: scoped to current bot")
     print("Reveal consent: Mooncloud terms/privacy/pricing links")
     print("Question and answer UX: final")
     print("Stage 63 migration: 20260807_0021_short_public_codes")
