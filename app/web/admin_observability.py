@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select, update
 
+from app.core.error_diagnostics import decode_bot_error_event
 from app.database.session import SessionFactory
 from app.models.admin import AdminAuditLog
 from app.models.billing import PaymentAttempt
@@ -96,7 +97,7 @@ async def observability_page(request: Request):
             ).scalars()
         )
 
-        error_rows = list(
+        web_error_rows = list(
             (
                 await session.execute(
                     select(AdminAuditLog)
@@ -106,7 +107,19 @@ async def observability_page(request: Request):
                 )
             ).scalars()
         )
-        recent_admin_errors = [decode_error_event(row) for row in error_rows]
+        recent_admin_errors = [decode_error_event(row) for row in web_error_rows]
+
+        bot_error_rows = list(
+            (
+                await session.execute(
+                    select(AdminAuditLog)
+                    .where(AdminAuditLog.action == "bot_error")
+                    .order_by(AdminAuditLog.created_at.desc())
+                    .limit(50)
+                )
+            ).scalars()
+        )
+        recent_bot_errors = [decode_bot_error_event(row) for row in bot_error_rows]
 
     return templates.TemplateResponse(
         request=request,
@@ -121,6 +134,7 @@ async def observability_page(request: Request):
             payment_errors=payment_errors,
             failed_deploys=_failed_deploys(),
             recent_admin_errors=recent_admin_errors,
+            recent_bot_errors=recent_bot_errors,
             bot_names=bot_names,
         ),
     )
