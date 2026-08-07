@@ -55,6 +55,12 @@ async def delete_message_quietly(message: Message | None) -> None:
         return
 
 
+def source_list_text(count: int) -> str:
+    if count:
+        return "🔗 <b>Реферальные ссылки</b>\n\nВыберите источник, чтобы открыть статистику."
+    return "🔗 <b>Реферальные ссылки</b>\n\nИсточников пока нет. Создайте первую реферальную ссылку."
+
+
 @router.message(F.text.in_({ADMIN_STATISTICS, "Статистика"}))
 async def statistics(message: Message, session: AsyncSession) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
@@ -139,20 +145,12 @@ async def export_users(callback: CallbackQuery, session: AsyncSession) -> None:
 async def referrals(message: Message, session: AsyncSession) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         return
-    repository = MarketingRepository(session)
-    sources = await repository.sources()
-    summary = await repository.sources_summary()
+    sources = await MarketingRepository(session).sources()
     await delete_message_quietly(message)
     await message.answer(
-        (
-            "🔗 Источники\n\n"
-            f"• Активных источников — {number(len(sources))}\n"
-            f"• Бюджет — {money(summary['spend_kopecks'])} ₽\n"
-            f"• Пользователей — {number(summary['attributed'])}\n"
-            f"• Средняя цена — {money(summary['average_cpa_kopecks'])} ₽\n\n"
-            f"{admin_texts.SOURCES_PROMPT}"
-        ),
-        reply_markup=referrals_keyboard(sources),
+        source_list_text(len(sources)),
+        parse_mode="HTML",
+        reply_markup=referrals_keyboard(sources, page=0),
     )
 
 
@@ -161,22 +159,38 @@ async def referrals_callback(callback: CallbackQuery, session: AsyncSession) -> 
     if callback.from_user is None or not is_admin(callback.from_user.id):
         await callback.answer(admin_texts.DENIED, show_alert=True)
         return
-    repository = MarketingRepository(session)
-    sources = await repository.sources()
-    summary = await repository.sources_summary()
+    sources = await MarketingRepository(session).sources()
     if callback.message:
         await delete_message_quietly(callback.message)
         await callback.message.answer(
-            (
-                "🔗 Источники\n\n"
-                f"• Активных источников — {number(len(sources))}\n"
-                f"• Бюджет — {money(summary['spend_kopecks'])} ₽\n"
-                f"• Пользователей — {number(summary['attributed'])}\n"
-                f"• Средняя цена — {money(summary['average_cpa_kopecks'])} ₽\n\n"
-                f"{admin_texts.SOURCES_PROMPT}"
-            ),
-            reply_markup=referrals_keyboard(sources),
+            source_list_text(len(sources)),
+            parse_mode="HTML",
+            reply_markup=referrals_keyboard(sources, page=0),
         )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin25:referrals:page:"))
+async def referrals_page(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.from_user is None or not is_admin(callback.from_user.id):
+        await callback.answer(admin_texts.DENIED, show_alert=True)
+        return
+    try:
+        page = max(int((callback.data or "").rsplit(":", 1)[1]), 0)
+    except ValueError:
+        page = 0
+    sources = await MarketingRepository(session).sources()
+    if callback.message:
+        await callback.message.edit_text(
+            source_list_text(len(sources)),
+            parse_mode="HTML",
+            reply_markup=referrals_keyboard(sources, page=page),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin25:referrals:noop")
+async def referrals_noop(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
@@ -197,21 +211,30 @@ async def referral_details(callback: CallbackQuery, session: AsyncSession, bot: 
         return
     me = await bot.get_me()
     link = f"https://t.me/{me.username}?start=src_{source.code}"
+    clicks = int(stats["clicks"])
     attributed = int(stats["attributed"])
+    cpc = "Н/д" if not clicks else money(int(stats["cpc_kopecks"]))
+    cpu = "Н/д" if not attributed else money(int(stats["cpa_kopecks"]))
+    text = (
+        f"Название ссылки: <b>{escape(source.name)}</b>\n\n"
+        "📊 <b>Статистика:</b>\n\n"
+        f"• Всего перешли — {number(clicks)}\n"
+        f"• Из них уникальны — {number(attributed)}\n"
+        f"• Из них живы — {number(int(stats['alive']))}\n\n"
+        "👤 <b>Статистика по времени:</b>\n\n"
+        f"• Сегодня — {number(int(stats['today']))}\n"
+        f"• За последние 7 дней — {number(int(stats['week']))}\n"
+        f"• За последние 31 день — {number(int(stats['month']))}\n\n"
+        "💰 <b>Цены:</b>\n\n"
+        f"• Цена ссылки — {money(int(stats['spend_kopecks']))} ₽\n"
+        f"• Цена за переход — {cpc}{' ₽' if cpc != 'Н/д' else ''}\n"
+        f"• Цена за уникального — {cpu}{' ₽' if cpu != 'Н/д' else ''}\n\n"
+        f"Ссылка: <code>{escape(link)}</code>\n"
+        f"Активных карт по рефке: {number(int(stats['active_cards']))}"
+    )
     if callback.message:
-        await delete_message_quietly(callback.message)
-        await callback.message.answer(
-            (
-                f"🔗 <b>{escape(source.name)}</b>\n\n"
-                f"• Бюджет — {money(int(stats['spend_kopecks']))} ₽\n"
-                f"• Переходы — {number(int(stats['clicks']))}\n"
-                f"• Пользователи — {number(attributed)}\n"
-                f"• Конверсия — {stats['conversion_percent']:.1f}%\n"
-                f"• Цена пользователя — {money(int(stats['cpa_kopecks']))} ₽\n"
-                f"• Создан — {source.created_at.strftime('%d.%m.%Y %H:%M')}\n"
-                f"• Исходная ссылка — {escape(source.source_url)}\n\n"
-                f"<code>{escape(link)}</code>"
-            ),
+        await callback.message.edit_text(
+            text,
             parse_mode="HTML",
             reply_markup=referral_card_keyboard(source.id),
             disable_web_page_preview=True,
