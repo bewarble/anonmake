@@ -4,7 +4,7 @@ from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.source_admin import source_delete_confirm_keyboard
@@ -20,13 +20,21 @@ def is_admin(telegram_id: int) -> bool:
     return telegram_id in load_settings().admin_ids_set
 
 
+async def delete_message_quietly(message: Message | None) -> None:
+    if message is None:
+        return
+    try:
+        await message.delete()
+    except Exception:
+        return
+
+
 @router.callback_query(F.data.in_({"admin25:cancel:export", "admin25:referrals:cancel"}))
 async def cancel_admin_section(callback: CallbackQuery) -> None:
     if callback.from_user is None or not is_admin(callback.from_user.id):
         await callback.answer(admin_texts.DENIED, show_alert=True)
         return
-    if callback.message:
-        await callback.message.delete()
+    await delete_message_quietly(callback.message)
     await callback.answer()
 
 
@@ -36,8 +44,7 @@ async def cancel_source_create(callback: CallbackQuery, state: FSMContext) -> No
         await callback.answer(admin_texts.DENIED, show_alert=True)
         return
     await state.clear()
-    if callback.message:
-        await callback.message.edit_text(admin_texts.SOURCE_CREATE_CANCELLED)
+    await delete_message_quietly(callback.message)
     await callback.answer()
 
 
@@ -56,7 +63,8 @@ async def request_source_delete(callback: CallbackQuery, session: AsyncSession) 
         await callback.answer(admin_texts.SOURCE_NOT_FOUND, show_alert=True)
         return
     if callback.message:
-        await callback.message.edit_text(
+        await delete_message_quietly(callback.message)
+        await callback.message.answer(
             admin_texts.SOURCE_DELETE_PROMPT.format(name=escape(source.name)),
             reply_markup=source_delete_confirm_keyboard(source.id),
         )
@@ -82,7 +90,6 @@ async def confirm_source_delete(callback: CallbackQuery, session: AsyncSession) 
         )
         await session.commit()
     if callback.message:
-        await callback.message.edit_text(
-            admin_texts.SOURCE_DELETED if deleted else admin_texts.SOURCE_ALREADY_DELETED
-        )
+        await delete_message_quietly(callback.message)
+        await callback.message.answer(admin_texts.SOURCE_DELETED if deleted else admin_texts.SOURCE_ALREADY_DELETED)
     await callback.answer()
