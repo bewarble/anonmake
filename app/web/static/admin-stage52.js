@@ -58,36 +58,34 @@
     window.scrollTo({ top: target, left: 0, behavior });
   }
 
-  function focusFirstInvalid(form) {
+  function revealFirstInvalid(form) {
     const invalid = [...form.querySelectorAll(fieldSelector)].find((field) => !field.validity.valid);
     if (!invalid) return;
     showError(invalid);
 
-    if (isMobileViewport()) {
-      // iOS Safari may undo scripted scrolling when an invalid input receives
-      // programmatic focus. On mobile, scrolling to the error is more reliable
-      // and avoids unexpectedly opening the keyboard.
-      scrollInvalidBlock(invalid, 'smooth');
-      setTimeout(() => scrollInvalidBlock(invalid, 'auto'), 220);
-      setTimeout(() => scrollInvalidBlock(invalid, 'auto'), 520);
-      return;
-    }
-
     scrollInvalidBlock(invalid, 'smooth');
-    setTimeout(() => {
-      invalid.focus({ preventScroll: true });
-      scrollInvalidBlock(invalid, 'auto');
-    }, 120);
+    setTimeout(() => scrollInvalidBlock(invalid, 'auto'), 180);
+
+    if (!isMobileViewport()) {
+      setTimeout(() => invalid.focus({ preventScroll: true }), 120);
+    }
   }
 
   document.querySelectorAll('form').forEach((form) => {
     const fields = form.querySelectorAll(fieldSelector);
     if (!fields.length) return;
+    let invalidTimer = null;
 
     fields.forEach((field) => {
       field.addEventListener('invalid', (event) => {
         event.preventDefault();
         showError(field);
+
+        // Constraint validation fires `invalid` for each bad field and aborts
+        // submission before a `submit` event exists. Debounce the burst, then
+        // reveal the first invalid control after all inline errors are rendered.
+        clearTimeout(invalidTimer);
+        invalidTimer = setTimeout(() => revealFirstInvalid(form), 0);
       });
       field.addEventListener('input', () => {
         if (field.validity.valid) clearError(field);
@@ -97,14 +95,5 @@
         if (field.validity.valid) clearError(field);
       });
     });
-
-    form.addEventListener('submit', (event) => {
-      if (form.checkValidity()) return;
-      event.preventDefault();
-      fields.forEach((field) => {
-        if (!field.validity.valid) showError(field);
-      });
-      requestAnimationFrame(() => focusFirstInvalid(form));
-    }, true);
   });
 })();
