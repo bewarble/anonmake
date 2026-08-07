@@ -52,9 +52,6 @@ async def command_start(
 
     code = (command.args or "").strip()
     if not code:
-        # Telegram allows only one reply_markup per message. Install the persistent
-        # reply keyboard first, then keep the share inline button attached directly
-        # to the personal-link message.
         await message.answer(
             texts.WELCOME,
             reply_markup=main_menu_for(message.from_user.id),
@@ -92,12 +89,15 @@ async def command_start(
 @router.message(F.text == USER_PERSONAL_LINK)
 async def show_personal_link(
     message: Message,
+    state: FSMContext,
     session: AsyncSession,
     bot: Bot,
 ) -> None:
     if message.from_user is None:
         return
 
+    # The persistent menu is navigation, not content for a previous FSM flow.
+    await state.clear()
     user = await UserRepository(session).upsert_from_telegram(message.from_user)
     await show_personal_link_message(
         message,
