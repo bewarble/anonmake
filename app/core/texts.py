@@ -20,7 +20,6 @@ WELCOME = (
 )
 PERSONAL_LINK = "🔗 Ваша ссылка\n\n{link}"
 PERSONAL_LINK_HINT = "Поделитесь ссылкой с друзьями или опубликуйте её в канале."
-PERSONAL_LINK_SHARE = "Поделиться ссылкой:"
 LINK_COPIED_HINT = "Нажмите на ссылку, чтобы скопировать её."
 
 HELP = (
