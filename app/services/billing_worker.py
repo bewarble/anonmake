@@ -7,6 +7,7 @@ import logging
 import time
 
 from app.core.performance import WORKER_BATCHES, WORKER_BATCH_SIZE
+from app.core.worker_health import mark_worker_heartbeat
 from app.database.session import SessionFactory
 from app.models.billing import Subscription
 from app.repositories.billing import BillingRepository
@@ -48,6 +49,11 @@ class BillingWorker:
         self._stop = asyncio.Event()
 
     async def run(self) -> None:
+        mark_worker_heartbeat(
+            "billing-worker",
+            state="started",
+            automatic_charges_enabled=self.automatic_charges_enabled,
+        )
         if not self.automatic_charges_enabled:
             logger.warning(
                 "Automatic recurrent charges are disabled "
@@ -57,9 +63,26 @@ class BillingWorker:
         while not self._stop.is_set():
             started = time.monotonic()
             try:
+                mark_worker_heartbeat(
+                    "billing-worker",
+                    state="processing",
+                    automatic_charges_enabled=self.automatic_charges_enabled,
+                )
                 stats = await self.tick()
+                duration_ms = int((time.monotonic() - started) * 1000)
                 WORKER_BATCHES.labels("billing", "completed").inc()
                 WORKER_BATCH_SIZE.labels("billing").observe(stats.due)
+                mark_worker_heartbeat(
+                    "billing-worker",
+                    state="idle",
+                    automatic_charges_enabled=self.automatic_charges_enabled,
+                    due=stats.due,
+                    success=stats.success,
+                    pending=stats.pending,
+                    failed=stats.failed,
+                    expired=stats.expired,
+                    duration_ms=duration_ms,
+                )
                 logger.info(
                     "Billing tick completed due=%s locked=%s skipped=%s "
                     "success=%s insufficient=%s pending=%s failed=%s "
@@ -72,10 +95,16 @@ class BillingWorker:
                     stats.pending,
                     stats.failed,
                     stats.expired,
-                    int((time.monotonic() - started) * 1000),
+                    duration_ms,
                 )
-            except Exception:
+            except Exception as exc:
                 WORKER_BATCHES.labels("billing", "failed").inc()
+                mark_worker_heartbeat(
+                    "billing-worker",
+                    state="error",
+                    exception_type=type(exc).__name__,
+                    automatic_charges_enabled=self.automatic_charges_enabled,
+                )
                 logger.exception("Billing worker tick failed")
 
             try:
