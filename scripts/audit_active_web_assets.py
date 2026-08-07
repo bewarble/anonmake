@@ -6,7 +6,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "app/web/templates"
 STATIC = ROOT / "app/web/static"
-ACTIVE_ASSETS = {"admin-ui.css", "admin-ui.js", "admin-stage50.css"}
+ACTIVE_ASSETS = {
+    "admin-ui.css",
+    "admin-ui.js",
+    "admin-stage50.css",
+    "admin-stage51.css",
+    "admin-stage51.js",
+}
 
 
 def referenced_assets() -> set[str]:
