@@ -3,20 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.bot_context import require_current_bot
 from app.models.billing import PaymentMethod
-from app.models.delivery import DeliveryOutbox
 from app.models.marketing import SourceAttribution
 from app.models.user import User
-
-PERMANENT_ERRORS = (
-    "%bot was blocked%",
-    "%chat not found%",
-    "%user is deactivated%",
-)
 
 
 @dataclass(slots=True, frozen=True)
@@ -88,35 +81,11 @@ class AdminStatisticsStage25Repository:
         )
         return int(value or 0)
 
-    def _latest_permanent_failures(self, bot_id: int):
-        return (
-            select(
-                User.id.label("user_id"),
-                func.max(DeliveryOutbox.updated_at).label("blocked_at"),
-            )
-            .join(
-                DeliveryOutbox,
-                (DeliveryOutbox.chat_id == User.telegram_id)
-                & (DeliveryOutbox.bot_id == User.bot_id),
-            )
-            .where(
-                User.bot_id == bot_id,
-                DeliveryOutbox.bot_id == bot_id,
-                DeliveryOutbox.status == "failed",
-                self._permanent_error_condition(),
-            )
-            .group_by(User.id)
-            .subquery()
-        )
-
     async def _dead_users_count(self, bot_id: int) -> int:
-        latest_failure = self._latest_permanent_failures(bot_id)
         value = await self.session.scalar(
-            select(func.count(User.id))
-            .join(latest_failure, latest_failure.c.user_id == User.id)
-            .where(
+            select(func.count(User.id)).where(
                 User.bot_id == bot_id,
-                latest_failure.c.blocked_at > User.updated_at,
+                User.is_blocked.is_(True),
             )
         )
         return int(value or 0)
@@ -170,7 +139,6 @@ class AdminStatisticsStage25Repository:
             second=0,
             microsecond=0,
         )
-        latest_failure = self._latest_permanent_failures(bot_id)
 
         result: list[DailyStatisticsPoint] = []
         for offset in range(days):
@@ -190,13 +158,11 @@ class AdminStatisticsStage25Repository:
 
             blocked = int(
                 await self.session.scalar(
-                    select(func.count(User.id))
-                    .join(latest_failure, latest_failure.c.user_id == User.id)
-                    .where(
+                    select(func.count(User.id)).where(
                         User.bot_id == bot_id,
-                        latest_failure.c.blocked_at > User.updated_at,
-                        latest_failure.c.blocked_at >= left,
-                        latest_failure.c.blocked_at < right,
+                        User.blocked_at.is_not(None),
+                        User.blocked_at >= left,
+                        User.blocked_at < right,
                     )
                 )
                 or 0
@@ -211,12 +177,3 @@ class AdminStatisticsStage25Repository:
             )
 
         return result
-
-    @staticmethod
-    def _permanent_error_condition():
-        return or_(
-            *(
-                DeliveryOutbox.last_error.ilike(pattern)
-                for pattern in PERMANENT_ERRORS
-            )
-        )
