@@ -6,7 +6,7 @@ from aiogram.types import BotCommand
 
 PUBLIC_COMMANDS = (
     BotCommand(command="start", description="Главное меню"),
-    BotCommand(command="cancel", description="Отключить автопродление"),
+    BotCommand(command="cancel", description="Отключить подписку"),
 )
 
 
