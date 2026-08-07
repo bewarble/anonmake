@@ -28,7 +28,7 @@ def check() -> None:
     assert "Duplicate bot code" in config
     assert "Duplicate bot username" in config
 
-    required_services = {"bot", "bot-two", "bot-three", "bot-four"}
+    required_services = {"bot", "bot-two", "bot-three", "bot-four", "managed-bots"}
     services = set(
         re.findall(r"^  ([a-zA-Z0-9_-]+):\s*$", compose, re.MULTILINE)
     )
@@ -42,7 +42,9 @@ def check() -> None:
             re.MULTILINE | re.DOTALL,
         )
         assert match is not None, service
-        assert 'profiles: ["multibot"]' in match.group("body")
+        assert 'profiles: ["multibot"]' not in match.group("body")
+
+    assert 'profiles: ["multibot"]' not in compose
 
     for variable in (
         "BOT_TWO_TOKEN",
@@ -61,10 +63,10 @@ def check() -> None:
 
     print("Stage 38.4 check: OK")
     print("Four polling bot services: ready")
-    print("Secondary bots protected by multibot profile: ready")
+    print("Managed bot runtime: ready")
+    print("Unified default startup for all bot services: ready")
     print("Shared PostgreSQL and Redis: ready")
     print("Worker token pool for four bots: ready")
-    print("Single-bot default startup compatibility: preserved")
 
 
 if __name__ == "__main__":
