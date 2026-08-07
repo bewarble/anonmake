@@ -29,8 +29,7 @@ async def show_personal_link_message(
 ) -> None:
     link = await personal_link(bot, public_code)
     await message.answer(
-        f"{texts.PERSONAL_LINK.format(link=link)}\n\n"
-        f"{texts.PERSONAL_LINK_HINT}",
+        texts.START_PROMO.format(link=link.removeprefix("https://")),
         reply_markup=personal_link_share_keyboard(link),
     )
 
@@ -57,14 +56,10 @@ async def command_start(
         code = ""
 
     if not code:
+        link = await personal_link(bot, current_user.public_code)
         await message.answer(
-            texts.WELCOME,
+            texts.START_PROMO.format(link=link.removeprefix("https://")),
             reply_markup=main_menu_for(message.from_user.id),
-        )
-        await show_personal_link_message(
-            message,
-            bot=bot,
-            public_code=current_user.public_code,
         )
         return
 
