@@ -173,21 +173,27 @@ class AdminStatisticsStage25Repository:
 
             first_permanent_failure = (
                 select(
-                    DeliveryOutbox.chat_id.label("chat_id"),
+                    User.id.label("user_id"),
                     func.min(DeliveryOutbox.updated_at).label("blocked_at"),
                 )
+                .join(
+                    DeliveryOutbox,
+                    (DeliveryOutbox.chat_id == User.telegram_id)
+                    & (DeliveryOutbox.bot_id == User.bot_id),
+                )
                 .where(
+                    User.bot_id == bot_id,
                     DeliveryOutbox.bot_id == bot_id,
                     DeliveryOutbox.status == "failed",
                     self._permanent_error_condition(),
                 )
-                .group_by(DeliveryOutbox.chat_id)
+                .group_by(User.id)
                 .subquery()
             )
 
             blocked = int(
                 await self.session.scalar(
-                    select(func.count(first_permanent_failure.c.chat_id)).where(
+                    select(func.count(first_permanent_failure.c.user_id)).where(
                         first_permanent_failure.c.blocked_at >= left,
                         first_permanent_failure.c.blocked_at < right,
                     )
