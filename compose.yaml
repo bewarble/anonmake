@@ -42,7 +42,6 @@ services:
       start_period: 5s
     stop_grace_period: 60s
 
-
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -87,7 +86,6 @@ services:
 
   bot-two:
     <<: *app-common
-    profiles: ["multibot"]
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-anonmake}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-anonmake}
       REDIS_URL: redis://redis:6379/0
@@ -105,7 +103,6 @@ services:
 
   bot-three:
     <<: *app-common
-    profiles: ["multibot"]
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-anonmake}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-anonmake}
       REDIS_URL: redis://redis:6379/0
@@ -123,7 +120,6 @@ services:
 
   bot-four:
     <<: *app-common
-    profiles: ["multibot"]
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-anonmake}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-anonmake}
       REDIS_URL: redis://redis:6379/0
