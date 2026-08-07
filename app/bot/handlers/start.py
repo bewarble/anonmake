@@ -31,6 +31,7 @@ async def show_personal_link_message(
     await message.answer(
         texts.START_PROMO.format(link=link.removeprefix("https://")),
         reply_markup=personal_link_share_keyboard(link),
+        disable_web_page_preview=True,
     )
 
 
@@ -58,6 +59,7 @@ async def command_start(
         await message.answer(
             texts.START_PROMO.format(link=link.removeprefix("https://")),
             reply_markup=main_menu_for(message.from_user.id),
+            disable_web_page_preview=True,
         )
         return
 
