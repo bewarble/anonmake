@@ -99,16 +99,16 @@ def main() -> None:
 
     require(
         "app/bot/keyboards/personal_link.py",
-        'SHARE_TEXT = "Отправь мне анонимное сообщение 👇"',
+        'SHARE_TEXT = "Отправь мне анонимное сообщение 👉 {link}"',
         'full_link = link if link.startswith("https://") else f"https://{link}"',
-        "encoded_link = quote(full_link, safe=\"\")",
-        "encoded_text = quote(SHARE_TEXT, safe=\"\")",
-        'f"url={encoded_link}&text={encoded_text}"',
+        'short_link = full_link.removeprefix("https://")',
+        "share_text = SHARE_TEXT.format(link=short_link)",
+        'f"url=%20&text={encoded_text}"',
     )
     reject(
         "app/bot/keyboards/personal_link.py",
-        'SHARE_TEXT = "Отправь мне анонимное сообщение 👉 {link}"',
-        'f"url=%20&text={encoded_text}"',
+        'SHARE_TEXT = "Отправь мне анонимное сообщение 👇"',
+        "encoded_link =",
     )
     require(
         "app/models/question.py",
@@ -128,6 +128,7 @@ def main() -> None:
     print("/cancel is reserved for subscription cancellation in every FSM state")
     print("Test payment commands remain launch-gated")
     print("Unlimited replies from Stage 61 remain active")
+    print("Requested one-line Telegram share text: preserved")
     print("No Stage 62 migration required")
 
 
