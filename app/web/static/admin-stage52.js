@@ -43,9 +43,22 @@
     error.textContent = messageFor(field);
   }
 
-  function centerInvalidBlock(field, behavior = 'smooth') {
+  function scrollInvalidBlock(field, behavior = 'smooth') {
     const block = containerFor(field) || field;
-    block.scrollIntoView({ behavior, block: 'center', inline: 'nearest' });
+    const viewport = window.visualViewport;
+    const viewportHeight = viewport?.height || window.innerHeight;
+    const viewportOffsetTop = viewport?.offsetTop || 0;
+    const rect = block.getBoundingClientRect();
+
+    // Keep the complete field block in the upper-middle portion of the visible
+    // viewport. iOS Safari is more reliable with explicit window.scrollTo than
+    // with scrollIntoView after form validation/focus changes.
+    const desiredTop = Math.max(88, Math.min(150, viewportHeight * 0.22));
+    const target = Math.max(
+      0,
+      window.scrollY + rect.top - viewportOffsetTop - desiredTop
+    );
+    window.scrollTo({ top: target, behavior });
   }
 
   function focusFirstInvalid(form) {
@@ -53,14 +66,16 @@
     if (!invalid) return;
     showError(invalid);
 
-    // First position the complete field block, including the inline error.
-    centerInvalidBlock(invalid);
-    invalid.focus({ preventScroll: true });
+    // Move first, then focus without allowing Safari to override our scroll.
+    scrollInvalidBlock(invalid, 'smooth');
+    setTimeout(() => {
+      invalid.focus({ preventScroll: true });
+      scrollInvalidBlock(invalid, 'auto');
+    }, 120);
 
-    // Mobile browsers resize the visual viewport after focus/keyboard opening.
-    // Re-center after that resize so the error text remains visible as well.
-    setTimeout(() => centerInvalidBlock(invalid), 180);
-    setTimeout(() => centerInvalidBlock(invalid, 'auto'), 420);
+    // Recalculate after iOS settles its visual viewport/browser chrome.
+    setTimeout(() => scrollInvalidBlock(invalid, 'auto'), 320);
+    setTimeout(() => scrollInvalidBlock(invalid, 'auto'), 650);
   }
 
   document.querySelectorAll('form').forEach((form) => {
