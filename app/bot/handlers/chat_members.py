@@ -12,6 +12,10 @@ BLOCKED_STATUSES = {"kicked", "left"}
 ALIVE_STATUSES = {"member", "administrator", "creator", "restricted"}
 
 
+def enum_value(value) -> str:
+    return str(getattr(value, "value", value))
+
+
 @router.my_chat_member()
 async def track_private_bot_membership(
     event: ChatMemberUpdated,
@@ -22,10 +26,10 @@ async def track_private_bot_membership(
     In a private chat Telegram reports the bot as ``kicked`` when the user
     blocks it and ``member`` again after the user unblocks/returns.
     """
-    if str(event.chat.type) != "private":
+    if enum_value(event.chat.type) != "private":
         return
 
-    status = str(event.new_chat_member.status)
+    status = enum_value(event.new_chat_member.status)
     if status in BLOCKED_STATUSES:
         await UserRepository(session).set_block_state(
             event.chat.id,
