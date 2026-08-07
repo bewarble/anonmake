@@ -15,10 +15,19 @@ def main() -> None:
         "🚀 Здесь можно отправить анонимное сообщение человеку, который опубликовал эту ссылку.",
         "✅ Сообщение отправлено, ожидайте ответ от человека!",
         "💬 Начни получать анонимные сообщения прямо сейчас!",
+        "Разместите ссылку у себя в профиле и вам смогут написать ваши друзья и знакомые ✍️",
+        "🤫 Чтобы получать сообщения — добавь ссылку в свой профиль!",
+        "Пример как на фото 👇",
         "<b>📨 Вам отправили новое анонимное сообщение</b>",
         "💬 Напишите свой ответ на данное сообщение:",
         "✅ Ответ успешно отправлен и уже пришёл человеку!",
         "💝 Хочешь получать больше сообщений? Поделись ссылкой:",
+    )
+    require(
+        "app/bot/ui.py",
+        'USER_PERSONAL_LINK = "💬 Начать получать сообщения"',
+        'USER_HELP = "❓ Как получать сообщения?"',
+        'ACTION_CANCEL = "✖️ Отменить"',
     )
     require(
         "app/models/user.py",
@@ -41,6 +50,23 @@ def main() -> None:
         'callback_data=f"ask_again:{recipient_id}"',
         "CopyTextButton(text=full_link)",
         'full_link = link if link.startswith("https://") else f"https://{link}"',
+    )
+    require(
+        "app/bot/keyboards/personal_link.py",
+        "personal_link_copy_keyboard",
+        'text="Скопировать ссылку"',
+        "CopyTextButton(text=link)",
+    )
+    require(
+        "app/bot/handlers/start.py",
+        "texts.START_PROMO.format",
+        'link.removeprefix("https://")',
+        "texts.SELF_MESSAGE",
+    )
+    require(
+        "app/bot/handlers/navigation.py",
+        "personal_link_copy_keyboard(link)",
+        "texts.HELP",
     )
     require(
         "app/bot/handlers/questions.py",
@@ -67,11 +93,12 @@ def main() -> None:
     print("Stage 63 check: OK")
     print("Personal-link entry copy: final")
     print("Public codes: shortened to 8 characters")
+    print("Self-link, /start and help UX: final")
     print("Question cancel deletes the prompt and returns the personal-link promo")
     print("Post-send repeat action and self-promotion: ready")
     print("Anonymous-message header: bold and HTML-safe")
     print("Answer prompt and post-answer sharing actions: ready")
-    print("Copy-link action includes https://")
+    print("Copy-link actions include https://")
     print("Stage 63 migration: 20260807_0021_short_public_codes")
 
 
