@@ -158,6 +158,17 @@ def main() -> None:
         "PaymentAttempt.bot_id == self.bot_id",
     )
     require(
+        "app/services/admin_charts_stage25.py",
+        'label="Пользователи"',
+        'label="Заблокированные"',
+        'label="Оборот"',
+        '_date_range_title(labels, "Статистика")',
+        '_date_range_title(labels, "Оборот")',
+        "_label_bars(axis, joined_bars",
+        "_label_bars(axis, blocked_bars",
+        "_label_bars(axis, bars",
+    )
+    require(
         "app/repositories/marketing.py",
         "TrafficSource.bot_id == bot_id",
         "Broadcast.bot_id == require_current_bot().id",
@@ -193,6 +204,7 @@ def main() -> None:
     print("/cancel command label: Отключить подписку")
     print("Telegram admin statistics/export/profit/sources/broadcasts: scoped to current bot")
     print("Alive/dead users: live Telegram my_chat_member state with delivery fallback")
+    print("Admin charts: labeled daily users/blocked and turnover series")
     print("Reveal consent: Mooncloud terms/privacy/pricing links")
     print("Question and answer UX: final")
     print("Stage 63 migrations: short public codes + live block state")
