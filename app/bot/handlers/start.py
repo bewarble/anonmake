@@ -56,10 +56,17 @@ async def command_start(
         code = ""
 
     if not code:
-        link = await personal_link(bot, current_user.public_code)
+        # Telegram cannot attach a reply keyboard and an inline keyboard to the
+        # same message. Install the one-button persistent menu first, then render
+        # the launch card with native copy/share actions.
         await message.answer(
-            texts.START_PROMO.format(link=link.removeprefix("https://")),
+            "💬",
             reply_markup=main_menu_for(message.from_user.id),
+        )
+        await show_personal_link_message(
+            message,
+            bot=bot,
+            public_code=current_user.public_code,
         )
         return
 
