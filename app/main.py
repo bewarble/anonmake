@@ -28,6 +28,7 @@ async def main() -> None:
     database_middleware = DatabaseMiddleware(settings)
     dispatcher.message.outer_middleware(database_middleware)
     dispatcher.callback_query.outer_middleware(database_middleware)
+    dispatcher.my_chat_member.outer_middleware(database_middleware)
     dispatcher.include_router(build_router())
 
     await init_database()
