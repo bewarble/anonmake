@@ -91,8 +91,18 @@ def main() -> None:
     )
     require(
         "Makefile",
-        "docker-up-multibot:",
-        "$(COMPOSE) --profile multibot up -d --build",
+        "docker-up:",
+        "$(COMPOSE) up -d --build",
+        "restart bot bot-two bot-three bot-four managed-bots",
+    )
+    reject(
+        "Makefile",
+        "docker-up-multibot",
+        "--profile multibot",
+    )
+    reject(
+        "compose.yaml",
+        'profiles: ["multibot"]',
     )
     require(
         "app/core/texts.py",
@@ -111,7 +121,7 @@ def main() -> None:
     print("/start installs the reply keyboard and personal-link messages own their inline share button")
     print("Share action matches the Telegram share URL flow used by the reference implementation")
     print("Shared router is used by managed bot instances")
-    print("Full multibot rebuild command is ready")
+    print("Single docker-up path rebuilds all bot services")
     print("Help and unknown-input guidance are button-driven without command mentions")
     print("/cancel remains reserved for subscription auto-renew cancellation")
     print("No Stage 58 migration required")
