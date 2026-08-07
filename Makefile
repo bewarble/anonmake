@@ -4,7 +4,7 @@ COMPOSE = docker compose \
 	-f compose.delivery.yaml \
 	-f compose.marketing.yaml
 
-.PHONY: docker-config docker-build docker-up docker-down docker-restart \
+.PHONY: docker-config docker-build docker-up docker-up-multibot docker-down docker-restart \
 	docker-status docker-logs docker-logs-all docker-migrate docker-check \
 	docker-check-dependencies docker-shell docker-reset-db stabilize-check \
 	stabilize-apply stage50-check stage51-check stage52-check stage53-check stage54-check stage55-check stage56-check stage57-check stage58-check release-check release-check-runtime deploy
@@ -17,6 +17,11 @@ docker-build:
 
 docker-up:
 	$(COMPOSE) up -d --build
+
+# Full multibot deployment: rebuilds the primary bot, profile-based bot-two/three/four,
+# managed-bots and the rest of the application services with the same image/code.
+docker-up-multibot:
+	$(COMPOSE) --profile multibot up -d --build
 
 docker-down:
 	$(COMPOSE) down
