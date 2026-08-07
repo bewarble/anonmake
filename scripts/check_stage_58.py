@@ -28,6 +28,12 @@ def main() -> None:
         "KeyboardButton(text=USER_HELP)",
     )
     require(
+        "app/bot/keyboards/personal_link.py",
+        'SHARE_TEXT = "Отправь мне анонимное сообщение 👉"',
+        'text="Поделиться ссылкой"',
+        'url=f"https://t.me/share/url?{query}"',
+    )
+    require(
         "app/bot/handlers/navigation.py",
         "F.text == USER_HELP",
         "texts.UNKNOWN_INPUT",
@@ -41,10 +47,14 @@ def main() -> None:
     require(
         "app/bot/handlers/start.py",
         "CommandStart()",
-        "async def show_home",
+        "async def show_personal_link_message",
         "texts.PERSONAL_LINK",
-        "main_menu_for(message.from_user.id if message.from_user else None)",
         "personal_link_share_keyboard(link)",
+        "reply_markup=main_menu_for(message.from_user.id)",
+    )
+    reject(
+        "app/bot/handlers/start.py",
+        "texts.PERSONAL_LINK_SHARE",
     )
     require(
         "app/bot/handlers/questions.py",
@@ -69,7 +79,6 @@ def main() -> None:
     require(
         "app/core/texts.py",
         "UNKNOWN_INPUT",
-        "PERSONAL_LINK_SHARE",
         "HELP",
     )
     reject(
@@ -77,10 +86,11 @@ def main() -> None:
         "/menu",
         "/help",
         "отменить текущее действие",
+        "PERSONAL_LINK_SHARE",
     )
     assert not list((ROOT / "migrations/versions").glob("*stage_58*"))
     print("Stage 58 check: OK")
-    print("/start is the single home command and exposes the personal link with the reply keyboard")
+    print("/start installs the reply keyboard and personal-link messages own their inline share button")
     print("Help and unknown-input guidance are button-driven without command mentions")
     print("/cancel remains reserved for subscription auto-renew cancellation")
     print("No Stage 58 migration required")
