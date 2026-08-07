@@ -33,6 +33,7 @@ async def run_instance(instance: BotInstance, token: str, settings) -> None:
     middleware = DatabaseMiddleware(settings, current_bot=current)
     dispatcher.message.outer_middleware(middleware)
     dispatcher.callback_query.outer_middleware(middleware)
+    dispatcher.my_chat_member.outer_middleware(middleware)
     dispatcher.include_router(build_router())
     try:
         await bot.delete_webhook(drop_pending_updates=False)
