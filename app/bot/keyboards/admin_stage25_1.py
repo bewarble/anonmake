@@ -12,6 +12,8 @@ from app.bot.ui import (
     SOURCE_CREATE,
 )
 
+SOURCE_PAGE_SIZE = 7
+
 
 def broadcast_audience_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
@@ -26,21 +28,37 @@ def broadcast_audience_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def referrals_keyboard(sources) -> InlineKeyboardMarkup:
+def referrals_keyboard(sources, *, page: int = 0) -> InlineKeyboardMarkup:
+    total = len(sources)
+    pages = max((total + SOURCE_PAGE_SIZE - 1) // SOURCE_PAGE_SIZE, 1)
+    page = min(max(page, 0), pages - 1)
+    start = page * SOURCE_PAGE_SIZE
+    visible = sources[start : start + SOURCE_PAGE_SIZE]
+
     rows = [
-        [InlineKeyboardButton(text=f"🔗 {source.name}", callback_data=f"adminm:source:{source.id}")]
-        for source in sources
+        [InlineKeyboardButton(text=source.name, callback_data=f"adminm:source:{source.id}")]
+        for source in visible
     ]
-    rows.append([InlineKeyboardButton(text=SOURCE_CREATE, callback_data="adminm:source:create")])
+    rows.append([InlineKeyboardButton(text="Добавить реф. ссылку", callback_data="adminm:source:create")])
+    if pages > 1:
+        rows.append(
+            [
+                InlineKeyboardButton(text="<-", callback_data=f"admin25:referrals:page:{max(page - 1, 0)}"),
+                InlineKeyboardButton(text=f"{page + 1}/{pages}", callback_data="admin25:referrals:noop"),
+                InlineKeyboardButton(text="->", callback_data=f"admin25:referrals:page:{min(page + 1, pages - 1)}"),
+            ]
+        )
     rows.append([InlineKeyboardButton(text=ACTION_CANCEL, callback_data="admin25:referrals:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def referral_card_keyboard(source_id: int) -> InlineKeyboardMarkup:
+def referral_card_keyboard(source_id: int, *, page: int = 0) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=ACTION_BACK_TO_LIST, callback_data="admin25:referrals")],
-            [InlineKeyboardButton(text=ACTION_DELETE, callback_data=f"source:delete:{source_id}")],
+            [
+                InlineKeyboardButton(text="Назад", callback_data=f"admin25:referrals:page:{page}"),
+                InlineKeyboardButton(text="Удалить", callback_data=f"source:delete:{source_id}"),
+            ],
         ]
     )
 
