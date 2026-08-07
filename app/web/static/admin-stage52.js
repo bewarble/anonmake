@@ -43,22 +43,19 @@
     error.textContent = messageFor(field);
   }
 
+  function isMobileViewport() {
+    return window.matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+  }
+
   function scrollInvalidBlock(field, behavior = 'smooth') {
     const block = containerFor(field) || field;
-    const viewport = window.visualViewport;
-    const viewportHeight = viewport?.height || window.innerHeight;
-    const viewportOffsetTop = viewport?.offsetTop || 0;
     const rect = block.getBoundingClientRect();
-
-    // Keep the complete field block in the upper-middle portion of the visible
-    // viewport. iOS Safari is more reliable with explicit window.scrollTo than
-    // with scrollIntoView after form validation/focus changes.
-    const desiredTop = Math.max(88, Math.min(150, viewportHeight * 0.22));
-    const target = Math.max(
-      0,
-      window.scrollY + rect.top - viewportOffsetTop - desiredTop
-    );
-    window.scrollTo({ top: target, behavior });
+    const viewport = window.visualViewport;
+    const offsetTop = viewport?.offsetTop || 0;
+    const pageTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+    const desiredTop = isMobileViewport() ? 112 : 150;
+    const target = Math.max(0, pageTop + rect.top - offsetTop - desiredTop);
+    window.scrollTo({ top: target, left: 0, behavior });
   }
 
   function focusFirstInvalid(form) {
@@ -66,16 +63,21 @@
     if (!invalid) return;
     showError(invalid);
 
-    // Move first, then focus without allowing Safari to override our scroll.
+    if (isMobileViewport()) {
+      // iOS Safari may undo scripted scrolling when an invalid input receives
+      // programmatic focus. On mobile, scrolling to the error is more reliable
+      // and avoids unexpectedly opening the keyboard.
+      scrollInvalidBlock(invalid, 'smooth');
+      setTimeout(() => scrollInvalidBlock(invalid, 'auto'), 220);
+      setTimeout(() => scrollInvalidBlock(invalid, 'auto'), 520);
+      return;
+    }
+
     scrollInvalidBlock(invalid, 'smooth');
     setTimeout(() => {
       invalid.focus({ preventScroll: true });
       scrollInvalidBlock(invalid, 'auto');
     }, 120);
-
-    // Recalculate after iOS settles its visual viewport/browser chrome.
-    setTimeout(() => scrollInvalidBlock(invalid, 'auto'), 320);
-    setTimeout(() => scrollInvalidBlock(invalid, 'auto'), 650);
   }
 
   document.querySelectorAll('form').forEach((form) => {
