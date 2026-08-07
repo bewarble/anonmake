@@ -28,13 +28,17 @@ def main() -> None:
         "scripts/backup_recovery.py",
         'MAGIC = b"PGDMP"',
         "restore_plan",
-        "команды НЕ выполняются",
+        "restore_drill",
+        "anonmake_recovery_",
+        "Restore drill: OK",
+        "production restore автоматически",
     )
 
     print("Stage 49 check: OK")
     print("Backup integrity visibility: ready")
     print("Recovery planning CLI: ready")
-    print("Automatic destructive restore: intentionally disabled")
+    print("Isolated restore drill: ready")
+    print("Automatic destructive production restore: intentionally disabled")
     print("No database migration required")
 
 
