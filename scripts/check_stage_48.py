@@ -48,9 +48,9 @@ def main() -> None:
     )
     require(
         "app/web/templates/platform_observability.html",
-        "Наблюдаемость и ошибки",
         "Последние неудачные доставки",
         "Ошибки платежей",
+        "observability-table-wrap",
     )
     require(
         "app/web/templates/base.html",
