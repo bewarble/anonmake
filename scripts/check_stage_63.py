@@ -187,6 +187,26 @@ def main() -> None:
         "• Мертвые —",
         "♻️ <b>Прирост</b>",
         "📈 <b>Саморост</b>",
+        "async def delete_message_quietly",
+        "await delete_message_quietly(message)",
+        "await delete_message_quietly(callback.message)",
+        "await callback.message.answer_document",
+        "await callback.message.answer(admin_texts.BROADCAST_TEXT_PROMPT",
+    )
+    require(
+        "app/bot/handlers/admin_marketing.py",
+        "async def delete_message_quietly",
+        "await delete_message_quietly(callback.message)",
+        "await callback.message.answer(admin_texts.BROADCAST_QUEUED.format",
+    )
+    require(
+        "app/bot/handlers/source_management.py",
+        "async def delete_message_quietly",
+        "await delete_message_quietly(callback.message)",
+    )
+    reject(
+        "app/bot/handlers/admin_marketing.py",
+        "edit_text(admin_texts.BROADCAST_CANCELLED)",
     )
     require(
         "app/delivery_worker.py",
@@ -203,6 +223,7 @@ def main() -> None:
     print("Anonymous question/answer actions: 💬 Ответить + 👁️ Узнать кто это")
     print("/cancel command label: Отключить подписку")
     print("Telegram admin statistics/export/profit/sources/broadcasts: scoped to current bot")
+    print("Telegram admin navigation: replace-style messages; cancel deletes silently")
     print("Alive/dead users: live Telegram my_chat_member state with delivery fallback")
     print("Admin charts: labeled daily users/blocked and turnover series")
     print("Reveal consent: Mooncloud terms/privacy/pricing links")
