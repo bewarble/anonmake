@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ title }} · AnonMake</title>
-  <link rel="stylesheet" href="/admin/static/admin-ui.css?v=48">
+  <link rel="stylesheet" href="/admin/static/admin-ui.css?v=50">
 </head>
 <body>
   <div class="app-shell">
@@ -88,6 +88,15 @@
         </div>
       </header>
 
+      {% set flash_message = request.query_params.get('flash') %}
+      {% set flash_tone = request.query_params.get('flash_tone', 'success') %}
+      {% if flash_message %}
+      <section class="admin-flash {{ flash_tone if flash_tone in ['success', 'warning', 'danger', 'info'] else 'info' }}" role="status">
+        <span>{{ flash_message }}</span>
+        <button type="button" data-flash-dismiss aria-label="Закрыть уведомление">×</button>
+      </section>
+      {% endif %}
+
       {% block content %}{% endblock %}
     </main>
   </div>
@@ -112,6 +121,12 @@
       </div>
     </div>
   </div>
-  <script src="/admin/static/admin-ui.js?v=48" defer></script>
+  <script src="/admin/static/admin-ui.js?v=50" defer></script>
+  <script>
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-flash-dismiss]');
+      if (button) button.closest('.admin-flash')?.remove();
+    });
+  </script>
 </body>
 </html>
