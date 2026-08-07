@@ -15,6 +15,7 @@ from aiogram.exceptions import (
 )
 
 from app.core.config import load_settings
+from app.core.error_diagnostics import new_error_id, record_bot_error
 from app.core.logging import configure_logging
 from app.core.performance import WORKER_BATCHES, WORKER_BATCH_SIZE, WORKER_IDLE_SECONDS, next_idle_delay
 from app.core.worker_health import mark_worker_heartbeat
@@ -74,6 +75,30 @@ async def send_delivery(bot: Bot, job):
     )
 
 
+async def record_delivery_error(job, exc: BaseException, *, source: str) -> str:
+    error_id = new_error_id()
+    logger.exception(
+        "Unexpected delivery failure error_id=%s job_id=%s bot_id=%s",
+        error_id,
+        job.id,
+        job.bot_id,
+        exc_info=exc,
+    )
+    await record_bot_error(
+        error_id=error_id,
+        source=source,
+        exception=exc,
+        telegram_chat_id=job.chat_id,
+        extra={
+            "bot_id": job.bot_id,
+            "delivery_job_id": job.id,
+            "delivery_kind": job.kind,
+            "attempts": job.attempts,
+        },
+    )
+    return error_id
+
+
 async def deliver_job(
     bot: Bot,
     job,
@@ -89,9 +114,11 @@ async def deliver_job(
     except (TelegramForbiddenError, TelegramBadRequest) as exc:
         return "failed", str(exc), str(exc)
     except Exception as exc:
+        error_id = await record_delivery_error(job, exc, source="delivery_send")
+        safe_error = f"Unexpected delivery error ({error_id})"
         if job.attempts + 1 >= max_attempts:
-            return "failed", str(exc), str(exc)
-        return "retry", retry_delay(job.attempts), str(exc)
+            return "failed", safe_error, safe_error
+        return "retry", retry_delay(job.attempts), safe_error
 
 
 async def main() -> None:
@@ -164,8 +191,12 @@ async def main() -> None:
                     try:
                         bot = await bot_pool.for_instance(session, instance)
                     except RuntimeError as exc:
+                        error_id = await record_delivery_error(job, exc, source="delivery_bot_credentials")
                         repository = DeliveryRepository(session)
-                        await repository.mark_failed(job, error=str(exc))
+                        await repository.mark_failed(
+                            job,
+                            error=f"Bot credentials unavailable ({error_id})",
+                        )
                         await session.commit()
                         continue
 
