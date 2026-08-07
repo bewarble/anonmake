@@ -6,7 +6,6 @@ from app.bot.ui import (
     ADMIN_PROFIT,
     ADMIN_SOURCES,
     ADMIN_STATISTICS,
-    USER_HELP,
     USER_PERSONAL_LINK,
 )
 from app.core.config import load_settings
@@ -33,9 +32,9 @@ def main_menu_keyboard(*, is_admin: bool = False) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=USER_PERSONAL_LINK)],
-            [KeyboardButton(text=USER_HELP)],
         ],
         resize_keyboard=True,
+        is_persistent=True,
         input_field_placeholder="Выберите действие",
     )
 
