@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.payments import test_payment_keyboard
 from app.core.config import load_settings
+from app.core.error_diagnostics import new_error_id, record_bot_error
 from app.repositories.users import UserRepository
 from app.services.impaya import ImpayaClient
 from app.services.impaya_factory import create_impaya_client, load_impaya_config
@@ -42,6 +43,7 @@ def make_client(settings) -> ImpayaClient:
 async def test_payment(
     message: Message,
     session: AsyncSession,
+    request_id: str | None = None,
 ) -> None:
     if message.from_user is None:
         return
@@ -87,10 +89,23 @@ async def test_payment(
             public_base_url=settings.public_base_url,
         )
     except Exception as exc:
-        logger.exception("Test payment invoice creation failed")
+        error_id = new_error_id()
+        logger.exception(
+            "Test payment invoice creation failed error_id=%s",
+            error_id,
+        )
+        await record_bot_error(
+            error_id=error_id,
+            source="test_payment_invoice",
+            exception=exc,
+            telegram_user_id=message.from_user.id,
+            telegram_chat_id=message.chat.id,
+            request_id=request_id,
+            extra={"user_id": user.id, "bot_id": user.bot_id},
+        )
         await message.answer(
             "Не удалось создать тестовый платёж.\n\n"
-            f"Ошибка: {str(exc)[:300]}"
+            f"Код ошибки: {error_id}"
         )
         return
     finally:
