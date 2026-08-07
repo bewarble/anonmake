@@ -43,12 +43,27 @@ def main() -> None:
     reject("app/bot/ui.py", "USER_HELP")
     require("app/bot/keyboards/main_menu.py", "KeyboardButton(text=USER_PERSONAL_LINK)", "is_persistent=True")
     reject("app/bot/keyboards/main_menu.py", "USER_HELP")
-    require("app/models/user.py", "PUBLIC_CODE_LENGTH = 8", "PUBLIC_CODE_ALPHABET", "secrets.choice(PUBLIC_CODE_ALPHABET)")
+    require(
+        "app/models/user.py",
+        "PUBLIC_CODE_LENGTH = 8",
+        "PUBLIC_CODE_ALPHABET",
+        "secrets.choice(PUBLIC_CODE_ALPHABET)",
+        "is_blocked: Mapped[bool]",
+        "blocked_at: Mapped[datetime | None]",
+    )
     require(
         "migrations/versions/20260807_0021_short_public_codes.py",
         'revision = "20260807_0021"',
         'down_revision = "20260807_0020"',
         "_regenerate(8)",
+    )
+    require(
+        "migrations/versions/20260808_0022_user_block_state.py",
+        'revision = "20260808_0022"',
+        'down_revision = "20260807_0021"',
+        'sa.Column("is_blocked"',
+        'sa.Column("blocked_at"',
+        "latest_failure",
     )
     require(
         "app/bot/keyboards/questions.py",
@@ -115,24 +130,32 @@ def main() -> None:
     )
     require(
         "app/repositories/users.py",
-        "user.updated_at = datetime.now(timezone.utc)",
+        "user.is_blocked = False",
+        "async def set_block_state(",
+        "user.is_blocked = is_blocked",
     )
+    require(
+        "app/bot/handlers/chat_members.py",
+        "@router.my_chat_member()",
+        'BLOCKED_STATUSES = {"kicked", "left"}',
+        "set_block_state(",
+    )
+    require("app/main.py", "dispatcher.my_chat_member.outer_middleware(database_middleware)")
+    require("app/managed_bots.py", "dispatcher.my_chat_member.outer_middleware(middleware)")
     require(
         "app/services/admin_statistics_stage25.py",
         "bot_id = require_current_bot().id",
         "User.bot_id == bot_id",
-        "DeliveryOutbox.bot_id == bot_id",
+        "User.is_blocked.is_(True)",
+        "User.blocked_at >= left",
         "PaymentMethod.bot_id == bot_id",
-        "func.max(DeliveryOutbox.updated_at)",
-        "latest_failure.c.blocked_at > User.updated_at",
     )
     require(
         "app/core/admin_metrics.py",
         "return require_current_bot().id",
         "User.bot_id == self.bot_id",
-        "DeliveryOutbox.bot_id == self.bot_id",
+        "User.is_blocked.is_(False)",
         "PaymentAttempt.bot_id == self.bot_id",
-        "latest_failure.c.blocked_at > User.updated_at",
     )
     require(
         "app/repositories/marketing.py",
@@ -154,7 +177,13 @@ def main() -> None:
         "♻️ <b>Прирост</b>",
         "📈 <b>Саморост</b>",
     )
-    require("app/delivery_worker.py", 'parse_mode = payload.get("parse_mode")', "parse_mode=parse_mode")
+    require(
+        "app/delivery_worker.py",
+        'parse_mode = payload.get("parse_mode")',
+        "parse_mode=parse_mode",
+        "mark_user_blocked_fallback",
+        "user.is_blocked = True",
+    )
     print("Stage 63 check: OK")
     print("Public codes: shortened to 8 characters")
     print("Public menu: one persistent action")
@@ -163,10 +192,10 @@ def main() -> None:
     print("Anonymous question/answer actions: 💬 Ответить + 👁️ Узнать кто это")
     print("/cancel command label: Отключить подписку")
     print("Telegram admin statistics/export/profit/sources/broadcasts: scoped to current bot")
-    print("Alive/dead users: return-aware state based on last activity vs last permanent block")
+    print("Alive/dead users: live Telegram my_chat_member state with delivery fallback")
     print("Reveal consent: Mooncloud terms/privacy/pricing links")
     print("Question and answer UX: final")
-    print("Stage 63 migration: 20260807_0021_short_public_codes")
+    print("Stage 63 migrations: short public codes + live block state")
 
 
 if __name__ == "__main__":
