@@ -21,6 +21,25 @@ async def personal_link(bot: Bot, public_code: str) -> str:
     return f"https://t.me/{bot_user.username}?start={public_code}"
 
 
+async def show_home(
+    message: Message,
+    *,
+    bot: Bot,
+    public_code: str,
+) -> None:
+    link = await personal_link(bot, public_code)
+    await message.answer(
+        f"{texts.WELCOME}\n\n"
+        f"{texts.PERSONAL_LINK.format(link=link)}\n\n"
+        f"{texts.PERSONAL_LINK_HINT}",
+        reply_markup=main_menu_for(message.from_user.id if message.from_user else None),
+    )
+    await message.answer(
+        texts.PERSONAL_LINK_SHARE,
+        reply_markup=personal_link_share_keyboard(link),
+    )
+
+
 @router.message(CommandStart())
 async def command_start(
     message: Message,
@@ -38,16 +57,7 @@ async def command_start(
 
     code = (command.args or "").strip()
     if not code:
-        link = await personal_link(bot, current_user.public_code)
-        await message.answer(
-            texts.WELCOME,
-            reply_markup=main_menu_for(message.from_user.id),
-        )
-        await message.answer(
-            f"{texts.PERSONAL_LINK.format(link=link)}\n\n"
-            f"{texts.PERSONAL_LINK_HINT}",
-            reply_markup=personal_link_share_keyboard(link),
-        )
+        await show_home(message, bot=bot, public_code=current_user.public_code)
         return
 
     recipient = await users.get_by_public_code(code)
@@ -83,9 +93,4 @@ async def show_personal_link(
         return
 
     user = await UserRepository(session).upsert_from_telegram(message.from_user)
-    link = await personal_link(bot, user.public_code)
-    await message.answer(
-        f"{texts.PERSONAL_LINK.format(link=link)}\n\n"
-        f"{texts.PERSONAL_LINK_HINT}",
-        reply_markup=personal_link_share_keyboard(link),
-    )
+    await show_home(message, bot=bot, public_code=user.public_code)
