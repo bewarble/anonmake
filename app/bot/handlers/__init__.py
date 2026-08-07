@@ -6,6 +6,8 @@ from app.bot.handlers.admin_marketing import router as admin_marketing_router
 from app.bot.handlers.admin_stage25_1 import router as admin_router
 from app.bot.handlers.answers import router as answers_router
 from app.bot.handlers.errors import router as errors_router
+from app.bot.handlers.navigation import fallback_router as navigation_fallback_router
+from app.bot.handlers.navigation import router as navigation_router
 from app.bot.handlers.questions import router as questions_router
 from app.bot.handlers.recurrent_test import router as recurrent_test_router
 from app.bot.handlers.payments import router as payments_router
@@ -26,6 +28,8 @@ def build_router() -> Router:
 
     router.include_router(start_marketing_router)
     router.include_router(start_router)
+    # Navigation commands must be able to interrupt an active FSM cleanly.
+    router.include_router(navigation_router)
     router.include_router(subscriptions_router)
 
     if load_settings().payment_test_commands_enabled:
@@ -35,6 +39,8 @@ def build_router() -> Router:
     router.include_router(questions_router)
     router.include_router(reveals_router)
     router.include_router(answers_router)
+    # Unknown updates are handled only after all functional routers had a chance.
+    router.include_router(navigation_fallback_router)
     router.include_router(errors_router)
     return router
 
