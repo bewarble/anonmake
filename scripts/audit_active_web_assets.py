@@ -10,6 +10,7 @@ ACTIVE_ASSETS = {
     "admin-ui.css", "admin-ui.js", "admin-stage50.css",
     "admin-stage51.css", "admin-stage51.js",
     "admin-stage52.css", "admin-stage52.js",
+    "admin-stage53.css", "admin-stage53.js",
 }
 
 
