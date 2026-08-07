@@ -12,6 +12,7 @@ from app.bot.middlewares import DatabaseMiddleware, PerformanceMiddleware
 from app.bot.middlewares.request_context import RequestContextMiddleware
 from app.core.bot_context import CurrentBot
 from app.core.config import load_settings
+from app.core.error_diagnostics import new_error_id, record_bot_error
 from app.core.logging import configure_logging
 from app.database.session import SessionFactory, close_database, init_database
 from app.models.bot_instance import BotInstance
@@ -37,11 +38,32 @@ async def run_instance(instance: BotInstance, token: str, settings) -> None:
         await bot.session.close()
 
 
+async def record_runtime_crash(instance: BotInstance, exc: BaseException) -> None:
+    error_id = new_error_id()
+    logger.error(
+        "Managed bot runtime stopped unexpectedly error_id=%s bot_code=%s exception_type=%s",
+        error_id,
+        instance.code,
+        type(exc).__name__,
+    )
+    await record_bot_error(
+        error_id=error_id,
+        source="managed_bot_runtime",
+        exception=exc,
+        extra={
+            "bot_id": instance.id,
+            "bot_code": instance.code,
+            "bot_username": instance.username,
+        },
+    )
+
+
 async def main() -> None:
     settings = load_settings()
     configure_logging(settings.log_level, settings.json_logs)
     await init_database()
     tasks: dict[int, asyncio.Task] = {}
+    known_instances: dict[int, BotInstance] = {}
     try:
         while True:
             async with SessionFactory() as session:
@@ -52,9 +74,18 @@ async def main() -> None:
                         BotInstance.token_encrypted.is_not(None),
                     )
                 )).scalars())
+                known_instances.update({item.id: item for item in instances})
                 active_ids = {item.id for item in instances}
                 for bot_id, task in list(tasks.items()):
-                    if bot_id not in active_ids or task.done():
+                    if task.done():
+                        if not task.cancelled():
+                            exc = task.exception()
+                            instance = known_instances.get(bot_id)
+                            if exc is not None and instance is not None:
+                                await record_runtime_crash(instance, exc)
+                        tasks.pop(bot_id, None)
+                        continue
+                    if bot_id not in active_ids:
                         task.cancel()
                         tasks.pop(bot_id, None)
                 for item in instances:
