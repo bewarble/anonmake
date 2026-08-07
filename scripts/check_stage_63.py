@@ -25,7 +25,12 @@ def main() -> None:
         "<b>📨 Вам отправили новое анонимное сообщение</b>",
         "💬 Напишите свой ответ на данное сообщение:",
         "✅ Ответ успешно отправлен и уже пришёл человеку!",
-        "💝 Хочешь получать больше сообщений? Поделись ссылкой:",
+        "❗️ У вас не найдено активных подписок.",
+        "✅ Авто-продление успешно отключено!",
+        "Стоимость пробной подписки 1₽ за 1 день доступа.",
+        "https://sms.mooncloud.ltd/terms",
+        "https://sms.mooncloud.ltd/privacy",
+        "https://sms.mooncloud.ltd/pricing",
     )
     require(
         "app/bot/ui.py",
@@ -59,7 +64,6 @@ def main() -> None:
         'text="📤 Выложить в каналы / чаты"',
         'callback_data=f"ask_again:{recipient_id}"',
         "CopyTextButton(text=full_link)",
-        'full_link = link if link.startswith("https://") else f"https://{link}"',
     )
     require(
         "app/bot/keyboards/personal_link.py",
@@ -74,10 +78,24 @@ def main() -> None:
         'link.removeprefix("https://")',
         "texts.SELF_MESSAGE",
         "personal_link_share_keyboard(link)",
-        'await message.answer(\n            "💬",',
         "reply_markup=main_menu_for(message.from_user.id)",
     )
+    reject("app/bot/handlers/start.py", 'await message.answer(\n            "💬",')
     reject("app/bot/handlers/navigation.py", "USER_HELP", "show_help")
+    require(
+        "app/bot/handlers/subscriptions.py",
+        '@router.message(Command("cancel"))',
+        "if subscription.auto_renew:",
+        "await repository.cancel_auto_renew(subscription, cancelled_at=now)",
+        "texts.NO_ACTIVE_ACCESS",
+        "texts.AUTO_RENEW_OFF",
+    )
+    require(
+        "app/bot/handlers/reveals.py",
+        "texts.REVEAL_CONSENT",
+        'parse_mode="HTML"',
+        "disable_web_page_preview=True",
+    )
     require(
         "app/bot/handlers/questions.py",
         '@router.callback_query(F.data.startswith("ask_again:"))',
@@ -101,15 +119,13 @@ def main() -> None:
         "parse_mode=parse_mode",
     )
     print("Stage 63 check: OK")
-    print("Personal-link entry copy: final")
     print("Public codes: shortened to 8 characters")
     print("Public menu: one persistent action")
-    print("/start and personal-link action expose native copy/share buttons")
-    print("Question cancel deletes the prompt and returns the personal-link promo")
-    print("Post-send repeat action and self-promotion: ready")
-    print("Anonymous-message header: bold and HTML-safe")
-    print("Answer prompt and post-answer sharing actions: ready")
-    print("Copy-link actions include https://")
+    print("/start: single promo message without inline actions")
+    print("Personal-link action: native copy/share buttons")
+    print("/cancel: immediate auto-renew disable with final copy")
+    print("Reveal consent: Mooncloud terms/privacy/pricing links")
+    print("Question and answer UX: final")
     print("Stage 63 migration: 20260807_0021_short_public_codes")
 
 
