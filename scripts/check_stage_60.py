@@ -21,6 +21,11 @@ def main() -> None:
         "overall_runtime_status",
     )
     require(
+        "app/core/worker_health.py",
+        "except OSError as exc",
+        "Worker heartbeat write failed",
+    )
+    require(
         "app/services/billing_worker.py",
         '"billing-worker"',
         "mark_worker_heartbeat(",
@@ -36,14 +41,28 @@ def main() -> None:
     )
     require(
         "compose.yaml",
+        "runtime-health-init:",
+        'user: "0:0"',
+        "chown anonmake:anonmake /tmp/anonmake-health",
+        "chmod 0775 /tmp/anonmake-health",
         "runtime_health:/tmp/anonmake-health",
         "runtime_health:/tmp/anonmake-health:ro",
+        "runtime-health-init:",
+        "condition: service_completed_successfully",
         '"scripts.worker_healthcheck", "managed-bots"',
         '"scripts.worker_healthcheck", "billing-worker"',
         "runtime_health:",
     )
-    require("compose.delivery.yaml", "runtime_health:/tmp/anonmake-health")
-    require("compose.marketing.yaml", "runtime_health:/tmp/anonmake-health")
+    require(
+        "compose.delivery.yaml",
+        "runtime_health:/tmp/anonmake-health",
+        "runtime-health-init:",
+    )
+    require(
+        "compose.marketing.yaml",
+        "runtime_health:/tmp/anonmake-health",
+        "runtime-health-init:",
+    )
     require(
         "app/web/admin_observability.py",
         "runtime_health_snapshot()",
@@ -68,7 +87,8 @@ def main() -> None:
     require("scripts/audit_active_web_assets.py", '"admin-stage60.css"')
     assert not list((ROOT / "migrations/versions").glob("*stage_60*"))
     print("Stage 60 check: OK")
-    print("Shared runtime heartbeat volume: ready")
+    print("Shared runtime heartbeat volume and permission init: ready")
+    print("Heartbeat write failures cannot crash business workers")
     print("Managed bots, delivery, broadcast and billing health: visible")
     print("Platform incident summary: ready")
     print("No Docker socket exposure required")
