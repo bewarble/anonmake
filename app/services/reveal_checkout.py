@@ -6,7 +6,6 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.bot_context import require_current_bot
-
 from app.models.billing import PaymentAttempt, PaymentMethod
 from app.models.reveal import RevealCheckout
 from app.repositories.billing import BillingRepository
@@ -38,6 +37,11 @@ class RevealCheckoutService:
         self.trial_duration = trial_duration
         self.billing = BillingRepository(session)
 
+    def payment_url(self, invoice_id: str) -> str:
+        if not self.payment_form_url_template:
+            raise RuntimeError("IMPAYA_PAYMENT_FORM_URL_TEMPLATE is not configured")
+        return self.payment_form_url_template.format(invoice_id=invoice_id)
+
     async def create(
         self,
         checkout: RevealCheckout,
@@ -46,10 +50,13 @@ class RevealCheckoutService:
         success_url: str,
         fail_url: str,
     ) -> str:
-        if not self.payment_form_url_template:
-            raise RuntimeError("IMPAYA_PAYMENT_FORM_URL_TEMPLATE is not configured")
+        if checkout.status == "completed":
+            raise RuntimeError("Reveal checkout is already completed")
+        # Double taps on the consent button must reuse the same pending invoice
+        # instead of creating multiple payment intents for one reveal.
+        if checkout.status == "payment_pending" and checkout.invoice_id:
+            return self.payment_url(checkout.invoice_id)
 
-        current_bot = require_current_bot()
         current_bot = require_current_bot()
         subscription = await self.billing.get_or_create_subscription(user_id)
         method = await self.billing.payment_method_for_user(user_id)
@@ -109,7 +116,7 @@ class RevealCheckoutService:
             )
 
         await self.session.commit()
-        return self.payment_form_url_template.format(invoice_id=invoice_id)
+        return self.payment_url(str(invoice_id))
 
     async def finalize(
         self,
@@ -122,6 +129,7 @@ class RevealCheckoutService:
         if checkout.customer_operation_id is None:
             return False
 
+        current_bot = require_current_bot()
         result = await self.client.state(
             customer_operation_id=checkout.customer_operation_id
         )
