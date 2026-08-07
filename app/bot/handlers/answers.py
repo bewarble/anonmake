@@ -34,31 +34,17 @@ async def begin_answer(
         return
 
     question = await QuestionRepository(session).get_with_users(question_id)
-    current_user = await UserRepository(session).get_by_telegram_id(
-        callback.from_user.id
-    )
-
-    if question is None or current_user is None:
+    current_user = await UserRepository(session).get_by_telegram_id(callback.from_user.id)
+    if question is None or current_user is None or question.recipient_id != current_user.id:
         await state.clear()
         await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
-        return
-    if question.recipient_id != current_user.id:
-        await state.clear()
-        await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
-        return
-    if question.answer is not None:
-        await state.clear()
-        await callback.answer(texts.ANSWER_ALREADY_SENT, show_alert=True)
         return
 
     await state.set_state(AnswerQuestion.waiting_for_text)
     await state.update_data(question_id=question.id)
     await callback.answer()
     if callback.message:
-        await callback.message.answer(
-            texts.ANSWER_PROMPT,
-            reply_markup=cancel_keyboard(),
-        )
+        await callback.message.answer(texts.ANSWER_PROMPT, reply_markup=cancel_keyboard())
 
 
 @router.callback_query(F.data.startswith("answer_back:"))
@@ -69,7 +55,6 @@ async def begin_answer_back(
 ) -> None:
     if callback.from_user is None:
         return
-
     try:
         question_id = int((callback.data or "").split(":", 1)[1])
     except (IndexError, ValueError):
@@ -78,15 +63,8 @@ async def begin_answer_back(
         return
 
     question = await QuestionRepository(session).get_with_users(question_id)
-    current_user = await UserRepository(session).get_by_telegram_id(
-        callback.from_user.id
-    )
-
-    if (
-        question is None
-        or current_user is None
-        or question.sender_id != current_user.id
-    ):
+    current_user = await UserRepository(session).get_by_telegram_id(callback.from_user.id)
+    if question is None or current_user is None or question.sender_id != current_user.id:
         await state.clear()
         await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
         return
@@ -95,10 +73,7 @@ async def begin_answer_back(
     await state.update_data(recipient_id=question.recipient_id)
     await callback.answer()
     if callback.message:
-        await callback.message.answer(
-            texts.QUESTION_PROMPT,
-            reply_markup=cancel_keyboard(),
-        )
+        await callback.message.answer(texts.QUESTION_PROMPT, reply_markup=cancel_keyboard())
 
 
 @router.message(AnswerQuestion.waiting_for_text, F.text)
@@ -115,77 +90,41 @@ async def receive_answer(
         await message.answer(texts.ANSWER_EMPTY)
         return
     if len(text) > MAX_ANSWER_LENGTH:
-        await message.answer(
-            texts.ANSWER_TOO_LONG.format(limit=MAX_ANSWER_LENGTH)
-        )
+        await message.answer(texts.ANSWER_TOO_LONG.format(limit=MAX_ANSWER_LENGTH))
         return
 
     data = await state.get_data()
     question_id = data.get("question_id")
     if not isinstance(question_id, int):
         await state.clear()
-        await message.answer(
-            texts.ANSWER_SESSION_EXPIRED,
-            reply_markup=main_menu_for(message.from_user.id),
-        )
+        await message.answer(texts.ANSWER_SESSION_EXPIRED, reply_markup=main_menu_for(message.from_user.id))
         return
 
-    # Serialize submissions for the same question. The answers table already has a
-    # unique question_id constraint; the row lock makes the user-facing behavior
-    # deterministic instead of surfacing a unique-constraint exception on double tap.
-    question = await QuestionRepository(session).get_with_users(
-        question_id,
-        for_update=True,
-    )
-    current_user = await UserRepository(session).upsert_from_telegram(
-        message.from_user
-    )
-
+    # Lock the source message while appending a reply so concurrent submissions
+    # remain ordered, but do not impose a one-reply-per-message limit.
+    question = await QuestionRepository(session).get_with_users(question_id, for_update=True)
+    current_user = await UserRepository(session).upsert_from_telegram(message.from_user)
     if question is None or question.recipient_id != current_user.id:
         await state.clear()
-        await message.answer(
-            texts.ANSWER_NOT_FOUND,
-            reply_markup=main_menu_for(message.from_user.id),
-        )
-        return
-    if question.answer is not None:
-        await state.clear()
-        await session.rollback()
-        await message.answer(
-            texts.ANSWER_ALREADY_SENT,
-            reply_markup=main_menu_for(message.from_user.id),
-        )
+        await message.answer(texts.ANSWER_NOT_FOUND, reply_markup=main_menu_for(message.from_user.id))
         return
 
     answer = await AnswerRepository(session).create(question=question, text=text)
-
     await DeliveryRepository(session).enqueue(
         kind="answer",
         dedupe_key=f"answer:{answer.id}",
         chat_id=question.sender.telegram_id,
         text=texts.ANSWER_RECEIVED.format(answer=text),
-        reply_markup=serialize_markup(
-            answer_received_keyboard(question.id)
-        ),
+        reply_markup=serialize_markup(answer_received_keyboard(question.id)),
     )
 
     tracking = CrmTrackingService(session)
-    await tracking.answer_sent(
-        user_id=current_user.id,
-        answer_id=answer.id,
-    )
-    await tracking.answer_received(
-        user_id=question.sender_id,
-        answer_id=answer.id,
-    )
-
+    await tracking.answer_sent(user_id=current_user.id, answer_id=answer.id)
+    await tracking.answer_received(user_id=question.sender_id, answer_id=answer.id)
     await session.commit()
 
     await state.clear()
-    await message.answer(
-        texts.ANSWER_SENT,
-        reply_markup=main_menu_for(message.from_user.id),
-    )
+    await message.answer(texts.ANSWER_SENT, reply_markup=main_menu_for(message.from_user.id))
 
 
 @router.message(AnswerQuestion.waiting_for_text)
