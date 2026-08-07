@@ -22,6 +22,27 @@ def safe_exception_type(exc: BaseException | None) -> str | None:
     return type(exc).__name__[:120]
 
 
+def decode_bot_error_event(row: AdminAuditLog) -> dict[str, Any]:
+    try:
+        details = json.loads(row.details or "{}")
+    except (TypeError, json.JSONDecodeError):
+        details = {}
+    return {
+        "error_id": row.target or "—",
+        "created_at": row.created_at,
+        "source": details.get("source") or "—",
+        "exception_type": details.get("exception_type") or "—",
+        "telegram_user_id": details.get("telegram_user_id"),
+        "telegram_chat_id": details.get("telegram_chat_id"),
+        "update_id": details.get("update_id"),
+        "update_type": details.get("update_type") or "—",
+        "request_id": details.get("request_id") or "—",
+        "bot_id": details.get("bot_id"),
+        "bot_code": details.get("bot_code") or "—",
+        "bot_username": details.get("bot_username") or "—",
+    }
+
+
 async def record_bot_error(
     *,
     error_id: str,
