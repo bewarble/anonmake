@@ -6,6 +6,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from sqlalchemy import select
 
+from app.bot.commands import sync_public_commands
 from app.bot.handlers import build_router
 from app.bot.middlewares import DatabaseMiddleware, PerformanceMiddleware
 from app.bot.middlewares.request_context import RequestContextMiddleware
@@ -35,6 +36,7 @@ async def run_instance(instance: BotInstance, token: str, settings) -> None:
     dispatcher.include_router(build_router())
     try:
         await bot.delete_webhook(drop_pending_updates=False)
+        await sync_public_commands(bot)
         await dispatcher.start_polling(bot)
     finally:
         await storage.close()
