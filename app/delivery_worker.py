@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import logging
 import os
 import socket
@@ -13,6 +14,7 @@ from aiogram.exceptions import (
     TelegramNetworkError,
     TelegramRetryAfter,
 )
+from sqlalchemy import select
 
 from app.core.config import load_settings
 from app.core.error_diagnostics import new_error_id, record_bot_error
@@ -21,15 +23,42 @@ from app.core.performance import WORKER_BATCHES, WORKER_BATCH_SIZE, WORKER_IDLE_
 from app.core.worker_health import mark_worker_heartbeat
 from app.database.session import SessionFactory, close_database, init_database
 from app.models.bot_instance import BotInstance
+from app.models.user import User
 from app.repositories.delivery import DeliveryRepository
 from app.services.bot_pool import BotPool
 from app.services.delivery import deserialize_markup
 
 logger = logging.getLogger(__name__)
 
+PERMANENT_BLOCK_MARKERS = (
+    "bot was blocked",
+    "chat not found",
+    "user is deactivated",
+)
+
 
 def retry_delay(attempt: int) -> int:
     return min(300, 2 ** min(attempt + 1, 8))
+
+
+def is_permanent_user_block(error: str) -> bool:
+    lowered = error.lower()
+    return any(marker in lowered for marker in PERMANENT_BLOCK_MARKERS)
+
+
+async def mark_user_blocked_fallback(session, job, error: str) -> None:
+    if not is_permanent_user_block(error):
+        return
+    user = await session.scalar(
+        select(User).where(
+            User.bot_id == job.bot_id,
+            User.telegram_id == job.chat_id,
+        )
+    )
+    if user is None:
+        return
+    user.is_blocked = True
+    user.blocked_at = datetime.now(timezone.utc)
 
 
 async def send_delivery(bot: Bot, job):
@@ -223,7 +252,9 @@ async def main() -> None:
                             delay_seconds=int(value),
                         )
                     else:
-                        await repository.mark_failed(job, error=str(value))
+                        final_error = str(value)
+                        await repository.mark_failed(job, error=final_error)
+                        await mark_user_blocked_fallback(session, job, final_error)
 
                     await session.commit()
                     mark_worker_heartbeat(
