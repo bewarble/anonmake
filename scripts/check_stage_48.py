@@ -55,7 +55,7 @@ def main() -> None:
     require(
         "app/web/templates/base.html",
         "/admin/platform/observability",
-        "admin-ui.css?v=48",
+        "/admin/static/admin-ui.css?v=",
     )
 
     print("Stage 48 check: OK")
