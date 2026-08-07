@@ -9,6 +9,12 @@ def require(path: str, *needles: str) -> None:
         assert needle in text, (path, needle)
 
 
+def reject(path: str, *needles: str) -> None:
+    text = (ROOT / path).read_text(encoding="utf-8")
+    for needle in needles:
+        assert needle not in text, (path, needle)
+
+
 def main() -> None:
     require(
         "app/core/texts.py",
@@ -16,8 +22,6 @@ def main() -> None:
         "✅ Сообщение отправлено, ожидайте ответ от человека!",
         "💬 Начни получать анонимные сообщения прямо сейчас!",
         "Разместите ссылку у себя в профиле и вам смогут написать ваши друзья и знакомые ✍️",
-        "🤫 Чтобы получать сообщения — добавь ссылку в свой профиль!",
-        "Пример как на фото 👇",
         "<b>📨 Вам отправили новое анонимное сообщение</b>",
         "💬 Напишите свой ответ на данное сообщение:",
         "✅ Ответ успешно отправлен и уже пришёл человеку!",
@@ -26,9 +30,15 @@ def main() -> None:
     require(
         "app/bot/ui.py",
         'USER_PERSONAL_LINK = "💬 Начать получать сообщения"',
-        'USER_HELP = "❓ Как получать сообщения?"',
         'ACTION_CANCEL = "✖️ Отменить"',
     )
+    reject("app/bot/ui.py", "USER_HELP")
+    require(
+        "app/bot/keyboards/main_menu.py",
+        "KeyboardButton(text=USER_PERSONAL_LINK)",
+        "is_persistent=True",
+    )
+    reject("app/bot/keyboards/main_menu.py", "USER_HELP")
     require(
         "app/models/user.py",
         "PUBLIC_CODE_LENGTH = 8",
@@ -53,21 +63,21 @@ def main() -> None:
     )
     require(
         "app/bot/keyboards/personal_link.py",
-        "personal_link_copy_keyboard",
-        'text="Скопировать ссылку"',
-        "CopyTextButton(text=link)",
+        'text="🔗 Скопировать ссылку"',
+        'text="📤 Выложить в каналы / чаты"',
+        "CopyTextButton(text=full_link)",
+        '"https://t.me/share/url/?"',
     )
     require(
         "app/bot/handlers/start.py",
         "texts.START_PROMO.format",
         'link.removeprefix("https://")',
         "texts.SELF_MESSAGE",
+        "personal_link_share_keyboard(link)",
+        'await message.answer(\n            "💬",',
+        "reply_markup=main_menu_for(message.from_user.id)",
     )
-    require(
-        "app/bot/handlers/navigation.py",
-        "personal_link_copy_keyboard(link)",
-        "texts.HELP",
-    )
+    reject("app/bot/handlers/navigation.py", "USER_HELP", "show_help")
     require(
         "app/bot/handlers/questions.py",
         '@router.callback_query(F.data.startswith("ask_again:"))',
@@ -93,7 +103,8 @@ def main() -> None:
     print("Stage 63 check: OK")
     print("Personal-link entry copy: final")
     print("Public codes: shortened to 8 characters")
-    print("Self-link, /start and help UX: final")
+    print("Public menu: one persistent action")
+    print("/start and personal-link action expose native copy/share buttons")
     print("Question cancel deletes the prompt and returns the personal-link promo")
     print("Post-send repeat action and self-promotion: ready")
     print("Anonymous-message header: bold and HTML-safe")
