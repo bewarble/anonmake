@@ -29,8 +29,8 @@ def main() -> None:
     )
     require(
         "app/web/templates/base.html",
-        "admin-stage51.css?v=51",
-        "admin-stage51.js?v=51",
+        "admin-stage51.css?v=",
+        "admin-stage51.js?v=",
     )
     require(
         "app/web/templates/platform_admins.html",
