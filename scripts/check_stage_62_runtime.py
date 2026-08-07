@@ -3,32 +3,55 @@ from __future__ import annotations
 import asyncio
 
 from aiogram import Bot
+from sqlalchemy import select
 
 from app.core.config import load_settings
+from app.database.session import SessionFactory
+from app.models.bot_instance import BotInstance
+from app.services.bot_credentials import resolve_bot_token
 
 EXPECTED_COMMANDS = ["start", "cancel"]
 
 
 async def check_telegram_commands() -> None:
     settings = load_settings()
-    bot = Bot(token=settings.require_bot_token())
-    try:
-        me = await bot.get_me()
-        commands = await bot.get_my_commands()
-    finally:
-        await bot.session.close()
-
-    actual = [item.command for item in commands]
-    assert actual == EXPECTED_COMMANDS, (
-        f"public Telegram commands mismatch: expected={EXPECTED_COMMANDS}, actual={actual}"
-    )
-
-    configured_username = settings.bot_username.strip().lstrip("@").lower()
-    if configured_username:
-        assert (me.username or "").lower() == configured_username, (
-            f"BOT_USERNAME mismatch: configured={configured_username}, telegram={me.username}"
+    async with SessionFactory() as session:
+        instances = list(
+            (
+                await session.execute(
+                    select(BotInstance)
+                    .where(BotInstance.is_active.is_(True))
+                    .order_by(BotInstance.id)
+                )
+            ).scalars()
         )
-    print(f"Stage 62 runtime: @{me.username} commands OK: /start, /cancel")
+
+        assert instances, "No active bot instances found"
+        checked = 0
+        for instance in instances:
+            token = await resolve_bot_token(session, settings, instance)
+            bot = Bot(token=token)
+            try:
+                me = await bot.get_me()
+                commands = await bot.get_my_commands()
+            finally:
+                await bot.session.close()
+
+            actual = [item.command for item in commands]
+            assert actual == EXPECTED_COMMANDS, (
+                f"@{instance.username} public commands mismatch: "
+                f"expected={EXPECTED_COMMANDS}, actual={actual}"
+            )
+            assert (me.username or "").lower() == instance.username.lstrip("@").lower(), (
+                f"bot username mismatch for {instance.code}: "
+                f"database={instance.username}, telegram={me.username}"
+            )
+            checked += 1
+            print(
+                f"Stage 62 runtime: @{me.username} commands OK: /start, /cancel"
+            )
+
+    print(f"Stage 62 runtime: active bots checked: {checked}")
 
 
 def check_runtime_config() -> None:
@@ -57,7 +80,10 @@ def check_runtime_config() -> None:
         assert settings.fallback_duration_days == 1
         print("Stage 62 runtime: billing copy/config contract OK")
     else:
-        print("Stage 62 runtime: billing disabled (allowed for runtime smoke; launch-check is stricter)")
+        print(
+            "Stage 62 runtime: billing disabled "
+            "(allowed for runtime smoke; launch-check is stricter)"
+        )
 
 
 async def main_async() -> None:
