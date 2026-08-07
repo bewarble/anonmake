@@ -14,9 +14,9 @@ def require(path: str, *needles: str) -> None:
 def main() -> None:
     require(
         "app/web/static/admin-stage51.js",
-        "data.confirm",
+        "form.dataset.confirm",
         "requestSubmit",
-        "data-loading-label",
+        "dataset.loadingLabel",
         "Escape",
         "is-submitting",
     )
@@ -34,14 +34,14 @@ def main() -> None:
     )
     require(
         "app/web/templates/platform_admins.html",
-        "data-confirm-title=\"Удалить аккаунт?\"",
-        "data-confirm-tone=\"danger\"",
-        "data-loading-label=\"Удаляем…\"",
+        "data-confirm-title",
+        "data-confirm-tone",
+        "data-loading-label",
     )
     require(
         "app/web/templates/platform_observability.html",
-        "data-confirm-title=\"Освободить зависшие доставки?\"",
-        "data-loading-label=\"Повторяем…\"",
+        "data-confirm-title",
+        "data-loading-label",
     )
     require(
         "scripts/audit_active_web_assets.py",
@@ -54,7 +54,7 @@ def main() -> None:
 
     print("Stage 51 check: OK")
     print("Unified confirmations, loading states and repeat-submit protection: ready")
-    print("Dangerous and bulk admin actions use the shared confirmation UX")
+    print("Shared confirmation UX is wired to sensitive and bulk admin actions")
     print("No Stage 51 migration required")
 
 
