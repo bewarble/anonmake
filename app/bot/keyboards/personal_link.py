@@ -3,7 +3,7 @@ from urllib.parse import quote
 from aiogram.types import CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
 
 
-SHARE_TEXT = "Отправь мне анонимное сообщение 👉 {link}"
+SHARE_TEXT = "По этой ссылке можно мне прислать анонимное сообщение:\n👉 {link}"
 
 
 def personal_link_share_keyboard(link: str) -> InlineKeyboardMarkup:
@@ -24,7 +24,7 @@ def personal_link_share_keyboard(link: str) -> InlineKeyboardMarkup:
                     text="📤 Выложить в каналы / чаты",
                     url=(
                         "https://t.me/share/url/?"
-                        f"url=%20&text={encoded_text}"
+                        f"url=&text={encoded_text}"
                     ),
                 )
             ],
