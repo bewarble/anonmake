@@ -24,7 +24,8 @@ def check() -> None:
 
     repository = (ROOT / "app/repositories/users.py").read_text(encoding="utf-8")
     assert repository.count("User.bot_id == bot_id") == 2
-    assert "bot_id=require_current_bot().id" in repository
+    assert "bot_id = require_current_bot().id" in repository
+    assert "bot_id=bot_id" in repository
 
     middleware = (
         ROOT / "app/bot/middlewares/database.py"
