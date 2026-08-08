@@ -50,6 +50,31 @@ class TrafficSource(Base):
     )
 
 
+class SourceClick(Base):
+    __tablename__ = "source_clicks"
+    __table_args__ = (
+        UniqueConstraint("source_id", "user_id", name="uq_source_click_source_user"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("traffic_sources.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        index=True,
+    )
+
+
 class SourceAttribution(Base):
     __tablename__ = "source_attributions"
     __table_args__ = (
