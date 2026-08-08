@@ -234,7 +234,7 @@ async def payment_settings_page(request: Request):
         repo = PlatformAdminRepository(session)
         bots = await _bots(session)
         gateways = {
-            bot.id: await repo.gateway_for_bot(bot.id)
+            bot.id: await repo.gateway_for_bot_any(bot.id)
             for bot in bots
         }
     return templates.TemplateResponse(
@@ -274,7 +274,7 @@ async def save_payment_settings(
         )
         if bot is None:
             raise HTTPException(status_code=404, detail="Проект не найден")
-        current = await repo.gateway_for_bot(bot_id)
+        current = await repo.gateway_for_bot_any(bot_id)
         values = {
             "api_url": api_url.strip(),
             "auth_header": "Authorization",
