@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramUnauthorizedError
 from sqlalchemy import select
 
 from app.core.config import load_settings
@@ -29,11 +30,20 @@ async def check_telegram_commands() -> None:
         assert instances, "No active bot instances found"
         checked = 0
         for instance in instances:
+            print(
+                f"Stage 62 runtime: checking {instance.code} / @{instance.username.lstrip('@')}"
+            )
             token = await resolve_bot_token(session, settings, instance)
             bot = Bot(token=token)
             try:
-                me = await bot.get_me()
-                commands = await bot.get_my_commands()
+                try:
+                    me = await bot.get_me()
+                    commands = await bot.get_my_commands()
+                except TelegramUnauthorizedError as exc:
+                    raise AssertionError(
+                        f"Telegram token is unauthorized for {instance.code} / "
+                        f"@{instance.username.lstrip('@')}"
+                    ) from exc
             finally:
                 await bot.session.close()
 
