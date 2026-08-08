@@ -6,6 +6,7 @@ import json
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bot_context import require_current_bot
 from app.models.admin import AdminAuditLog
 from app.models.billing import PaymentMethod, Subscription
 from app.repositories.billing import BillingRepository
@@ -43,6 +44,11 @@ class AdminSubscriptionControl:
         self.primary_days = primary_days
         self.fallback_days = fallback_days
 
+    @staticmethod
+    def _require_current_subscription(subscription: Subscription) -> None:
+        if subscription.bot_id != require_current_bot().id:
+            raise ValueError("Subscription does not belong to the current bot")
+
     async def charge(
         self,
         subscription: Subscription,
@@ -50,11 +56,14 @@ class AdminSubscriptionControl:
         *,
         plan: str,
     ) -> AdminActionResult:
+        self._require_current_subscription(subscription)
         if self.client is None:
             return AdminActionResult(False, "Платёжный клиент недоступен.")
 
         if method is None:
             return AdminActionResult(False, "У пользователя нет привязанной карты.")
+        if method.bot_id != subscription.bot_id or method.user_id != subscription.user_id:
+            raise ValueError("Payment method does not belong to the subscription project/user")
         if not method.is_active or not method.is_recurrent:
             return AdminActionResult(False, "Платёжная привязка неактивна.")
         if not method.binding_id or not method.impaya_user_id:
@@ -68,6 +77,13 @@ class AdminSubscriptionControl:
             )
 
         try:
+            await self.session.refresh(subscription)
+            if not subscription.auto_renew and subscription.cancelled_at is not None:
+                return AdminActionResult(
+                    False,
+                    "Автопродление отключено пользователем. Для ручного списания сначала включите его явно.",
+                )
+
             if plan == "primary":
                 amount = self.primary_amount
                 period = timedelta(days=self.primary_days)
@@ -98,6 +114,7 @@ class AdminSubscriptionControl:
                 action="subscription.manual_charge",
                 target=f"subscription:{subscription.id}",
                 details={
+                    "bot_id": subscription.bot_id,
                     "plan": plan,
                     "amount_kopecks": amount,
                     "decision": result.decision.value,
@@ -132,10 +149,13 @@ class AdminSubscriptionControl:
         *,
         enabled: bool,
     ) -> AdminActionResult:
+        self._require_current_subscription(subscription)
         now = datetime.now(timezone.utc)
-        subscription.auto_renew = enabled
 
         if enabled:
+            await self.repo.lock_subscription_transaction(subscription.id)
+            await self.session.refresh(subscription)
+            subscription.auto_renew = True
             subscription.cancelled_at = None
             subscription.next_charge_at = (
                 subscription.access_until
@@ -148,18 +168,12 @@ class AdminSubscriptionControl:
                 else "past_due"
             )
         else:
-            subscription.next_charge_at = None
-            subscription.cancelled_at = now
-            subscription.status = (
-                "cancelled_active"
-                if subscription.access_until and subscription.access_until > now
-                else "expired"
-            )
+            await self.repo.cancel_auto_renew(subscription, cancelled_at=now)
 
         await self._audit(
             action="subscription.auto_renew",
             target=f"subscription:{subscription.id}",
-            details={"enabled": enabled},
+            details={"bot_id": subscription.bot_id, "enabled": enabled},
         )
         await self.session.commit()
         return AdminActionResult(
@@ -173,9 +187,12 @@ class AdminSubscriptionControl:
         *,
         days: int,
     ) -> AdminActionResult:
+        self._require_current_subscription(subscription)
         if days not in {1, 3}:
             return AdminActionResult(False, "Недопустимый срок продления.")
 
+        await self.repo.lock_subscription_transaction(subscription.id)
+        await self.session.refresh(subscription)
         now = datetime.now(timezone.utc)
         base = max(subscription.access_until or now, now)
         subscription.access_until = base + timedelta(days=days)
@@ -187,7 +204,11 @@ class AdminSubscriptionControl:
         await self._audit(
             action="subscription.manual_extend",
             target=f"subscription:{subscription.id}",
-            details={"days": days, "access_until": subscription.access_until.isoformat()},
+            details={
+                "bot_id": subscription.bot_id,
+                "days": days,
+                "access_until": subscription.access_until.isoformat(),
+            },
         )
         await self.session.commit()
         return AdminActionResult(True, f"VIP статус продлён на {days} дн.")
