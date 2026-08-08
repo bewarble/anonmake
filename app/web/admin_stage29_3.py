@@ -19,6 +19,11 @@ def parse_period(value: str) -> int | None:
         return 30
 
 
+def _scope_bot_id(request: Request) -> int | None:
+    scope = getattr(request.state, "admin_bot_scope", None)
+    return getattr(scope, "bot_id", None)
+
+
 @router.get("/business/analytics", response_class=HTMLResponse)
 async def business_analytics(request: Request, period: str = "1"):
     if require_session(request) is None:
@@ -28,7 +33,7 @@ async def business_analytics(request: Request, period: str = "1"):
     chart_days = 90 if days is None else (7 if days == 1 else days)
 
     async with SessionFactory() as session:
-        repository = Stage29Repository(session)
+        repository = Stage29Repository(session, bot_id=_scope_bot_id(request))
         chart = await repository.chart(chart_days)
         snapshot = await repository.dashboard(days)
 
