@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from html import escape
 import logging
 import os
 
@@ -79,8 +80,9 @@ async def enqueue_broadcast_batch(session, *, item, users: list[User], sender: U
             dedupe_key=f"broadcast:{item.id}:user:{recipient.id}",
             bot_id=item.bot_id,
             chat_id=recipient.telegram_id,
-            text=texts.NEW_QUESTION.format(text=question.text),
+            text=texts.NEW_QUESTION.format(text=escape(question.text)),
             reply_markup=serialize_markup(markup),
+            payload={"parse_mode": "HTML"},
         )
 
 
