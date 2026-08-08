@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.bot_context import require_current_bot
-from app.models.billing import PaymentMethod
+from app.models.billing import PaymentMethod, Subscription
 from app.models.marketing import SourceAttribution
 from app.models.user import User
 
@@ -32,6 +32,7 @@ class StatisticsStage25:
     organic_week: int
     organic_month: int
     organic_all_time: int
+    total_cards: int
     active_cards: int
     points: list[DailyStatisticsPoint]
 
@@ -62,6 +63,7 @@ class AdminStatisticsStage25Repository:
             organic_week=await self._organic_since(bot_id, week),
             organic_month=await self._organic_since(bot_id, month),
             organic_all_time=await self._organic_all_time(bot_id),
+            total_cards=await self._total_cards(bot_id),
             active_cards=await self._active_cards(bot_id),
             points=await self._daily_points(bot_id, days=days),
         )
@@ -119,14 +121,28 @@ class AdminStatisticsStage25Repository:
         )
         return int(value or 0)
 
+    async def _total_cards(self, bot_id: int) -> int:
+        value = await self.session.scalar(
+            select(func.count(func.distinct(PaymentMethod.user_id))).where(
+                PaymentMethod.bot_id == bot_id,
+                PaymentMethod.binding_id.is_not(None),
+            )
+        )
+        return int(value or 0)
+
     async def _active_cards(self, bot_id: int) -> int:
         value = await self.session.scalar(
-            select(func.count(PaymentMethod.id)).where(
+            select(func.count(func.distinct(PaymentMethod.user_id)))
+            .join(
+                Subscription,
+                (Subscription.bot_id == PaymentMethod.bot_id)
+                & (Subscription.user_id == PaymentMethod.user_id),
+            )
+            .where(
                 PaymentMethod.bot_id == bot_id,
-                PaymentMethod.is_active.is_(True),
-                PaymentMethod.is_recurrent.is_(True),
                 PaymentMethod.binding_id.is_not(None),
                 PaymentMethod.blocked_at.is_(None),
+                Subscription.auto_renew.is_(True),
             )
         )
         return int(value or 0)
@@ -156,9 +172,6 @@ class AdminStatisticsStage25Repository:
                 or 0
             )
 
-            # The graph must reflect the same live state as the summary.
-            # A user who blocked the bot and later returned is alive again,
-            # so their old blocked_at value must not remain on the red series.
             blocked = int(
                 await self.session.scalar(
                     select(func.count(User.id)).where(
