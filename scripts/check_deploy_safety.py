@@ -20,17 +20,9 @@ def main() -> None:
     text = (ROOT / deploy).read_text(encoding="utf-8")
 
     assert 'POSTGRES_CUSTOM_MAGIC = b"PGDMP"' in text
-    assert '"20260729_0019"' in text
-    assert '"20260807_0020"' in text
-    assert '"20260807_0021"' in text
-    assert '"20260808_0022"' in text
-    assert '"--allow-public-code-rotation"' in text
-
-    guard = function_source(deploy, "ensure_safe_migration_path")
-    assert "PUBLIC_CODE_ROTATION_HEADS" in guard
-    assert "allow_public_code_rotation" in guard
-    assert "raise DeployError" in guard
-    assert "инвалидируют ранее опубликованные" in guard
+    assert "PUBLIC_CODE_ROTATION_HEADS" not in text
+    assert "--allow-public-code-rotation" not in text
+    assert "ensure_safe_migration_path" not in text
 
     backup = function_source(deploy, "backup_database")
     assert "POSTGRES_CUSTOM_MAGIC" in backup
@@ -40,20 +32,29 @@ def main() -> None:
     assert '"-Fc"' in backup
 
     main = function_source(deploy, "main")
-    assert "ensure_safe_migration_path" in main
-    assert main.index("ensure_safe_migration_path") < main.index("backup_database")
     assert main.index("backup_database") < main.index("run_migrations")
     assert main.index("run_migrations") < main.index("cleanup_backups")
+    assert "scripts.release_check" in main
+    assert "--runtime-only" in main
 
     migration_21 = (ROOT / "migrations/versions/20260807_0021_short_public_codes.py").read_text(encoding="utf-8")
     migration_23 = (ROOT / "migrations/versions/20260808_0023_random_short_public_codes.py").read_text(encoding="utf-8")
-    assert "_regenerate(8)" in migration_21
-    assert "_regenerate(5, 6)" in migration_23
+    migration_27 = (ROOT / "migrations/versions/20260808_0027_public_code_aliases.py").read_text(encoding="utf-8")
+    assert '_snapshot_current_codes("before_0021")' in migration_21
+    assert '_snapshot_current_codes("before_0023")' in migration_23
+    assert "new_code not in historical" in migration_21
+    assert "new_code not in historical" in migration_23
+    assert "_import_snapshot()" in migration_27
+    assert "INSERT INTO user_public_code_aliases" in migration_27
+
+    release = (ROOT / "scripts/release_check.py").read_text(encoding="utf-8")
+    assert '"scripts.check_public_code_aliases_runtime"' in release
 
     print("Deploy safety check: OK")
-    print("Pre-0023 databases fail closed before public-code rotation")
+    print("Public-code rotations preserve historical links through bridge snapshots")
+    print("No manual public-code-rotation bypass is required")
     print("PostgreSQL backup is validated as custom PGDMP format")
-    print("Backup remains before migrations and retention remains after success")
+    print("Backup remains before migrations and runtime integrity checks remain after migration")
 
 
 if __name__ == "__main__":
