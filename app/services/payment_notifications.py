@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 
 from aiogram import Bot
-from sqlalchemy import text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import texts
@@ -22,33 +22,6 @@ from app.services.reveal_checkout import RevealCheckoutService
 from app.services.sender_identity import resolve_current_sender
 
 logger = logging.getLogger(__name__)
-REVEAL_NOTIFICATION_LOCK_NAMESPACE = 170221
-
-
-async def _lock_notification(session: AsyncSession, checkout_id: int) -> None:
-    """Serialize one checkout across commits without holding a database row lock.
-
-    Reveal finalization commits the payment state before Telegram I/O. A normal
-    FOR UPDATE lock is therefore released before notification and cannot prevent
-    two concurrent return/webhook requests from both sending the message. A
-    PostgreSQL session advisory lock survives those commits and blocks only the
-    same checkout notification path, not unrelated database rows.
-    """
-    if session.get_bind().dialect.name != "postgresql":
-        return
-    await session.execute(
-        text("SELECT pg_advisory_lock(:namespace, :checkout_id)"),
-        {"namespace": REVEAL_NOTIFICATION_LOCK_NAMESPACE, "checkout_id": int(checkout_id)},
-    )
-
-
-async def _unlock_notification(session: AsyncSession, checkout_id: int) -> None:
-    if session.get_bind().dialect.name != "postgresql":
-        return
-    await session.execute(
-        text("SELECT pg_advisory_unlock(:namespace, :checkout_id)"),
-        {"namespace": REVEAL_NOTIFICATION_LOCK_NAMESPACE, "checkout_id": int(checkout_id)},
-    )
 
 
 async def finalize_checkout_and_notify(
@@ -59,50 +32,54 @@ async def finalize_checkout_and_notify(
     *,
     payment_form_url_template: str,
 ) -> str:
-    """Finalize a reveal payment and notify exactly once for one checkout."""
+    """Finalize payment and Telegram notification once for one reveal checkout.
+
+    The checkout row is the serialization boundary. Payment mutations are
+    flushed, not committed, until notification succeeds or its failure is
+    recorded. This prevents a concurrent return/webhook from observing
+    ``completed + notified_at=NULL`` and sending the same notification twice.
+    """
     del bot, client, payment_form_url_template
     settings = load_settings()
-    await _lock_notification(session, checkout.id)
 
-    runtime_bot: Bot | None = None
-    runtime_client: ImpayaClient | None = None
-    context_token = None
+    locked = await session.scalar(
+        select(RevealCheckout)
+        .where(RevealCheckout.id == checkout.id)
+        .with_for_update()
+    )
+    if locked is None:
+        return "notification_failed"
+    checkout = locked
+
+    buyer_row = await session.get(User, checkout.buyer_id)
+    if buyer_row is None:
+        checkout.notification_error = "Buyer was not found"
+        await session.commit()
+        return "notification_failed"
+    instance = await session.get(BotInstance, buyer_row.bot_id)
+    if instance is None:
+        checkout.notification_error = "Bot instance was not found"
+        await session.commit()
+        return "notification_failed"
+
+    token = await resolve_bot_token(session, settings, instance)
+    impaya_config = await load_impaya_config(session, settings, instance.id)
+    runtime_bot = Bot(token=token)
+    runtime_client = create_impaya_client(impaya_config)
+    context_token = set_current_bot(CurrentBot(instance.id, instance.code, instance.username, instance.display_name))
     try:
-        # Refresh after waiting for the advisory lock. Another request may have
-        # finalized/notified this checkout while this request was blocked.
-        await session.refresh(checkout)
-
-        buyer_row = await session.get(User, checkout.buyer_id)
-        if buyer_row is None:
-            checkout.notification_error = "Buyer was not found"
-            await session.commit()
-            return "notification_failed"
-
-        instance = await session.get(BotInstance, buyer_row.bot_id)
-        if instance is None:
-            checkout.notification_error = "Bot instance was not found"
-            await session.commit()
-            return "notification_failed"
-
-        token = await resolve_bot_token(session, settings, instance)
-        impaya_config = await load_impaya_config(session, settings, instance.id)
-        runtime_bot = Bot(token=token)
-        runtime_client = create_impaya_client(impaya_config)
-        context_token = set_current_bot(CurrentBot(instance.id, instance.code, instance.username, instance.display_name))
-
         paid = await RevealCheckoutService(
             session,
             runtime_client,
             payment_form_url_template=impaya_config.payment_form_url_template,
             trial_amount=settings.trial_price_kopecks,
             trial_duration=timedelta(hours=settings.trial_duration_hours),
-        ).finalize(checkout, user_id=checkout.buyer_id)
+        ).finalize(checkout, user_id=checkout.buyer_id, commit=False)
         if not paid:
+            await session.rollback()
             return "pending"
-
-        # finalize() commits, but the session advisory lock is still held.
-        await session.refresh(checkout)
         if checkout.notified_at is not None:
+            await session.commit()
             return "already_notified"
 
         buyer = await UserRepository(session).get_by_id(checkout.buyer_id)
@@ -111,7 +88,6 @@ async def finalize_checkout_and_notify(
             checkout.notification_error = "Buyer or question was not found"
             await session.commit()
             return "notification_failed"
-
         if buyer.id == question.recipient_id:
             target_user = question.sender
         elif buyer.id == question.sender_id:
@@ -135,21 +111,17 @@ async def finalize_checkout_and_notify(
         except Exception as exc:
             checkout.notification_error = type(exc).__name__
             await session.commit()
-            logger.exception(
-                "Failed to send VIP activation notification",
-                extra={"bot_code": instance.code, "telegram_user_id": buyer.telegram_id},
-            )
+            logger.exception("Failed to send VIP activation notification", extra={"bot_code": instance.code, "telegram_user_id": buyer.telegram_id})
             return "notification_failed"
 
         checkout.notified_at = datetime.now(timezone.utc)
         checkout.notification_error = None
         await session.commit()
         return "notified"
+    except Exception:
+        await session.rollback()
+        raise
     finally:
-        if context_token is not None:
-            reset_current_bot(context_token)
-        if runtime_client is not None:
-            await runtime_client.close()
-        if runtime_bot is not None:
-            await runtime_bot.session.close()
-        await _unlock_notification(session, checkout.id)
+        reset_current_bot(context_token)
+        await runtime_client.close()
+        await runtime_bot.session.close()
