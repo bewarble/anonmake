@@ -132,6 +132,7 @@ for observability_route in admin_observability_module.router.routes:
 from app.web.admin_audit_scoped import install_scoped_admin_audit  # noqa: E402
 from app.web.admin_csrf import install_admin_csrf_guard  # noqa: E402
 from app.web.admin_error_ux import install_admin_error_ux  # noqa: E402
+from app.web.admin_project_details_scoped import install_scoped_project_details  # noqa: E402
 from app.web.app import app as web_app  # noqa: E402
 from app.web.metrics_endpoint import install_metrics_endpoint  # noqa: E402
 from app.web.payment_return import install_payment_return  # noqa: E402
@@ -143,3 +144,4 @@ install_impaya_webhook(web_app)
 install_payment_return(web_app)
 install_metrics_endpoint(web_app)
 install_scoped_admin_audit(web_app)
+install_scoped_project_details(web_app)
