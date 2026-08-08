@@ -11,6 +11,19 @@ from app.models.admin import AdminAuditLog
 
 logger = logging.getLogger(__name__)
 
+SENSITIVE_KEY_FRAGMENTS = (
+    "token",
+    "secret",
+    "password",
+    "passwd",
+    "authorization",
+    "cookie",
+    "credential",
+    "api_key",
+    "apikey",
+    "private_key",
+)
+
 
 def new_error_id() -> str:
     return f"err_{secrets.token_hex(6)}"
@@ -20,6 +33,11 @@ def safe_exception_type(exc: BaseException | None) -> str | None:
     if exc is None:
         return None
     return type(exc).__name__[:120]
+
+
+def is_sensitive_diagnostic_key(key: object) -> bool:
+    normalized = str(key).strip().lower().replace("-", "_")
+    return any(fragment in normalized for fragment in SENSITIVE_KEY_FRAGMENTS)
 
 
 def decode_bot_error_event(row: AdminAuditLog) -> dict[str, Any]:
@@ -70,7 +88,7 @@ async def record_bot_error(
     }
     if extra:
         for key, value in extra.items():
-            if key in {"traceback", "token", "secret", "exception", "password"}:
+            if is_sensitive_diagnostic_key(key) or str(key).lower() in {"traceback", "exception"}:
                 continue
             if isinstance(value, (str, int, float, bool)) or value is None:
                 details[str(key)[:80]] = value if not isinstance(value, str) else value[:500]
