@@ -143,6 +143,30 @@ class BillingRepository:
         )
         return result.scalar_one_or_none()
 
+    async def pending_recurrent_attempt(
+        self,
+        subscription_id: int,
+    ) -> PaymentAttempt | None:
+        """Return unresolved recurrent work before creating another charge.
+
+        This deliberately ignores the calendar billing-cycle key. A payment can
+        become pending shortly before midnight and still be the same external
+        operation after the date changes; issuing a new operation at that point
+        could charge the customer twice.
+        """
+        result = await self.session.execute(
+            select(PaymentAttempt)
+            .where(
+                PaymentAttempt.bot_id == require_current_bot().id,
+                PaymentAttempt.subscription_id == subscription_id,
+                PaymentAttempt.status == "pending",
+                PaymentAttempt.attempt_kind.in_(("primary", "fallback")),
+            )
+            .order_by(PaymentAttempt.id.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def cancel_auto_renew(
         self,
         subscription: Subscription,
