@@ -1,19 +1,22 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import hmac
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from app.core.bot_context import CurrentBot, reset_current_bot, set_current_bot
 from app.core.config import load_settings
 from app.database.session import SessionFactory
+from app.models.bot_instance import BotInstance
 from app.repositories.marketing import MarketingRepository
 from app.web.admin import login_redirect, page_context, require_session, templates
 from app.web.admin_auth import COOKIE_NAME
-from app.web.admin_repository import WebAdminRepository
 from app.web.admin_repository_stage27 import WebCrmRepository
 from app.web.admin_repository_stage28 import WebAdminProRepository
+from app.web.admin_scoped_repository import ScopedWebAdminRepository
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 settings = load_settings()
@@ -36,14 +39,40 @@ def verify_csrf(request: Request, received: str) -> None:
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
 
+def _scope_bot_id(request: Request) -> int | None:
+    return getattr(request.state.admin_bot_scope, "bot_id", None)
+
+
+def _selected_bot(request: Request) -> BotInstance:
+    selected = getattr(request.state.admin_bot_scope, "selected", None)
+    if selected is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Выберите проект для выполнения этого действия",
+        )
+    return selected
+
+
+@contextmanager
+def _bot_context(instance: BotInstance):
+    token = set_current_bot(
+        CurrentBot(instance.id, instance.code, instance.username, instance.display_name)
+    )
+    try:
+        yield
+    finally:
+        reset_current_bot(token)
+
+
 @router.get("/overview", response_class=HTMLResponse)
 async def overview(request: Request):
     if require_session(request) is None:
         return login_redirect(request)
 
+    bot_id = _scope_bot_id(request)
     async with SessionFactory() as session:
-        base = await WebAdminRepository(session).dashboard()
-        pro = WebAdminProRepository(session)
+        base = await ScopedWebAdminRepository(session, bot_id=bot_id).dashboard()
+        pro = WebAdminProRepository(session, bot_id=bot_id)
         periods = await pro.periods(14)
         funnel = await pro.funnel()
         sources = await pro.source_performance()
@@ -80,6 +109,7 @@ async def overview(request: Request):
 async def source_create_page(request: Request):
     if require_session(request) is None:
         return login_redirect(request)
+    _selected_bot(request)
 
     return templates.TemplateResponse(
         request=request,
@@ -108,6 +138,7 @@ async def source_create_submit(
         return login_redirect(request)
 
     verify_csrf(request, csrf)
+    selected_bot = _selected_bot(request)
 
     name = name.strip()
     source_url = source_url.strip()
@@ -149,12 +180,13 @@ async def source_create_submit(
         )
 
     async with SessionFactory() as session:
-        source = await MarketingRepository(session).create_source(
-            name=name,
-            source_url=source_url,
-            spend_kopecks=spend_kopecks,
-            admin_telegram_id=0,
-        )
+        with _bot_context(selected_bot):
+            source = await MarketingRepository(session).create_source(
+                name=name,
+                source_url=source_url,
+                spend_kopecks=spend_kopecks,
+                admin_telegram_id=0,
+            )
         await session.commit()
         source_id = source.id
 
