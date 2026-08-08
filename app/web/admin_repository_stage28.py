@@ -53,43 +53,50 @@ class OperationsSummary:
 
 
 class WebAdminProRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, bot_id: int | None = None) -> None:
         self.session = session
+        self.bot_id = bot_id
 
     async def funnel(self) -> Funnel:
         now = datetime.now(timezone.utc)
         users = await self._count(User)
 
-        question_senders = int(
-            await self.session.scalar(
-                select(func.count(func.distinct(Question.sender_id)))
-            )
-            or 0
+        sender_query = select(func.count(func.distinct(Question.sender_id))).join(
+            User, User.id == Question.sender_id
         )
-        answerers = int(
-            await self.session.scalar(
-                select(func.count(func.distinct(Question.recipient_id)))
-                .join(Answer, Answer.question_id == Question.id)
-            )
-            or 0
+        answerer_query = (
+            select(func.count(func.distinct(Question.recipient_id)))
+            .join(Answer, Answer.question_id == Question.id)
+            .join(User, User.id == Question.recipient_id)
         )
+        if self.bot_id is not None:
+            sender_query = sender_query.where(User.bot_id == self.bot_id)
+            answerer_query = answerer_query.where(User.bot_id == self.bot_id)
+        question_senders = int(await self.session.scalar(sender_query) or 0)
+        answerers = int(await self.session.scalar(answerer_query) or 0)
+
+        vip_filters = [
+            Subscription.access_until.is_not(None),
+            Subscription.access_until > now,
+        ]
+        card_filters = [
+            PaymentMethod.is_active.is_(True),
+            PaymentMethod.is_recurrent.is_(True),
+            PaymentMethod.binding_id.is_not(None),
+            PaymentMethod.blocked_at.is_(None),
+        ]
+        if self.bot_id is not None:
+            vip_filters.append(Subscription.bot_id == self.bot_id)
+            card_filters.append(PaymentMethod.bot_id == self.bot_id)
         vip_users = int(
             await self.session.scalar(
-                select(func.count(Subscription.id)).where(
-                    Subscription.access_until.is_not(None),
-                    Subscription.access_until > now,
-                )
+                select(func.count(Subscription.id)).where(*vip_filters)
             )
             or 0
         )
         active_cards = int(
             await self.session.scalar(
-                select(func.count(PaymentMethod.id)).where(
-                    PaymentMethod.is_active.is_(True),
-                    PaymentMethod.is_recurrent.is_(True),
-                    PaymentMethod.binding_id.is_not(None),
-                    PaymentMethod.blocked_at.is_(None),
-                )
+                select(func.count(PaymentMethod.id)).where(*card_filters)
             )
             or 0
         )
@@ -129,18 +136,18 @@ class WebAdminProRepository:
                 left,
                 right,
             )
+            revenue_filters = [
+                PaymentAttempt.status.in_(SUCCESS_STATUSES),
+                PaymentAttempt.created_at >= left,
+                PaymentAttempt.created_at < right,
+            ]
+            if self.bot_id is not None:
+                revenue_filters.append(PaymentAttempt.bot_id == self.bot_id)
             revenue = int(
                 await self.session.scalar(
                     select(
-                        func.coalesce(
-                            func.sum(PaymentAttempt.amount_kopecks),
-                            0,
-                        )
-                    ).where(
-                        PaymentAttempt.status.in_(SUCCESS_STATUSES),
-                        PaymentAttempt.created_at >= left,
-                        PaymentAttempt.created_at < right,
-                    )
+                        func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0)
+                    ).where(*revenue_filters)
                 )
                 or 0
             )
@@ -162,7 +169,7 @@ class WebAdminProRepository:
             func.distinct(SourceAttribution.user_id)
         ).label("users_count")
 
-        result = await self.session.execute(
+        source_query = (
             select(TrafficSource, users_count)
             .outerjoin(
                 SourceAttribution,
@@ -172,6 +179,9 @@ class WebAdminProRepository:
             .order_by(users_count.desc(), TrafficSource.id.desc())
             .limit(limit)
         )
+        if self.bot_id is not None:
+            source_query = source_query.where(TrafficSource.bot_id == self.bot_id)
+        result = await self.session.execute(source_query)
 
         rows: list[SourcePerformance] = []
         for source, users in result.all():
@@ -181,7 +191,8 @@ class WebAdminProRepository:
                     select(func.count(func.distinct(SourceAttribution.user_id)))
                     .join(
                         Subscription,
-                        Subscription.user_id == SourceAttribution.user_id,
+                        (Subscription.user_id == SourceAttribution.user_id)
+                        & (Subscription.bot_id == source.bot_id),
                     )
                     .where(
                         SourceAttribution.source_id == source.id,
@@ -237,12 +248,15 @@ class WebAdminProRepository:
         )
 
     async def _count(self, model, *conditions) -> int:
-        return int(
-            await self.session.scalar(
-                select(func.count(model.id)).where(*conditions)
-            )
-            or 0
-        )
+        query = select(func.count(model.id)).where(*conditions)
+        if self.bot_id is not None:
+            if hasattr(model, "bot_id"):
+                query = query.where(model.bot_id == self.bot_id)
+            elif model is CrmEvent:
+                query = query.join(User, User.id == CrmEvent.user_id).where(
+                    User.bot_id == self.bot_id
+                )
+        return int(await self.session.scalar(query) or 0)
 
     async def _count_between(
         self,
@@ -251,12 +265,21 @@ class WebAdminProRepository:
         left: datetime,
         right: datetime,
     ) -> int:
-        return int(
-            await self.session.scalar(
-                select(func.count(model.id)).where(
-                    column >= left,
-                    column < right,
-                )
-            )
-            or 0
+        query = select(func.count(model.id)).where(
+            column >= left,
+            column < right,
         )
+        if self.bot_id is not None:
+            if hasattr(model, "bot_id"):
+                query = query.where(model.bot_id == self.bot_id)
+            elif model is Question:
+                query = query.join(User, User.id == Question.recipient_id).where(
+                    User.bot_id == self.bot_id
+                )
+            elif model is Answer:
+                query = (
+                    query.join(Question, Question.id == Answer.question_id)
+                    .join(User, User.id == Question.recipient_id)
+                    .where(User.bot_id == self.bot_id)
+                )
+        return int(await self.session.scalar(query) or 0)
