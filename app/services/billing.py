@@ -323,17 +323,31 @@ class BillingService:
         period: timedelta,
         now: datetime,
     ) -> None:
+        # A recurrent payment may finish after the user has explicitly disabled
+        # auto-renewal. The confirmed payment still grants its purchased access,
+        # but confirmation must never silently undo that cancellation.
+        explicitly_cancelled = (
+            subscription.auto_renew is False
+            and subscription.cancelled_at is not None
+        )
         base = max(subscription.access_until or now, now)
         subscription.access_until = base + period
-        subscription.next_charge_at = subscription.access_until
-        subscription.status = (
-            "active_3_days"
-            if attempt.attempt_kind in {"primary", "test_primary"}
-            else "active_1_day"
-        )
         subscription.last_successful_plan = attempt.attempt_kind
-        subscription.auto_renew = True
-        subscription.cancelled_at = None
+
+        if explicitly_cancelled:
+            subscription.auto_renew = False
+            subscription.next_charge_at = None
+            subscription.status = "cancelled_active"
+        else:
+            subscription.next_charge_at = subscription.access_until
+            subscription.status = (
+                "active_3_days"
+                if attempt.attempt_kind in {"primary", "test_primary"}
+                else "active_1_day"
+            )
+            subscription.auto_renew = True
+            subscription.cancelled_at = None
+
         attempt.status = "success"
         attempt.completed_at = now
         attempt.error_code = None
