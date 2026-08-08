@@ -7,7 +7,6 @@ from datetime import timedelta
 from app.core.config import load_settings
 from app.database.session import close_database, init_database
 from app.services.billing_worker import BillingWorker
-from app.services.impaya import ImpayaClient
 from app.services.impaya_factory import create_impaya_client, load_impaya_config
 
 
@@ -24,27 +23,11 @@ async def main() -> None:
         )
         return
 
-    client = ImpayaClient(
-        settings.impaya_api_url,
-        settings.impaya_api_token,
-        (
-            settings.impaya_binding_terminal_name
-            or settings.impaya_terminal_name
-        ),
-        auth_header=settings.impaya_auth_header,
-        auth_prefix=settings.impaya_auth_prefix,
-        protocol_version=settings.impaya_protocol_version,
-        recurrent_terminal_name=(
-            settings.impaya_recurrent_terminal_name
-            or settings.impaya_terminal_name
-        ),
-    )
     async def client_factory(session, bot_id: int):
         config = await load_impaya_config(session, settings, bot_id)
         return create_impaya_client(config)
 
     worker = BillingWorker(
-        client,
         client_factory=client_factory,
         interval_seconds=settings.billing_worker_interval_seconds,
         automatic_charges_enabled=settings.billing_automatic_charges_enabled,
@@ -61,7 +44,6 @@ async def main() -> None:
     try:
         await worker.run()
     finally:
-        await client.close()
         await close_database()
 
 
