@@ -15,6 +15,13 @@ from app.repositories.platform_admin import PlatformAdminRepository
 
 
 COOKIE_NAME = "anonmake_admin_session"
+# Fixed dummy PBKDF2 record used only to equalize the cost of an unknown DB
+# account with a wrong password for an existing DB account. It is not a real
+# credential and cannot authenticate any administrator.
+DUMMY_PASSWORD_HASH = (
+    "pbkdf2_sha256$310000$YW5vbm1ha2UtYWRtaW4tZHVtbXk=$"
+    "zkPEwbUk5cc-1vtbQhwIMQYWCz34za55hLx-A7_Oz_U="
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -54,14 +61,20 @@ class AdminAuth:
         async with SessionFactory() as session:
             repo = PlatformAdminRepository(session)
             admin = await repo.admin_by_email(normalized)
-            if admin is not None and verify_password(password, admin.password_hash):
-                await repo.mark_login(admin)
-                return AdminSession(
-                    admin_id=admin.id,
-                    username=admin.email,
-                    role=admin.role,
-                    expires_at=datetime.now(timezone.utc),
-                )
+            if admin is not None:
+                password_ok = verify_password(password, admin.password_hash)
+                if password_ok:
+                    await repo.mark_login(admin)
+                    return AdminSession(
+                        admin_id=admin.id,
+                        username=admin.email,
+                        role=admin.role,
+                        expires_at=datetime.now(timezone.utc),
+                    )
+            else:
+                # Unknown DB users still pay one full PBKDF2 verification cost,
+                # reducing username-enumeration information in response timing.
+                verify_password(password, DUMMY_PASSWORD_HASH)
             admin_count = await repo.admin_count()
 
         # The environment bootstrap credential is a one-time bootstrap path.
