@@ -13,30 +13,15 @@ from app.bot.keyboards.payments import test_payment_keyboard
 from app.core.config import load_settings
 from app.core.error_diagnostics import new_error_id, record_bot_error
 from app.repositories.users import UserRepository
-from app.services.impaya import ImpayaClient
-from app.services.impaya_factory import create_impaya_client, load_impaya_config
+from app.services.impaya_factory import (
+    PaymentGatewayDisabledError,
+    create_impaya_client,
+    load_impaya_config,
+)
 from app.services.subscription_checkout import SubscriptionCheckoutService
 
 router = Router(name="payments")
 logger = logging.getLogger(__name__)
-
-
-def make_client(settings) -> ImpayaClient:
-    return ImpayaClient(
-        settings.impaya_api_url,
-        settings.impaya_api_token,
-        (
-            settings.impaya_binding_terminal_name
-            or settings.impaya_terminal_name
-        ),
-        auth_header=settings.impaya_auth_header,
-        auth_prefix=settings.impaya_auth_prefix,
-        protocol_version=settings.impaya_protocol_version,
-        recurrent_terminal_name=(
-            settings.impaya_recurrent_terminal_name
-            or settings.impaya_terminal_name
-        ),
-    )
 
 
 @router.message(Command("testpay"))
@@ -57,20 +42,25 @@ async def test_payment(
         await message.answer("BILLING_ENABLED=false")
         return
 
+    user = await UserRepository(session).upsert_from_telegram(
+        message.from_user
+    )
+    try:
+        impaya_config = await load_impaya_config(session, settings, user.bot_id)
+    except PaymentGatewayDisabledError:
+        await message.answer("Платежи для этого проекта отключены")
+        return
+
     if (
-        not settings.impaya_api_token.strip()
+        not impaya_config.api_token.strip()
+        or not impaya_config.payment_form_url_template.strip()
         or not settings.public_base_url.strip()
-        or not settings.impaya_payment_form_url_template.strip()
     ):
         await message.answer(
             "Платёжная конфигурация заполнена не полностью"
         )
         return
 
-    user = await UserRepository(session).upsert_from_telegram(
-        message.from_user
-    )
-    impaya_config = await load_impaya_config(session, settings, user.bot_id)
     client = create_impaya_client(impaya_config)
 
     try:
