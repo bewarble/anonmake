@@ -75,15 +75,16 @@ async def statistics(message: Message, session: AsyncSession) -> None:
             f"• Всего — {number(data.users_total)}\n"
             f"• Живые — {number(data.users_alive)}\n"
             f"• Мертвые — {number(data.users_dead)}\n\n"
-            "♻️ <b>Прирост</b>\n"
+            "📈 <b>Прирост</b>\n"
             f"• За сегодня — {number(data.today)}\n"
             f"• За неделю — {number(data.week)}\n"
             f"• За месяц — {number(data.month)}\n\n"
-            "📈 <b>Саморост</b>\n"
+            "♻️ <b>Саморост</b>\n"
             f"• За сегодня — {number(data.organic_today)}\n"
             f"• За неделю — {number(data.organic_week)}\n"
             f"• За месяц — {number(data.organic_month)}\n\n"
-            f"💳 Активных карт — {number(data.active_cards)}"
+            f"⚡️ Всего карт: {number(data.total_cards)}\n"
+            f"💳 Активные карты: {number(data.active_cards)}"
         ),
         parse_mode="HTML",
     )
@@ -265,7 +266,11 @@ async def broadcast_audience(callback: CallbackQuery, state: FSMContext) -> None
     await state.set_state(BroadcastCreate.waiting_text)
     if callback.message:
         await delete_message_quietly(callback.message)
-        await callback.message.answer(admin_texts.BROADCAST_TEXT_PROMPT, reply_markup=broadcast_text_cancel_keyboard())
+        prompt = await callback.message.answer(
+            admin_texts.BROADCAST_TEXT_PROMPT,
+            reply_markup=broadcast_text_cancel_keyboard(),
+        )
+        await state.update_data(text_prompt_message_id=prompt.message_id)
     await callback.answer()
 
 
