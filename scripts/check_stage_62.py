@@ -38,7 +38,12 @@ def main() -> None:
     assert "current_bot = require_current_bot()\n        current_bot = require_current_bot()" not in text
     require("app/bot/handlers/reveals.py", "TelegramBadRequest", "has_active_vip(subscription)", "_deliver_identity", "RevealCheckoutService(")
     require("app/bot/handlers/questions.py", "TelegramBadRequest", 'callback.data == "cancel"')
-    require("app/bot/handlers/__init__.py", "if load_settings().payment_test_commands_enabled:", "router.include_router(payments_router)", "router.include_router(recurrent_test_router)")
+    require(
+        "app/bot/handlers/__init__.py",
+        "if load_settings().payment_test_commands_enabled:",
+        "router.include_router(_fresh_router(payments_router))",
+        "router.include_router(_fresh_router(recurrent_test_router))",
+    )
     require("app/core/config.py", "payment_test_commands_enabled: bool = Field(default=False")
     require(
         "app/bot/keyboards/personal_link.py",
@@ -60,7 +65,7 @@ def main() -> None:
     print("Stale callbacks and repeat taps: safe")
     print("Reveal checkout and payment finalization: hardened")
     print("/cancel is reserved for subscription cancellation in every FSM state")
-    print("Test payment commands remain launch-gated")
+    print("Test payment commands remain launch-gated and router-isolated")
     print("Unlimited replies from Stage 61 remain active")
     print("Exact Telegram share text: preserved")
     print("No Stage 62 migration required")
