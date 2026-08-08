@@ -63,7 +63,6 @@ def main() -> None:
     assert "Broadcast.bot_id == self.bot_id" in function_source(crm_repo, "broadcasts")
     assert "User.bot_id == self.bot_id" in function_source(crm_repo, "users")
 
-    # Both Stage28 route generations are still registered and must be scoped.
     stage28 = "app/web/admin_stage28.py"
     pro_dashboard = function_source(stage28, "pro_dashboard")
     assert "_scope_bot_id(request)" in pro_dashboard
@@ -123,7 +122,6 @@ def main() -> None:
     assert "cancel_auto_renew" in function_source(support, "set_auto_renew")
     assert "lock_subscription_transaction" in function_source(support, "extend_access")
 
-    # CRM repository itself validates user ownership even if a caller passes a raw PK.
     crm_core = "app/repositories/crm.py"
     require_user = function_source(crm_core, "_require_user")
     assert "User.id == user_id" in require_user
@@ -132,6 +130,16 @@ def main() -> None:
         assert "_require_user" in function_source(crm_core, name), name
     assert "TrafficSource.bot_id == user.bot_id" in function_source(crm_core, "profile")
 
+    cleanup = "app/repositories/marketing_cleanup.py"
+    source_lookup = function_source(cleanup, "source")
+    assert "require_current_bot().id" in source_lookup
+    assert "TrafficSource.id == source_id" in source_lookup
+    assert "TrafficSource.bot_id == bot_id" in source_lookup
+    assert "session.get(TrafficSource" not in source_lookup
+    delete_source = function_source(cleanup, "delete_source")
+    assert "self.source(source_id)" in delete_source
+    assert "session.get(TrafficSource" not in delete_source
+
     print("Admin project isolation check: OK")
     print("Stage29 source IDOR and metrics: isolated")
     print("Stage27 CRM/users/sources/broadcasts: isolated")
@@ -139,6 +147,7 @@ def main() -> None:
     print("Scoped legacy dashboard and cross-entity search: isolated")
     print("Stage31 subscription support actions and gateway: isolated")
     print("Core CRM user mutations: ownership-validated")
+    print("Telegram traffic-source cleanup: current-bot scoped")
 
 
 if __name__ == "__main__":
