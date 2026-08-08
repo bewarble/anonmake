@@ -30,6 +30,7 @@ def token_fingerprint(token: str) -> str:
 
 
 async def run_instance(instance: BotInstance, token: str, settings) -> None:
+    stage = "init"
     bot = Bot(token=token)
     storage = build_fsm_storage(settings.redis_url)
     dispatcher = Dispatcher(storage=storage)
@@ -41,51 +42,33 @@ async def run_instance(instance: BotInstance, token: str, settings) -> None:
     dispatcher.callback_query.outer_middleware(middleware)
     dispatcher.my_chat_member.outer_middleware(middleware)
     dispatcher.include_router(build_router())
-    stage = "initialization"
-    primary_error: BaseException | None = None
     try:
         stage = "delete_webhook"
         await bot.delete_webhook(drop_pending_updates=False)
         stage = "set_commands"
         await sync_public_commands(bot)
         stage = "polling"
-        logger.info(
-            "Managed project entering polling",
-            extra={"bot_code": instance.code},
-        )
+        logger.info("Managed project entering polling", extra={"bot_code": instance.code})
         await dispatcher.start_polling(bot)
-    except BaseException as exc:
-        primary_error = exc
-        try:
-            setattr(exc, "managed_runtime_stage", stage)
-        except Exception:
-            pass
+    except Exception as exc:
+        setattr(exc, "managed_runtime_stage", stage)
         raise
     finally:
-        try:
-            await storage.close()
-        except Exception:
-            logger.exception(
-                "Could not close managed bot FSM storage",
-                extra={"bot_code": instance.code},
-            )
-            if primary_error is None:
-                raise
-        finally:
-            await bot.session.close()
+        await storage.close()
+        await bot.session.close()
 
 
 async def record_runtime_crash(instance: BotInstance, exc: BaseException) -> None:
     error_id = new_error_id()
     stage = getattr(exc, "managed_runtime_stage", "unknown")
-    message = str(exc).replace("\n", " ")[:300]
+    safe_error = str(exc).replace("\n", " ")[:500]
     logger.error(
         "Managed bot runtime stopped unexpectedly error_id=%s bot_code=%s stage=%s exception_type=%s error=%s",
         error_id,
         instance.code,
         stage,
         type(exc).__name__,
-        message,
+        safe_error,
     )
     await record_bot_error(
         error_id=error_id,
@@ -96,7 +79,7 @@ async def record_runtime_crash(instance: BotInstance, exc: BaseException) -> Non
             "bot_code": instance.code,
             "bot_username": instance.username,
             "runtime_stage": stage,
-            "error_message": message,
+            "error_message": safe_error,
         },
     )
 
@@ -117,11 +100,13 @@ async def main() -> None:
     try:
         while True:
             async with SessionFactory() as session:
+                # Stage 64: every active Telegram project is owned by this single
+                # runtime. A token may live encrypted in DB or, for legacy projects
+                # during migration, still come from the existing environment.
                 instances = list((await session.execute(
                     select(BotInstance).where(
                         BotInstance.runtime_mode == "managed",
                         BotInstance.is_active.is_(True),
-                        BotInstance.token_encrypted.is_not(None),
                     )
                 )).scalars())
                 known_instances.update({item.id: item for item in instances})
@@ -144,7 +129,12 @@ async def main() -> None:
                         task_token_fingerprints.pop(bot_id, None)
 
                 for item in instances:
-                    token = await resolve_bot_token(session, settings, item)
+                    try:
+                        token = await resolve_bot_token(session, settings, item)
+                    except Exception as exc:
+                        crash_count += 1
+                        await record_runtime_crash(item, exc)
+                        continue
                     fingerprint = token_fingerprint(token)
                     running_task = tasks.get(item.id)
                     if (
