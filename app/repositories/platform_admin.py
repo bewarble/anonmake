@@ -17,6 +17,12 @@ class PlatformAdminRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def admin_count(self) -> int:
+        return int(
+            await self.session.scalar(select(func.count(AdminUser.id)))
+            or 0
+        )
+
     async def admin_by_email(self, email: str) -> AdminUser | None:
         return await self.session.scalar(
             select(AdminUser).where(
@@ -77,7 +83,6 @@ class PlatformAdminRepository:
             self.session.add(
                 AdminProjectAccess(admin_user_id=admin_id, bot_id=bot_id)
             )
-
 
     async def access_bot_ids(self, admin_id: int) -> list[int]:
         return list(
