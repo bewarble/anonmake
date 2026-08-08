@@ -13,10 +13,16 @@ def broadcast_text_cancel_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
+                    text="← Назад",
+                    callback_data="adminm:broadcast:back_audience",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text=ACTION_CANCEL,
                     callback_data="adminm:broadcast:cancel",
                 )
-            ]
+            ],
         ]
     )
 
