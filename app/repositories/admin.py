@@ -184,6 +184,7 @@ class AdminRepository:
             scoped_details += f";{details}"
         self.session.add(
             AdminAuditLog(
+                bot_id=bot.id,
                 admin_telegram_id=admin_telegram_id,
                 action=action,
                 target=target,
@@ -193,10 +194,9 @@ class AdminRepository:
 
     async def recent_audit(self, limit: int = 10) -> list[AdminAuditLog]:
         bot = require_current_bot()
-        prefix = f"bot_id={bot.id};bot_code={bot.code}%"
         result = await self.session.execute(
             select(AdminAuditLog)
-            .where(AdminAuditLog.details.like(prefix))
+            .where(AdminAuditLog.bot_id == bot.id)
             .order_by(AdminAuditLog.created_at.desc())
             .limit(limit)
         )
