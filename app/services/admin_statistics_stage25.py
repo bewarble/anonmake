@@ -156,10 +156,14 @@ class AdminStatisticsStage25Repository:
                 or 0
             )
 
+            # The graph must reflect the same live state as the summary.
+            # A user who blocked the bot and later returned is alive again,
+            # so their old blocked_at value must not remain on the red series.
             blocked = int(
                 await self.session.scalar(
                     select(func.count(User.id)).where(
                         User.bot_id == bot_id,
+                        User.is_blocked.is_(True),
                         User.blocked_at.is_not(None),
                         User.blocked_at >= left,
                         User.blocked_at < right,
