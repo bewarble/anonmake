@@ -5,6 +5,8 @@ import hashlib
 
 from redis.asyncio import Redis
 
+from app.core.bot_context import require_current_bot
+
 
 @dataclass(slots=True, frozen=True)
 class GuardDecision:
@@ -13,11 +15,11 @@ class GuardDecision:
 
 
 class AbuseGuard:
-    """Distributed protection scoped only to the sender.
+    """Distributed protection scoped to one sender inside one Telegram project.
 
     A popular recipient is never globally rate-limited. Ten thousand distinct
     users may write to the same blogger at the same time; only abusive behavior
-    from an individual sender is slowed down.
+    from an individual sender in the current bot is slowed down.
     """
 
     def __init__(
@@ -35,6 +37,11 @@ class AbuseGuard:
         self.minute_limit = minute_limit
         self.duplicate_window_seconds = duplicate_window_seconds
 
+    @staticmethod
+    def _namespace(sender_telegram_id: int) -> str:
+        bot_id = require_current_bot().id
+        return f"{bot_id}:{sender_telegram_id}"
+
     async def check_question(
         self,
         *,
@@ -42,7 +49,7 @@ class AbuseGuard:
         recipient_user_id: int,
         text: str,
     ) -> GuardDecision:
-        sender = str(sender_telegram_id)
+        sender = self._namespace(sender_telegram_id)
 
         if not await self._window(
             f"abuse:question:burst:{sender}",
@@ -83,9 +90,10 @@ class AbuseGuard:
     ) -> None:
         """Allow retry when database persistence or delivery failed."""
 
+        sender = self._namespace(sender_telegram_id)
         normalized = " ".join(text.casefold().split())
         digest = hashlib.sha256(
-            f"{sender_telegram_id}:{recipient_user_id}:{normalized}".encode("utf-8")
+            f"{sender}:{recipient_user_id}:{normalized}".encode("utf-8")
         ).hexdigest()
         await self.redis.delete(f"abuse:question:duplicate:{digest}")
 
