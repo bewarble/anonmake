@@ -147,6 +147,16 @@ class PlatformAdminRepository:
         admin.last_login_at = datetime.now(timezone.utc)
         await self.session.commit()
 
+    async def gateway_for_bot_any(
+        self, bot_id: int, provider: str = "impaya"
+    ) -> PaymentGatewayConfig | None:
+        return await self.session.scalar(
+            select(PaymentGatewayConfig).where(
+                PaymentGatewayConfig.bot_id == bot_id,
+                PaymentGatewayConfig.provider == provider,
+            )
+        )
+
     async def gateway_for_bot(
         self, bot_id: int, provider: str = "impaya"
     ) -> PaymentGatewayConfig | None:
@@ -165,12 +175,7 @@ class PlatformAdminRepository:
         provider: str,
         values: dict,
     ) -> PaymentGatewayConfig:
-        item = await self.session.scalar(
-            select(PaymentGatewayConfig).where(
-                PaymentGatewayConfig.bot_id == bot_id,
-                PaymentGatewayConfig.provider == provider,
-            )
-        )
+        item = await self.gateway_for_bot_any(bot_id, provider)
         if item is None:
             item = PaymentGatewayConfig(
                 bot_id=bot_id,
