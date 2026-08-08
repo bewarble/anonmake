@@ -228,6 +228,17 @@ async def main() -> None:
                         await session.commit()
                         continue
 
+                    if not instance.is_active or instance.is_maintenance:
+                        repository = DeliveryRepository(session)
+                        reason = (
+                            "Bot project is inactive"
+                            if not instance.is_active
+                            else "Bot project is in maintenance"
+                        )
+                        await repository.mark_paused(job, reason=reason)
+                        await session.commit()
+                        continue
+
                     try:
                         bot = await bot_pool.for_instance(session, instance)
                     except RuntimeError as exc:
