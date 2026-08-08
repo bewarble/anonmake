@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.source_admin import cancel_source_keyboard
-from app.bot.keyboards.admin_stage25_1 import referral_back_keyboard
+from app.bot.keyboards.admin_stage25_1 import broadcast_audience_keyboard, referral_back_keyboard
 from app.bot.keyboards.marketing import (
     broadcast_preview_keyboard,
     broadcast_text_cancel_keyboard,
@@ -33,6 +33,15 @@ async def delete_message_quietly(message: Message | None) -> None:
         return
     try:
         await message.delete()
+    except Exception:
+        return
+
+
+async def delete_message_id_quietly(bot: Bot, chat_id: int, message_id: int | None) -> None:
+    if not isinstance(message_id, int):
+        return
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
     except Exception:
         return
 
@@ -135,8 +144,24 @@ async def source_spend(message: Message, state: FSMContext, session: AsyncSessio
     )
 
 
+@router.callback_query(F.data == "adminm:broadcast:back_audience")
+async def broadcast_back_audience(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.from_user is None or not is_admin(callback.from_user.id):
+        await callback.answer(admin_texts.DENIED, show_alert=True)
+        return
+    await state.set_state(BroadcastCreate.waiting_audience)
+    await state.update_data(audience=None, text=None, text_prompt_message_id=None)
+    if callback.message:
+        await delete_message_quietly(callback.message)
+        await callback.message.answer(
+            admin_texts.BROADCAST_AUDIENCE_PROMPT,
+            reply_markup=broadcast_audience_keyboard(),
+        )
+    await callback.answer()
+
+
 @router.message(BroadcastCreate.waiting_text)
-async def broadcast_text(message: Message, state: FSMContext) -> None:
+async def broadcast_text(message: Message, state: FSMContext, bot: Bot) -> None:
     if message.from_user is None or not is_admin(message.from_user.id):
         await state.clear()
         return
@@ -147,10 +172,20 @@ async def broadcast_text(message: Message, state: FSMContext) -> None:
     if len(text) > 4000:
         await message.answer(admin_texts.BROADCAST_TEXT_LONG)
         return
-    await state.update_data(text=text)
+    data = await state.get_data()
+    await delete_message_id_quietly(
+        bot,
+        message.chat.id,
+        data.get("text_prompt_message_id"),
+    )
+    await state.update_data(text=text, text_prompt_message_id=None)
     await state.set_state(BroadcastCreate.waiting_confirm)
     await delete_message_quietly(message)
-    await message.answer(texts.NEW_QUESTION.format(text=text), reply_markup=broadcast_preview_keyboard())
+    await message.answer(
+        texts.NEW_QUESTION.format(text=escape(text)),
+        parse_mode="HTML",
+        reply_markup=broadcast_preview_keyboard(),
+    )
 
 
 @router.callback_query(F.data == "adminm:broadcast:preview")
