@@ -101,7 +101,7 @@ def check_compose_registry() -> set[str]:
     required = {
         "db",
         "redis",
-        "bot",
+        "managed-bots",
         "web",
         "worker",
         "delivery-worker",
@@ -110,6 +110,8 @@ def check_compose_registry() -> set[str]:
 
     missing = sorted(required - services)
     assert not missing, f"Missing Compose services: {missing}"
+    forbidden = sorted({"bot", "bot-two", "bot-three", "bot-four"} & services)
+    assert not forbidden, f"Legacy per-bot Compose services remain: {forbidden}"
 
     return services
 
@@ -126,7 +128,7 @@ def main() -> None:
     print(f"Jinja template references: verified ({template_count} templates)")
     print(
         "Docker Compose service registry: verified "
-        f"({len(services)} services)"
+        f"({len(services)} services; unified managed bot runtime)"
     )
 
 
