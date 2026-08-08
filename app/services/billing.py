@@ -15,6 +15,7 @@ from app.services.impaya import ImpayaClient
 INSUFFICIENT_FUNDS_CODES = {"AMOUNT_EXCEED", "INSUFFICIENT_FUNDS", "NOT_ENOUGH_FUNDS"}
 BLOCKING_CODES = {"CARD_BLOCKED", "CARD_EXPIRED", "LOST_CARD", "STOLEN_CARD", "BINDING_INACTIVE", "PAYMENT_OPTION_DISABLED"}
 SUCCESS_STATES = {"COMPLETED", "CONFIRMED", "PAID", "SUCCESS", "SUCCEEDED", "CHARGED"}
+DUPLICATE_OPERATION_CODES = {"DUPLICATE_PROCESSING_ORDER_ID"}
 
 
 class ChargeDecision(StrEnum):
@@ -155,6 +156,60 @@ class BillingService:
         await self.session.commit()
         return True, attempt, True
 
+    async def _recover_known_operation(
+        self,
+        subscription: Subscription,
+        attempt: PaymentAttempt,
+        *,
+        access_period: timedelta,
+        now: datetime,
+    ) -> ChargeResult:
+        verification = await self.client.state(
+            customer_operation_id=attempt.customer_operation_id
+        )
+        transaction = verification.data.get("transaction") or {}
+        state = str(
+            transaction.get("state")
+            or verification.data.get("state")
+            or ""
+        ).upper()
+        attempt.raw_response = json.dumps(
+            {"state": verification.data},
+            ensure_ascii=False,
+        )
+        attempt.transaction_id = (
+            transaction.get("transaction_id")
+            or verification.data.get("transaction_id")
+            or attempt.transaction_id
+        )
+
+        if verification.success and state in SUCCESS_STATES:
+            self._mark_success(
+                subscription,
+                attempt,
+                access_period,
+                now,
+            )
+            await self.session.commit()
+            return ChargeResult(
+                ChargeDecision.SUCCESS,
+                attempt,
+                subscription.access_until,
+            )
+
+        attempt.status = "pending"
+        attempt.completed_at = None
+        attempt.error_code = verification.error_code
+        attempt.error_message = verification.error_message
+        subscription.status = "payment_pending"
+        subscription.next_charge_at = now + timedelta(minutes=30)
+        await self.session.commit()
+        return ChargeResult(
+            ChargeDecision.PENDING,
+            attempt,
+            subscription.access_until,
+        )
+
     async def _charge(
         self,
         subscription: Subscription,
@@ -172,18 +227,17 @@ class BillingService:
             kind,
         )
         if existing is not None:
-            if existing.status == "pending":
-                finalized, refreshed, _ = await self.finalize_operation(
-                    existing.customer_operation_id
+            existing_code = (existing.error_code or "").upper()
+            if (
+                existing.status == "pending"
+                or existing_code in DUPLICATE_OPERATION_CODES
+            ):
+                return await self._recover_known_operation(
+                    subscription,
+                    existing,
+                    access_period=access_period,
+                    now=now,
                 )
-                if refreshed is not None:
-                    existing = refreshed
-                if finalized:
-                    return ChargeResult(
-                        ChargeDecision.SUCCESS,
-                        existing,
-                        subscription.access_until,
-                    )
             return ChargeResult(
                 self._decision(existing),
                 existing,
@@ -220,60 +274,28 @@ class BillingService:
         attempt.transaction_id = result.data.get("transaction_id")
 
         if result.success:
-            verification = await self.client.state(
-                customer_operation_id=op
-            )
-            transaction = verification.data.get("transaction") or {}
-            state = str(
-                transaction.get("state")
-                or verification.data.get("state")
-                or ""
-            ).upper()
-            attempt.raw_response = json.dumps(
-                {
-                    "pay": result.data,
-                    "state": verification.data,
-                },
-                ensure_ascii=False,
-            )
-            attempt.transaction_id = (
-                transaction.get("transaction_id")
-                or verification.data.get("transaction_id")
-                or attempt.transaction_id
-            )
-
-            if verification.success and state in SUCCESS_STATES:
-                self._mark_success(
-                    subscription,
-                    attempt,
-                    access_period,
-                    now,
-                )
-                await self.session.commit()
-                return ChargeResult(
-                    ChargeDecision.SUCCESS,
-                    attempt,
-                    subscription.access_until,
-                )
-
-            # The recurrent request was accepted, but money is not confirmed yet.
-            # Never grant access on transport/API success alone. Webhook or the next
-            # billing tick will re-check the same customer_operation_id.
-            attempt.status = "pending"
-            attempt.error_code = verification.error_code
-            attempt.error_message = verification.error_message
-            subscription.status = "payment_pending"
-            subscription.next_charge_at = now + timedelta(minutes=30)
-            await self.session.commit()
-            return ChargeResult(
-                ChargeDecision.PENDING,
+            return await self._recover_known_operation(
+                subscription,
                 attempt,
-                subscription.access_until,
+                access_period=access_period,
+                now=now,
             )
 
         code = (result.error_code or "").upper()
         attempt.error_code = result.error_code
         attempt.error_message = result.error_message
+
+        # A duplicate operation id means Impaya has already accepted an operation
+        # with this id. Never create a fresh id and risk a double charge; recover
+        # the authoritative result via /state instead.
+        if code in DUPLICATE_OPERATION_CODES:
+            return await self._recover_known_operation(
+                subscription,
+                attempt,
+                access_period=access_period,
+                now=now,
+            )
+
         attempt.completed_at = now
 
         if code in INSUFFICIENT_FUNDS_CODES:
