@@ -17,6 +17,8 @@ BLOCKING_CODES = {"CARD_BLOCKED", "CARD_EXPIRED", "LOST_CARD", "STOLEN_CARD", "B
 SUCCESS_STATES = {"COMPLETED", "CONFIRMED", "PAID", "SUCCESS", "SUCCEEDED", "CHARGED"}
 DUPLICATE_OPERATION_CODES = {"DUPLICATE_PROCESSING_ORDER_ID"}
 ZERO_TRANSACTION_IDS = {"", "00000000-0000-0000-0000-000000000000"}
+PRIMARY_ACCESS_KINDS = {"primary", "test_primary", "admin_primary"}
+FALLBACK_ACCESS_KINDS = {"fallback", "test_fallback", "admin_fallback"}
 
 
 class ChargeDecision(StrEnum):
@@ -69,19 +71,21 @@ class BillingService:
         self.fallback_amount = fallback_amount
         self.fallback_duration = fallback_duration
 
+    def _period_for_attempt(self, attempt: PaymentAttempt) -> timedelta:
+        return (
+            self.primary_duration
+            if attempt.attempt_kind in PRIMARY_ACCESS_KINDS
+            else self.fallback_duration
+        )
+
     async def renew(self, subscription: Subscription, method: PaymentMethod) -> ChargeResult:
         now = datetime.now(timezone.utc)
         pending = await self.repo.pending_recurrent_attempt(subscription.id)
         if pending is not None:
-            period = (
-                self.primary_duration
-                if pending.attempt_kind == "primary"
-                else self.fallback_duration
-            )
             return await self._recover_known_operation(
                 subscription,
                 pending,
-                access_period=period,
+                access_period=self._period_for_attempt(pending),
                 now=now,
             )
 
@@ -155,12 +159,12 @@ class BillingService:
         if subscription is None:
             return False, attempt, False
 
-        period = (
-            self.primary_duration
-            if attempt.attempt_kind in {"primary", "test_primary"}
-            else self.fallback_duration
+        self._mark_success(
+            subscription,
+            attempt,
+            self._period_for_attempt(attempt),
+            datetime.now(timezone.utc),
         )
-        self._mark_success(subscription, attempt, period, datetime.now(timezone.utc))
         await self.session.commit()
         return True, attempt, True
 
@@ -338,9 +342,6 @@ class BillingService:
         period: timedelta,
         now: datetime,
     ) -> None:
-        # A recurrent payment may finish after the user has explicitly disabled
-        # auto-renewal. The confirmed payment still grants its purchased access,
-        # but confirmation must never silently undo that cancellation.
         explicitly_cancelled = (
             subscription.auto_renew is False
             and subscription.cancelled_at is not None
@@ -357,7 +358,7 @@ class BillingService:
             subscription.next_charge_at = subscription.access_until
             subscription.status = (
                 "active_3_days"
-                if attempt.attempt_kind in {"primary", "test_primary"}
+                if attempt.attempt_kind in PRIMARY_ACCESS_KINDS
                 else "active_1_day"
             )
             subscription.auto_renew = True
