@@ -18,7 +18,6 @@ def function_source(path: str, name: str) -> str:
 def main() -> None:
     routes = "app/web/admin_stage29.py"
     repo = "app/web/admin_repository_stage29.py"
-
     helper = function_source(routes, "_scoped_source")
     assert "TrafficSource.id == source_id" in helper
     assert "TrafficSource.bot_id == bot_id" in helper
@@ -26,16 +25,13 @@ def main() -> None:
         body = function_source(routes, name)
         assert "_scoped_source" in body, name
         assert "session.get(TrafficSource" not in body, name
-
     assert "_selected_bot(request)" in function_source(routes, "source_new_submit")
     assert "_bot_context(selected_bot)" in function_source(routes, "source_new_submit")
     assert "_selected_bot(request)" in function_source(routes, "broadcast_create")
     assert "_bot_context(selected_bot)" in function_source(routes, "broadcast_create")
-
     details = function_source(routes, "source_details")
     assert "session.get(BotInstance, source.bot_id)" in details
     assert "source_referral_url(source, owner.username)" in details
-
     chart = function_source(routes, "chart_api")
     assert "bot_id=_scope_bot_id(request)" in chart.replace(" ", "")
 
@@ -43,18 +39,10 @@ def main() -> None:
     assert "failure_filters.append(DeliveryOutbox.bot_id == self.bot_id)" in stage29
     assert "dead_filters.append(DeliveryOutbox.bot_id == self.bot_id)" in stage29
     assert "User.bot_id == self.bot_id" in function_source(repo, "_dead_users")
-    assert "filters.append(PaymentAttempt.bot_id == self.bot_id)" in function_source(
-        repo, "_payment_count_comparison"
-    )
+    assert "filters.append(PaymentAttempt.bot_id == self.bot_id)" in function_source(repo, "_payment_count_comparison")
 
     stage27_routes = "app/web/admin_stage27.py"
-    for name in (
-        "dashboard_v2",
-        "crm_users",
-        "crm_user_details",
-        "crm_source_details",
-        "broadcasts",
-    ):
+    for name in ("dashboard_v2", "crm_users", "crm_user_details", "crm_source_details", "broadcasts"):
         assert "_scope_bot_id(request)" in function_source(stage27_routes, name), name
     crm_repo = "app/web/admin_repository_stage27.py"
     crm_text = (ROOT / crm_repo).read_text(encoding="utf-8")
@@ -69,9 +57,7 @@ def main() -> None:
     assert "ScopedWebAdminRepository(session, bot_id=bot_id)" in pro_dashboard
     assert "WebCrmRepository(session, bot_id=bot_id)" in pro_dashboard
     assert "WebAdminProRepository(session, bot_id=bot_id)" in pro_dashboard
-    assert "bot_id=_scope_bot_id(request)" in function_source(
-        stage28, "analytics_periods"
-    ).replace(" ", "")
+    assert "bot_id=_scope_bot_id(request)" in function_source(stage28, "analytics_periods").replace(" ", "")
 
     stage28_1 = "app/web/admin_stage28_1.py"
     overview = function_source(stage28_1, "overview")
@@ -87,14 +73,7 @@ def main() -> None:
 
     scoped_repo = "app/web/admin_scoped_repository.py"
     scoped_dashboard = function_source(scoped_repo, "dashboard")
-    for needle in (
-        "User.bot_id == self.bot_id",
-        "DeliveryOutbox.bot_id == self.bot_id",
-        "Subscription.bot_id == self.bot_id",
-        "PaymentMethod.bot_id == self.bot_id",
-        "PaymentAttempt.bot_id == self.bot_id",
-        "TrafficSource.bot_id == self.bot_id",
-    ):
+    for needle in ("User.bot_id == self.bot_id", "DeliveryOutbox.bot_id == self.bot_id", "Subscription.bot_id == self.bot_id", "PaymentMethod.bot_id == self.bot_id", "PaymentAttempt.bot_id == self.bot_id", "TrafficSource.bot_id == self.bot_id"):
         assert needle in scoped_dashboard, needle
 
     search_route = function_source("app/web/admin_complete.py", "global_search")
@@ -140,6 +119,12 @@ def main() -> None:
     assert "self.source(source_id)" in delete_source
     assert "session.get(TrafficSource" not in delete_source
 
+    marketing = "app/repositories/marketing.py"
+    create_broadcast = function_source(marketing, "create_broadcast")
+    assert "current_bot_id = require_current_bot().id" in create_broadcast
+    assert "bot_id != current_bot_id" in create_broadcast
+    assert "Broadcast(bot_id=current_bot_id" in create_broadcast
+
     print("Admin project isolation check: OK")
     print("Stage29 source IDOR and metrics: isolated")
     print("Stage27 CRM/users/sources/broadcasts: isolated")
@@ -148,6 +133,7 @@ def main() -> None:
     print("Stage31 subscription support actions and gateway: isolated")
     print("Core CRM user mutations: ownership-validated")
     print("Telegram traffic-source cleanup: current-bot scoped")
+    print("Broadcast creation: repository-level current-bot invariant")
 
 
 if __name__ == "__main__":
