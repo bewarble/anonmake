@@ -16,6 +16,13 @@ VAR_DIR = ROOT / "var"
 BACKUP_DIR = ROOT / "backups" / "deploy"
 STATE_FILE = VAR_DIR / "deploy-state.json"
 LOG_FILE = VAR_DIR / "deploy-history.jsonl"
+POSTGRES_CUSTOM_MAGIC = b"PGDMP"
+PUBLIC_CODE_ROTATION_HEADS = {
+    "20260729_0019",
+    "20260807_0020",
+    "20260807_0021",
+    "20260808_0022",
+}
 COMPOSE_FILES = (
     "compose.yaml",
     "compose.backup.yaml",
@@ -78,6 +85,21 @@ def ensure_clean_git(allow_dirty: bool) -> None:
         )
 
 
+def ensure_safe_migration_path(database_head: str, *, allow_public_code_rotation: bool) -> None:
+    heads = {value.strip() for value in database_head.split(",") if value.strip()}
+    dangerous = sorted(heads & PUBLIC_CODE_ROTATION_HEADS)
+    if dangerous and not allow_public_code_rotation:
+        raise DeployError(
+            "Автоматический деплой остановлен: текущая БД находится до миграции "
+            "20260808_0023, а миграции 0021/0023 перегенерируют public_code у "
+            "существующих пользователей и инвалидируют ранее опубликованные "
+            "Telegram-ссылки. Сначала подготовьте совместимую миграцию/aliases. "
+            "Для осознанного принятия этого breaking change используйте "
+            "--allow-public-code-rotation. Текущая версия БД: "
+            + ", ".join(dangerous)
+        )
+
+
 def backup_database(timestamp: str) -> Path:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     destination = BACKUP_DIR / f"anonmake-before-{timestamp}.dump"
@@ -100,9 +122,16 @@ def backup_database(timestamp: str) -> Path:
     print(f"\n$ {' '.join(shlex.quote(x) for x in command)} > {destination}")
     with destination.open("wb") as stream:
         result = subprocess.run(command, cwd=ROOT, stdout=stream)
-    if result.returncode != 0 or destination.stat().st_size == 0:
+    valid = False
+    if result.returncode == 0:
+        try:
+            with destination.open("rb") as stream:
+                valid = stream.read(len(POSTGRES_CUSTOM_MAGIC)) == POSTGRES_CUSTOM_MAGIC
+        except OSError:
+            valid = False
+    if not valid:
         destination.unlink(missing_ok=True)
-        raise DeployError("Не удалось создать резервную копию PostgreSQL.")
+        raise DeployError("Не удалось создать корректную резервную копию PostgreSQL custom format.")
     print(f"Резервная копия: {destination} ({destination.stat().st_size} байт)")
     return destination
 
@@ -250,6 +279,11 @@ def main() -> None:
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--skip-backup", action="store_true")
+    parser.add_argument(
+        "--allow-public-code-rotation",
+        action="store_true",
+        help="Разрешить breaking migrations 0021/0023, которые меняют ранее опубликованные public_code.",
+    )
     parser.add_argument("--health-timeout", type=int, default=120)
     parser.add_argument("--backup-retain", type=int, default=10)
     parser.add_argument(
@@ -288,6 +322,13 @@ def main() -> None:
         step("Проверка Compose", lambda: compose("config", "--quiet"))
         source_head = step("Чтение Alembic head", alembic_head_from_source)
         database_head_before = step("Чтение версии БД", current_database_head)
+        step(
+            "Проверка безопасного пути миграции",
+            lambda: ensure_safe_migration_path(
+                database_head_before,
+                allow_public_code_rotation=args.allow_public_code_rotation,
+            ),
+        )
 
         if not args.skip_backup:
             backup_path = step("Резервная копия PostgreSQL", lambda: backup_database(timestamp))
