@@ -5,11 +5,16 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.database.session import SessionFactory
 from app.web.admin import login_redirect, page_context, require_session, templates
-from app.web.admin_repository import WebAdminRepository
 from app.web.admin_repository_stage27 import WebCrmRepository
 from app.web.admin_repository_stage28 import WebAdminProRepository
+from app.web.admin_scoped_repository import ScopedWebAdminRepository
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
+
+
+def _scope_bot_id(request: Request) -> int | None:
+    scope = getattr(request.state, "admin_bot_scope", None)
+    return getattr(scope, "bot_id", None)
 
 
 def serialize_periods(rows):
@@ -30,10 +35,11 @@ async def pro_dashboard(request: Request):
     if require_session(request) is None:
         return login_redirect(request)
 
+    bot_id = _scope_bot_id(request)
     async with SessionFactory() as session:
-        base = await WebAdminRepository(session).dashboard()
-        crm = WebCrmRepository(session)
-        pro = WebAdminProRepository(session)
+        base = await ScopedWebAdminRepository(session, bot_id=bot_id).dashboard()
+        crm = WebCrmRepository(session, bot_id=bot_id)
+        pro = WebAdminProRepository(session, bot_id=bot_id)
 
         periods = await pro.periods(14)
         funnel = await pro.funnel()
@@ -64,8 +70,9 @@ async def analytics(request: Request):
     if require_session(request) is None:
         return login_redirect(request)
 
+    bot_id = _scope_bot_id(request)
     async with SessionFactory() as session:
-        pro = WebAdminProRepository(session)
+        pro = WebAdminProRepository(session, bot_id=bot_id)
         periods = await pro.periods(30)
         funnel = await pro.funnel()
         sources = await pro.source_performance(limit=20)
@@ -92,6 +99,8 @@ async def analytics_periods(request: Request, days: int = 30):
 
     days = min(max(days, 7), 90)
     async with SessionFactory() as session:
-        rows = await WebAdminProRepository(session).periods(days)
+        rows = await WebAdminProRepository(
+            session, bot_id=_scope_bot_id(request)
+        ).periods(days)
 
     return {"items": serialize_periods(rows)}
