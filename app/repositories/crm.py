@@ -5,8 +5,10 @@ from dataclasses import dataclass
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bot_context import require_current_bot
 from app.models.crm import CrmEvent, CrmNote, CrmTag, CrmUserTag
 from app.models.marketing import SourceAttribution, TrafficSource
+from app.models.user import User
 
 
 @dataclass(slots=True, frozen=True)
@@ -18,16 +20,30 @@ class CrmProfile:
 
 
 class CrmRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, *, bot_id: int | None = None) -> None:
         self.session = session
+        self.bot_id = bot_id
+
+    def _bot_id(self) -> int:
+        return self.bot_id if self.bot_id is not None else require_current_bot().id
+
+    async def _require_user(self, user_id: int) -> User:
+        bot_id = self._bot_id()
+        user = await self.session.scalar(
+            select(User).where(User.id == user_id, User.bot_id == bot_id)
+        )
+        if user is None:
+            raise ValueError("CRM user does not belong to the current bot")
+        return user
 
     async def profile(self, user_id: int) -> CrmProfile:
+        user = await self._require_user(user_id)
         tags = list(
             (
                 await self.session.execute(
                     select(CrmTag)
                     .join(CrmUserTag, CrmUserTag.tag_id == CrmTag.id)
-                    .where(CrmUserTag.user_id == user_id)
+                    .where(CrmUserTag.user_id == user.id)
                     .order_by(CrmTag.name)
                 )
             ).scalars()
@@ -36,7 +52,7 @@ class CrmRepository:
             (
                 await self.session.execute(
                     select(CrmNote)
-                    .where(CrmNote.user_id == user_id)
+                    .where(CrmNote.user_id == user.id)
                     .order_by(CrmNote.id.desc())
                     .limit(5)
                 )
@@ -46,7 +62,7 @@ class CrmRepository:
             (
                 await self.session.execute(
                     select(CrmEvent)
-                    .where(CrmEvent.user_id == user_id)
+                    .where(CrmEvent.user_id == user.id)
                     .order_by(CrmEvent.occurred_at.desc(), CrmEvent.id.desc())
                     .limit(12)
                 )
@@ -58,7 +74,10 @@ class CrmRepository:
                 SourceAttribution,
                 SourceAttribution.source_id == TrafficSource.id,
             )
-            .where(SourceAttribution.user_id == user_id)
+            .where(
+                SourceAttribution.user_id == user.id,
+                TrafficSource.bot_id == user.bot_id,
+            )
         )
         return CrmProfile(tags=tags, notes=notes, events=events, source=source)
 
@@ -69,8 +88,9 @@ class CrmRepository:
         text: str,
         admin_telegram_id: int,
     ) -> CrmNote:
+        user = await self._require_user(user_id)
         note = CrmNote(
-            user_id=user_id,
+            user_id=user.id,
             text=text,
             created_by_telegram_id=admin_telegram_id,
         )
@@ -105,9 +125,10 @@ class CrmRepository:
         tag: CrmTag,
         admin_telegram_id: int,
     ) -> bool:
+        user = await self._require_user(user_id)
         existing = await self.session.scalar(
             select(CrmUserTag).where(
-                CrmUserTag.user_id == user_id,
+                CrmUserTag.user_id == user.id,
                 CrmUserTag.tag_id == tag.id,
             )
         )
@@ -115,7 +136,7 @@ class CrmRepository:
             return False
         self.session.add(
             CrmUserTag(
-                user_id=user_id,
+                user_id=user.id,
                 tag_id=tag.id,
                 assigned_by_telegram_id=admin_telegram_id,
             )
@@ -124,9 +145,10 @@ class CrmRepository:
         return True
 
     async def remove_tag(self, *, user_id: int, tag_id: int) -> bool:
+        user = await self._require_user(user_id)
         result = await self.session.execute(
             delete(CrmUserTag).where(
-                CrmUserTag.user_id == user_id,
+                CrmUserTag.user_id == user.id,
                 CrmUserTag.tag_id == tag_id,
             )
         )
@@ -140,14 +162,18 @@ class CrmRepository:
         summary: str,
         external_key: str | None = None,
     ) -> CrmEvent | None:
+        user = await self._require_user(user_id)
         if external_key:
             existing = await self.session.scalar(
-                select(CrmEvent).where(CrmEvent.external_key == external_key)
+                select(CrmEvent).where(
+                    CrmEvent.user_id == user.id,
+                    CrmEvent.external_key == external_key,
+                )
             )
             if existing is not None:
                 return None
         item = CrmEvent(
-            user_id=user_id,
+            user_id=user.id,
             event_type=event_type,
             summary=summary[:500],
             external_key=external_key,
