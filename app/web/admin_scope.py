@@ -44,6 +44,7 @@ async def load_admin_bot_scope(request: Request) -> AdminBotScope:
     requested = requested.strip().lower() or ALL_PROJECTS
 
     principal = auth.session_from_request(request)
+    current_admin = None
     async with SessionFactory() as session:
         if principal is None or principal.admin_id is None:
             bots = list(
@@ -57,17 +58,22 @@ async def load_admin_bot_scope(request: Request) -> AdminBotScope:
             )
         else:
             repo = PlatformAdminRepository(session)
-            admin = await repo.admin_by_id(principal.admin_id)
-            bots = (
-                await repo.accessible_bots(admin)
-                if admin is not None and admin.is_active
-                else []
-            )
+            current_admin = await repo.admin_by_id(principal.admin_id)
+            # The database is authoritative for account status and role. A signed
+            # cookie may still be cryptographically valid after an admin is
+            # disabled or demoted; invalidate that stale session immediately.
+            if (
+                current_admin is None
+                or not current_admin.is_active
+                or current_admin.role != principal.role
+            ):
+                return AdminBotScope((), None, denied=True)
+            bots = await repo.accessible_bots(current_admin)
 
     can_view_all = (
         principal is None
         or principal.admin_id is None
-        or principal.is_superadmin
+        or bool(current_admin and current_admin.is_superadmin)
     )
 
     # Администратор проекта никогда не получает общий режим.
