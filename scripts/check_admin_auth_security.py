@@ -25,9 +25,16 @@ def main() -> None:
     repository = function_source("app/repositories/platform_admin.py", "admin_count")
     assert "func.count(AdminUser.id)" in repository
 
+    runtime = function_source("scripts/check_web_admin_runtime.py", "check_bootstrap_admin")
+    assert "admin_count > 0" in runtime
+    assert "len(password) >= 12" in runtime
+    assert "WEAK_BOOTSTRAP_PASSWORDS" in runtime
+    assert "password.strip().lower() != username.lower()" in runtime
+
     print("Admin authentication security check: OK")
     print("Legacy environment credentials are bootstrap-only")
     print("Any DB administrator permanently disables legacy superadmin login")
+    print("Bootstrap-only mode rejects weak/default superadmin passwords")
 
 
 if __name__ == "__main__":
