@@ -172,6 +172,7 @@ for observability_route in admin_observability_module.router.routes:
 
 
 # Stage 50 installs admin-only error pages and the outer response safety net.
+from app.web.admin_audit_scoped import install_scoped_admin_audit  # noqa: E402
 from app.web.admin_csrf import install_admin_csrf_guard  # noqa: E402
 from app.web.admin_error_ux import install_admin_error_ux  # noqa: E402
 from app.web.app import app as web_app  # noqa: E402
@@ -180,3 +181,4 @@ from app.web.payment_webhook import install_impaya_webhook  # noqa: E402
 install_admin_csrf_guard(web_app)
 install_admin_error_ux(web_app)
 install_impaya_webhook(web_app)
+install_scoped_admin_audit(web_app)
