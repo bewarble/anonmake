@@ -41,22 +41,51 @@ async def run_instance(instance: BotInstance, token: str, settings) -> None:
     dispatcher.callback_query.outer_middleware(middleware)
     dispatcher.my_chat_member.outer_middleware(middleware)
     dispatcher.include_router(build_router())
+    stage = "initialization"
+    primary_error: BaseException | None = None
     try:
+        stage = "delete_webhook"
         await bot.delete_webhook(drop_pending_updates=False)
+        stage = "set_commands"
         await sync_public_commands(bot)
+        stage = "polling"
+        logger.info(
+            "Managed project entering polling",
+            extra={"bot_code": instance.code},
+        )
         await dispatcher.start_polling(bot)
+    except BaseException as exc:
+        primary_error = exc
+        try:
+            setattr(exc, "managed_runtime_stage", stage)
+        except Exception:
+            pass
+        raise
     finally:
-        await storage.close()
-        await bot.session.close()
+        try:
+            await storage.close()
+        except Exception:
+            logger.exception(
+                "Could not close managed bot FSM storage",
+                extra={"bot_code": instance.code},
+            )
+            if primary_error is None:
+                raise
+        finally:
+            await bot.session.close()
 
 
 async def record_runtime_crash(instance: BotInstance, exc: BaseException) -> None:
     error_id = new_error_id()
+    stage = getattr(exc, "managed_runtime_stage", "unknown")
+    message = str(exc).replace("\n", " ")[:300]
     logger.error(
-        "Managed bot runtime stopped unexpectedly error_id=%s bot_code=%s exception_type=%s",
+        "Managed bot runtime stopped unexpectedly error_id=%s bot_code=%s stage=%s exception_type=%s error=%s",
         error_id,
         instance.code,
+        stage,
         type(exc).__name__,
+        message,
     )
     await record_bot_error(
         error_id=error_id,
@@ -66,6 +95,8 @@ async def record_runtime_crash(instance: BotInstance, exc: BaseException) -> Non
             "bot_id": instance.id,
             "bot_code": instance.code,
             "bot_username": instance.username,
+            "runtime_stage": stage,
+            "error_message": message,
         },
     )
 
