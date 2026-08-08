@@ -22,4 +22,4 @@ RUN chmod +x /app/docker-entrypoint.sh \
 USER anonmake
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["python", "-m", "app.main"]
+CMD ["python", "-m", "app.managed_bots"]
