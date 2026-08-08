@@ -19,7 +19,6 @@ def main() -> None:
     routes = "app/web/admin_stage29.py"
     repo = "app/web/admin_repository_stage29.py"
 
-    # Source detail/edit/delete must use a bot-scoped lookup, never a naked PK get.
     helper = function_source(routes, "_scoped_source")
     assert "TrafficSource.id == source_id" in helper
     assert "TrafficSource.bot_id == bot_id" in helper
@@ -28,18 +27,15 @@ def main() -> None:
         assert "_scoped_source" in body, name
         assert "session.get(TrafficSource" not in body, name
 
-    # Mutating actions are project-only and establish the matching CurrentBot.
     assert "_selected_bot(request)" in function_source(routes, "source_new_submit")
     assert "_bot_context(selected_bot)" in function_source(routes, "source_new_submit")
     assert "_selected_bot(request)" in function_source(routes, "broadcast_create")
     assert "_bot_context(selected_bot)" in function_source(routes, "broadcast_create")
 
-    # Referral links use the source owner's bot username, not the global primary bot.
     details = function_source(routes, "source_details")
     assert "session.get(BotInstance, source.bot_id)" in details
     assert "source_referral_url(source, owner.username)" in details
 
-    # API chart must preserve the selected project scope.
     chart = function_source(routes, "chart_api")
     assert "bot_id=_scope_bot_id(request)" in chart.replace(" ", "")
 
@@ -51,7 +47,6 @@ def main() -> None:
         repo, "_payment_count_comparison"
     )
 
-    # Legacy Stage27 CRM routes remain registered, so they must also pass bot_id.
     stage27_routes = "app/web/admin_stage27.py"
     for name in (
         "dashboard_v2",
@@ -68,12 +63,22 @@ def main() -> None:
     assert "Broadcast.bot_id == self.bot_id" in function_source(crm_repo, "broadcasts")
     assert "User.bot_id == self.bot_id" in function_source(crm_repo, "users")
 
-    # Stage28.1 overview/source-create are active legacy routes too.
-    stage28_routes = "app/web/admin_stage28_1.py"
-    overview = function_source(stage28_routes, "overview")
+    # Both Stage28 route generations are still registered and must be scoped.
+    stage28 = "app/web/admin_stage28.py"
+    pro_dashboard = function_source(stage28, "pro_dashboard")
+    assert "_scope_bot_id(request)" in pro_dashboard
+    assert "ScopedWebAdminRepository(session, bot_id=bot_id)" in pro_dashboard
+    assert "WebCrmRepository(session, bot_id=bot_id)" in pro_dashboard
+    assert "WebAdminProRepository(session, bot_id=bot_id)" in pro_dashboard
+    assert "bot_id=_scope_bot_id(request)" in function_source(
+        stage28, "analytics_periods"
+    ).replace(" ", "")
+
+    stage28_1 = "app/web/admin_stage28_1.py"
+    overview = function_source(stage28_1, "overview")
     assert "ScopedWebAdminRepository(session, bot_id=bot_id)" in overview
     assert "WebAdminProRepository(session, bot_id=bot_id)" in overview
-    source_create = function_source(stage28_routes, "source_create_submit")
+    source_create = function_source(stage28_1, "source_create_submit")
     assert "_selected_bot(request)" in source_create
     assert "_bot_context(selected_bot)" in source_create
 
@@ -93,13 +98,10 @@ def main() -> None:
     ):
         assert needle in scoped_dashboard, needle
 
-    # Global search means cross-entity search, not cross-project access.
     search_route = function_source("app/web/admin_complete.py", "global_search")
     for model in ("User", "PaymentAttempt", "PaymentMethod", "TrafficSource"):
         assert f"_scope_filter(request, {model})" in search_route, model
 
-    # Stage31 support controls can trigger real MIT charges and therefore must
-    # bind user/subscription/card/gateway to the selected/owning project.
     stage31 = "app/web/admin_stage31.py"
     entities = function_source(stage31, "load_entities")
     assert "User.bot_id == bot_id" in entities
@@ -121,13 +123,22 @@ def main() -> None:
     assert "cancel_auto_renew" in function_source(support, "set_auto_renew")
     assert "lock_subscription_transaction" in function_source(support, "extend_access")
 
+    # CRM repository itself validates user ownership even if a caller passes a raw PK.
+    crm_core = "app/repositories/crm.py"
+    require_user = function_source(crm_core, "_require_user")
+    assert "User.id == user_id" in require_user
+    assert "User.bot_id == bot_id" in require_user
+    for name in ("profile", "add_note", "assign_tag", "remove_tag", "record_event"):
+        assert "_require_user" in function_source(crm_core, name), name
+    assert "TrafficSource.bot_id == user.bot_id" in function_source(crm_core, "profile")
+
     print("Admin project isolation check: OK")
     print("Stage29 source IDOR and metrics: isolated")
     print("Stage27 CRM/users/sources/broadcasts: isolated")
-    print("Stage28 overview/source creation: isolated")
-    print("Scoped legacy dashboard: isolated")
-    print("Admin cross-entity search: selected-project scoped")
+    print("Stage28/28.1 analytics and overview: isolated")
+    print("Scoped legacy dashboard and cross-entity search: isolated")
     print("Stage31 subscription support actions and gateway: isolated")
+    print("Core CRM user mutations: ownership-validated")
 
 
 if __name__ == "__main__":
