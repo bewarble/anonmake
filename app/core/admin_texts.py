@@ -38,10 +38,7 @@ SOURCE_DELETED = "✅ Источник отключён."
 SOURCE_ALREADY_DELETED = "ℹ️ Источник уже отключён."
 
 BROADCAST_AUDIENCE_PROMPT = "📣 Рассылка\n\nВыберите аудиторию для рассылки."
-BROADCAST_TEXT_PROMPT = (
-    "✍️ Отправьте текст рассылки.\n\n"
-    "Чтобы выйти, нажмите «Отмена» или отправьте /cancel."
-)
+BROADCAST_TEXT_PROMPT = "✍️ Отправьте текст рассылки."
 BROADCAST_TEXT_EMPTY = "⚠️ Текст не может быть пустым."
 BROADCAST_TEXT_LONG = "⚠️ Текст слишком длинный.\n\nМаксимум: 4000 символов."
 BROADCAST_PREVIEW_NOTE = "Это предпросмотр. В рассылке кнопка будет рабочей."
