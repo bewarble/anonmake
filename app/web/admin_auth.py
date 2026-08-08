@@ -15,9 +15,6 @@ from app.repositories.platform_admin import PlatformAdminRepository
 
 
 COOKIE_NAME = "anonmake_admin_session"
-# Fixed dummy PBKDF2 record used only to equalize the cost of an unknown DB
-# account with a wrong password for an existing DB account. It is not a real
-# credential and cannot authenticate any administrator.
 DUMMY_PASSWORD_HASH = (
     "pbkdf2_sha256$310000$YW5vbm1ha2UtYWRtaW4tZHVtbXk=$"
     "zkPEwbUk5cc-1vtbQhwIMQYWCz34za55hLx-A7_Oz_U="
@@ -29,6 +26,7 @@ class AdminSession:
     admin_id: int | None
     username: str
     role: str
+    issued_at: datetime
     expires_at: datetime
 
     @property
@@ -57,6 +55,7 @@ class AdminAuth:
     ) -> AdminSession | None:
         self.ensure_configured()
         normalized = username.strip().lower()
+        now = datetime.now(timezone.utc)
 
         async with SessionFactory() as session:
             repo = PlatformAdminRepository(session)
@@ -69,17 +68,13 @@ class AdminAuth:
                         admin_id=admin.id,
                         username=admin.email,
                         role=admin.role,
-                        expires_at=datetime.now(timezone.utc),
+                        issued_at=now,
+                        expires_at=now,
                     )
             else:
-                # Unknown DB users still pay one full PBKDF2 verification cost,
-                # reducing username-enumeration information in response timing.
                 verify_password(password, DUMMY_PASSWORD_HASH)
             admin_count = await repo.admin_count()
 
-        # The environment bootstrap credential is a one-time bootstrap path.
-        # As soon as any DB administrator exists, DB accounts are authoritative
-        # and the legacy superadmin credential must no longer authenticate.
         if (
             admin_count == 0
             and self.settings.web_admin_username.strip()
@@ -94,20 +89,22 @@ class AdminAuth:
                 admin_id=None,
                 username=self.settings.web_admin_username.strip(),
                 role="superadmin",
-                expires_at=datetime.now(timezone.utc),
+                issued_at=now,
+                expires_at=now,
             )
         return None
 
     def create_token(self, principal: AdminSession) -> str:
         self.ensure_configured()
-        expires_at = datetime.now(timezone.utc) + timedelta(
+        issued_at = datetime.now(timezone.utc)
+        expires_at = issued_at + timedelta(
             minutes=self.settings.web_admin_session_minutes
         )
         nonce = secrets.token_urlsafe(18)
         admin_id = principal.admin_id or 0
         payload = (
             f"{admin_id}|{principal.username}|{principal.role}|"
-            f"{int(expires_at.timestamp())}|{nonce}"
+            f"{int(issued_at.timestamp())}|{int(expires_at.timestamp())}|{nonce}"
         )
         return f"{payload}|{self._sign(payload)}"
 
@@ -115,20 +112,34 @@ class AdminAuth:
         if not token:
             return None
         try:
-            admin_raw, username, role, expires_raw, nonce, signature = token.split("|", 5)
-            payload = f"{admin_raw}|{username}|{role}|{expires_raw}|{nonce}"
+            (
+                admin_raw,
+                username,
+                role,
+                issued_raw,
+                expires_raw,
+                nonce,
+                signature,
+            ) = token.split("|", 6)
+            payload = (
+                f"{admin_raw}|{username}|{role}|{issued_raw}|"
+                f"{expires_raw}|{nonce}"
+            )
             if not hmac.compare_digest(signature, self._sign(payload)):
                 return None
+            issued_at = datetime.fromtimestamp(int(issued_raw), tz=timezone.utc)
             expires_at = datetime.fromtimestamp(int(expires_raw), tz=timezone.utc)
             admin_id = int(admin_raw) or None
         except (TypeError, ValueError, OverflowError):
             return None
-        if expires_at <= datetime.now(timezone.utc):
+        now = datetime.now(timezone.utc)
+        if issued_at > now + timedelta(minutes=1) or expires_at <= now:
             return None
         return AdminSession(
             admin_id=admin_id,
             username=username,
             role=role,
+            issued_at=issued_at,
             expires_at=expires_at,
         )
 
