@@ -7,9 +7,8 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.bot_context import get_current_bot, require_current_bot
+from app.core.bot_context import require_current_bot
 from app.models.billing import PaymentMethod, Subscription
-from app.models.bot_instance import BotInstance
 from app.models.delivery import DeliveryOutbox
 from app.models.marketing import Broadcast, SourceAttribution, SourceClick, TrafficSource
 from app.models.user import User
@@ -43,6 +42,9 @@ class MarketingRepository:
         )
 
     async def record_source_click(self, source: TrafficSource, user: User) -> bool:
+        bot_id = require_current_bot().id
+        if source.bot_id != bot_id or user.bot_id != bot_id:
+            raise ValueError("Source click entities must belong to the current bot")
         click = SourceClick(source_id=source.id, user_id=user.id)
         try:
             async with self.session.begin_nested():
@@ -55,6 +57,9 @@ class MarketingRepository:
         return True
 
     async def register_source_start(self, *, source: TrafficSource, user: User) -> bool:
+        bot_id = require_current_bot().id
+        if source.bot_id != bot_id or user.bot_id != bot_id:
+            raise ValueError("Source attribution entities must belong to the current bot")
         existing = await self.session.scalar(select(SourceAttribution.id).where(SourceAttribution.user_id == user.id))
         if existing is not None:
             return False
@@ -175,15 +180,7 @@ class MarketingRepository:
             raise ValueError("Unsupported broadcast audience")
         if not text.strip() or len(text) > 4000:
             raise ValueError("Invalid broadcast text")
-        resolved_bot_id = bot_id
-        if resolved_bot_id is None:
-            current_bot = get_current_bot()
-            if current_bot is not None:
-                resolved_bot_id = current_bot.id
-            else:
-                resolved_bot_id = await self.session.scalar(select(BotInstance.id).where(BotInstance.is_active.is_(True)).order_by(BotInstance.id).limit(1))
-        if resolved_bot_id is None:
-            raise RuntimeError("No active bot instance is available")
+        resolved_bot_id = bot_id if bot_id is not None else require_current_bot().id
         item = Broadcast(bot_id=resolved_bot_id, kind=kind, audience=audience, text=text, status="queued", created_by_telegram_id=admin_telegram_id)
         self.session.add(item)
         await self.session.flush()
@@ -232,6 +229,8 @@ class MarketingRepository:
         return {"delivered": delivered, "failed": failed, "pending": pending, "blocked": blocked}
 
     async def next_broadcast(self) -> Broadcast | None:
+        # Global scheduler: each claimed Broadcast carries its own bot_id and the
+        # worker scopes the audience and delivery jobs to that exact project.
         result = await self.session.execute(
             select(Broadcast).where(Broadcast.status.in_(("queued", "processing"))).order_by(Broadcast.id).limit(1).with_for_update(skip_locked=True)
         )
