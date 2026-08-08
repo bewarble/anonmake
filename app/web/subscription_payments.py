@@ -15,26 +15,11 @@ from app.models.billing import PaymentAttempt, Subscription
 from app.models.bot_instance import BotInstance
 from app.repositories.users import UserRepository
 from app.services.bot_credentials import resolve_bot_token
-from app.services.impaya import ImpayaClient
+from app.services.impaya_factory import create_impaya_client, load_impaya_config
 from app.services.subscription_checkout import SubscriptionCheckoutService
 
 router = APIRouter(include_in_schema=False)
 settings = load_settings()
-
-
-def make_client() -> ImpayaClient:
-    return ImpayaClient(
-        settings.impaya_api_url,
-        settings.impaya_api_token,
-        settings.impaya_binding_terminal_name or settings.impaya_terminal_name,
-        auth_header=settings.impaya_auth_header,
-        auth_prefix=settings.impaya_auth_prefix,
-        protocol_version=settings.impaya_protocol_version,
-        recurrent_terminal_name=(
-            settings.impaya_recurrent_terminal_name
-            or settings.impaya_terminal_name
-        ),
-    )
 
 
 async def finalize_subscription_payment(
@@ -42,14 +27,14 @@ async def finalize_subscription_payment(
     *,
     notify: bool,
 ) -> str:
-    client = make_client()
     bot: Bot | None = None
+    client = None
     context_token = None
 
     try:
         async with SessionFactory() as session:
-            # Operation IDs are globally unique. Resolve ownership before using the
-            # bot-scoped billing repository inside SubscriptionCheckoutService.
+            # Operation IDs are globally unique. Resolve project ownership first;
+            # only then load that project's payment gateway and bot credentials.
             seed_attempt = await session.scalar(
                 select(PaymentAttempt).where(
                     PaymentAttempt.customer_operation_id == operation_id
@@ -70,11 +55,13 @@ async def finalize_subscription_payment(
                     instance.display_name,
                 )
             )
+            impaya_config = await load_impaya_config(session, settings, instance.id)
+            client = create_impaya_client(impaya_config)
 
             paid, attempt, newly_confirmed = await SubscriptionCheckoutService(
                 session,
                 client,
-                payment_form_url_template=settings.impaya_payment_form_url_template,
+                payment_form_url_template=impaya_config.payment_form_url_template,
                 trial_amount=settings.trial_price_kopecks,
                 trial_duration=timedelta(hours=settings.trial_duration_hours),
             ).finalize(operation_id)
@@ -89,7 +76,10 @@ async def finalize_subscription_payment(
                     Subscription,
                     attempt.subscription_id,
                 )
-                if subscription is not None:
+                if (
+                    subscription is not None
+                    and subscription.bot_id == instance.id
+                ):
                     user = await UserRepository(session).get_by_id(
                         subscription.user_id
                     )
@@ -102,7 +92,8 @@ async def finalize_subscription_payment(
     finally:
         if context_token is not None:
             reset_current_bot(context_token)
-        await client.close()
+        if client is not None:
+            await client.close()
         if bot is not None:
             await bot.session.close()
 
