@@ -215,11 +215,10 @@ class AdminSubscriptionControl:
         target: str,
         details: dict,
     ) -> None:
-        # The historical column is named admin_telegram_id, but web admin
-        # authenticates by username. Store a deterministic neutral value and
-        # preserve the username inside details until the audit schema evolves.
+        bot = require_current_bot()
         self.session.add(
             AdminAuditLog(
+                bot_id=bot.id,
                 admin_telegram_id=0,
                 action=action,
                 target=target,
