@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.bot_context import require_current_bot
-from app.models.user import User, generate_public_code
+from app.models.user import User, UserPublicCodeAlias, generate_public_code
 
 
 PUBLIC_CODE_CREATE_ATTEMPTS = 20
@@ -40,13 +40,23 @@ class UserRepository:
 
     async def get_by_public_code(self, public_code: str) -> User | None:
         bot_id = require_current_bot().id
-        result = await self.session.execute(
+        user = await self.session.scalar(
             select(User).where(
                 User.bot_id == bot_id,
                 User.public_code == public_code,
             )
         )
-        return result.scalar_one_or_none()
+        if user is not None:
+            return user
+        return await self.session.scalar(
+            select(User)
+            .join(UserPublicCodeAlias, UserPublicCodeAlias.user_id == User.id)
+            .where(
+                User.bot_id == bot_id,
+                UserPublicCodeAlias.bot_id == bot_id,
+                UserPublicCodeAlias.public_code == public_code,
+            )
+        )
 
     @staticmethod
     def _sync_telegram_fields(user: User, telegram_user: TelegramUser) -> None:
@@ -93,10 +103,19 @@ class UserRepository:
 
         bot_id = require_current_bot().id
         for _ in range(PUBLIC_CODE_CREATE_ATTEMPTS):
+            public_code = generate_public_code()
+            alias_owner = await self.session.scalar(
+                select(UserPublicCodeAlias.user_id).where(
+                    UserPublicCodeAlias.bot_id == bot_id,
+                    UserPublicCodeAlias.public_code == public_code,
+                )
+            )
+            if alias_owner is not None:
+                continue
             user = User(
                 bot_id=bot_id,
                 telegram_id=telegram_user.id,
-                public_code=generate_public_code(),
+                public_code=public_code,
                 username=telegram_user.username,
                 first_name=telegram_user.first_name,
                 last_name=telegram_user.last_name,
@@ -112,8 +131,6 @@ class UserRepository:
                     self._sync_telegram_fields(existing, telegram_user)
                     await self.session.flush()
                     return existing, False
-                # The telegram id is still free, so this was most likely a
-                # public-code collision. Generate another short code.
                 continue
             return user, True
 
