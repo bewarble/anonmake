@@ -27,7 +27,7 @@ def main() -> None:
     assert "UserPublicCodeAlias.bot_id == bot_id" in lookup
 
     create = function_source("app/repositories/users.py", "get_or_create_from_telegram")
-    assert "UserPublicCodeAlias.public_code == public_code" in create
+    assert "UserPublicCodeAlias.public_code == user.public_code" in create
     assert "UserPublicCodeAlias.bot_id == bot_id" in create
 
     migration_21 = (ROOT / "migrations/versions/20260807_0021_short_public_codes.py").read_text(encoding="utf-8")
