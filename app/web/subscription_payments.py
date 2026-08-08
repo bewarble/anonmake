@@ -55,7 +55,14 @@ async def finalize_subscription_payment(
                     instance.display_name,
                 )
             )
-            impaya_config = await load_impaya_config(session, settings, instance.id)
+            # This path only verifies/finalizes an operation that already exists.
+            # It must remain possible after the administrator disables new charges.
+            impaya_config = await load_impaya_config(
+                session,
+                settings,
+                instance.id,
+                allow_inactive=True,
+            )
             client = create_impaya_client(impaya_config)
 
             paid, attempt, newly_confirmed = await SubscriptionCheckoutService(
