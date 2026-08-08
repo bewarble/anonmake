@@ -34,11 +34,13 @@ def broadcast_preview_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text=QUESTION_ANSWER,
                     callback_data="adminm:broadcast:preview",
-                ),
+                )
+            ],
+            [
                 InlineKeyboardButton(
                     text=QUESTION_REVEAL,
                     callback_data="adminm:broadcast:preview",
-                ),
+                )
             ],
             [
                 InlineKeyboardButton(
