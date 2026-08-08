@@ -131,9 +131,7 @@ class Stage29Repository:
             active_vip_filters.append(Subscription.bot_id == self.bot_id)
         active_vip = int(
             await self.session.scalar(
-                select(func.count(Subscription.id)).where(
-                    *active_vip_filters,
-                )
+                select(func.count(Subscription.id)).where(*active_vip_filters)
             )
             or 0
         )
@@ -175,17 +173,20 @@ class Stage29Repository:
         start = (now - timedelta(days=days - 1)).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
+        failure_filters = [
+            DeliveryOutbox.status == "failed",
+            or_(
+                *(DeliveryOutbox.last_error.ilike(p) for p in PERMANENT_ERRORS)
+            ),
+        ]
+        if self.bot_id is not None:
+            failure_filters.append(DeliveryOutbox.bot_id == self.bot_id)
         first_failure = (
             select(
                 DeliveryOutbox.chat_id.label("chat_id"),
                 func.min(DeliveryOutbox.updated_at).label("blocked_at"),
             )
-            .where(
-                DeliveryOutbox.status == "failed",
-                or_(
-                    *(DeliveryOutbox.last_error.ilike(p) for p in PERMANENT_ERRORS)
-                ),
-            )
+            .where(*failure_filters)
             .group_by(DeliveryOutbox.chat_id)
             .subquery()
         )
@@ -247,27 +248,29 @@ class Stage29Repository:
                     )
                 )
 
-        active_vip = exists(
-            select(Subscription.id).where(
-                Subscription.user_id == User.id,
-                Subscription.access_until.is_not(None),
-                Subscription.access_until > now,
-            )
-        )
+        active_vip_filters = [
+            Subscription.user_id == User.id,
+            Subscription.access_until.is_not(None),
+            Subscription.access_until > now,
+        ]
+        if self.bot_id is not None:
+            active_vip_filters.append(Subscription.bot_id == self.bot_id)
+        active_vip = exists(select(Subscription.id).where(*active_vip_filters))
         if vip == "active":
             filters.append(active_vip)
         elif vip == "inactive":
             filters.append(~active_vip)
 
-        dead = exists(
-            select(DeliveryOutbox.id).where(
-                DeliveryOutbox.chat_id == User.telegram_id,
-                DeliveryOutbox.status == "failed",
-                or_(
-                    *(DeliveryOutbox.last_error.ilike(p) for p in PERMANENT_ERRORS)
-                ),
-            )
-        )
+        dead_filters = [
+            DeliveryOutbox.chat_id == User.telegram_id,
+            DeliveryOutbox.status == "failed",
+            or_(
+                *(DeliveryOutbox.last_error.ilike(p) for p in PERMANENT_ERRORS)
+            ),
+        ]
+        if self.bot_id is not None:
+            dead_filters.append(DeliveryOutbox.bot_id == self.bot_id)
+        dead = exists(select(DeliveryOutbox.id).where(*dead_filters))
         if health == "alive":
             filters.append(~dead)
         elif health == "dead":
@@ -314,6 +317,12 @@ class Stage29Repository:
             .subquery()
         )
 
+        subscription_join = Subscription.user_id == User.id
+        source_join = TrafficSource.id == SourceAttribution.source_id
+        if self.bot_id is not None:
+            subscription_join = subscription_join & (Subscription.bot_id == self.bot_id)
+            source_join = source_join & (TrafficSource.bot_id == self.bot_id)
+
         result = await self.session.execute(
             select(
                 User.id,
@@ -331,9 +340,9 @@ class Stage29Repository:
             .outerjoin(last_event, last_event.c.user_id == User.id)
             .outerjoin(sent, sent.c.user_id == User.id)
             .outerjoin(answered, answered.c.user_id == User.id)
-            .outerjoin(Subscription, Subscription.user_id == User.id)
+            .outerjoin(Subscription, subscription_join)
             .outerjoin(SourceAttribution, SourceAttribution.user_id == User.id)
-            .outerjoin(TrafficSource, TrafficSource.id == SourceAttribution.source_id)
+            .outerjoin(TrafficSource, source_join)
             .where(*filters)
             .order_by(User.id.desc())
             .offset(page * page_size)
@@ -382,7 +391,8 @@ class Stage29Repository:
                     select(func.count(func.distinct(SourceAttribution.user_id)))
                     .join(
                         Subscription,
-                        Subscription.user_id == SourceAttribution.user_id,
+                        (Subscription.user_id == SourceAttribution.user_id)
+                        & (Subscription.bot_id == source.bot_id),
                     )
                     .where(
                         SourceAttribution.source_id == source.id,
@@ -394,15 +404,12 @@ class Stage29Repository:
             )
             paid_users = int(
                 await self.session.scalar(
-                    select(
-                        func.count(
-                            func.distinct(Subscription.user_id)
-                        )
-                    )
+                    select(func.count(func.distinct(Subscription.user_id)))
                     .select_from(PaymentAttempt)
                     .join(
                         Subscription,
-                        Subscription.id == PaymentAttempt.subscription_id,
+                        (Subscription.id == PaymentAttempt.subscription_id)
+                        & (Subscription.bot_id == source.bot_id),
                     )
                     .join(
                         SourceAttribution,
@@ -410,6 +417,7 @@ class Stage29Repository:
                     )
                     .where(
                         SourceAttribution.source_id == source.id,
+                        PaymentAttempt.bot_id == source.bot_id,
                         PaymentAttempt.status.in_(SUCCESS_STATUSES),
                     )
                 )
@@ -421,7 +429,8 @@ class Stage29Repository:
                     .select_from(PaymentAttempt)
                     .join(
                         Subscription,
-                        Subscription.id == PaymentAttempt.subscription_id,
+                        (Subscription.id == PaymentAttempt.subscription_id)
+                        & (Subscription.bot_id == source.bot_id),
                     )
                     .join(
                         SourceAttribution,
@@ -429,6 +438,7 @@ class Stage29Repository:
                     )
                     .where(
                         SourceAttribution.source_id == source.id,
+                        PaymentAttempt.bot_id == source.bot_id,
                         PaymentAttempt.status.in_(SUCCESS_STATUSES),
                     )
                 )
@@ -436,12 +446,11 @@ class Stage29Repository:
             )
             revenue = int(
                 await self.session.scalar(
-                    select(
-                        func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0)
-                    )
+                    select(func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0))
                     .join(
                         Subscription,
-                        Subscription.id == PaymentAttempt.subscription_id,
+                        (Subscription.id == PaymentAttempt.subscription_id)
+                        & (Subscription.bot_id == source.bot_id),
                     )
                     .join(
                         SourceAttribution,
@@ -449,6 +458,7 @@ class Stage29Repository:
                     )
                     .where(
                         SourceAttribution.source_id == source.id,
+                        PaymentAttempt.bot_id == source.bot_id,
                         PaymentAttempt.status.in_(SUCCESS_STATUSES),
                     )
                 )
@@ -467,25 +477,18 @@ class Stage29Repository:
                     paid_users=paid_users,
                     payments=payments,
                     revenue_kopecks=revenue,
-                    cpa_kopecks=(
-                        round(source.spend_kopecks / users)
-                        if users else None
-                    ),
+                    cpa_kopecks=(round(source.spend_kopecks / users) if users else None),
                     vip_cpa_kopecks=(
-                        round(source.spend_kopecks / vip_users)
-                        if vip_users else None
+                        round(source.spend_kopecks / vip_users) if vip_users else None
                     ),
                     payment_cpa_kopecks=(
-                        round(source.spend_kopecks / paid_users)
-                        if paid_users else None
+                        round(source.spend_kopecks / paid_users) if paid_users else None
                     ),
                     registration_conversion_percent=(
-                        round(users / source.clicks * 100, 1)
-                        if source.clicks else None
+                        round(users / source.clicks * 100, 1) if source.clicks else None
                     ),
                     payment_conversion_percent=(
-                        round(paid_users / users * 100, 1)
-                        if users else None
+                        round(paid_users / users * 100, 1) if users else None
                     ),
                     roi_percent=roi,
                 )
@@ -505,9 +508,15 @@ class Stage29Repository:
         if direct is not None:
             query = query.where(direct)
         elif self.bot_id is not None and model is Question:
-            query = query.join(User, User.id == Question.recipient_id).where(User.bot_id == self.bot_id)
+            query = query.join(User, User.id == Question.recipient_id).where(
+                User.bot_id == self.bot_id
+            )
         elif self.bot_id is not None and model is Answer:
-            query = query.join(Question, Question.id == Answer.question_id).join(User, User.id == Question.recipient_id).where(User.bot_id == self.bot_id)
+            query = (
+                query.join(Question, Question.id == Answer.question_id)
+                .join(User, User.id == Question.recipient_id)
+                .where(User.bot_id == self.bot_id)
+            )
         if start is not None:
             query = query.where(column >= start)
         return int(await self.session.scalar(query) or 0)
@@ -518,9 +527,15 @@ class Stage29Repository:
         if direct is not None:
             query = query.where(direct)
         elif self.bot_id is not None and model is Question:
-            query = query.join(User, User.id == Question.recipient_id).where(User.bot_id == self.bot_id)
+            query = query.join(User, User.id == Question.recipient_id).where(
+                User.bot_id == self.bot_id
+            )
         elif self.bot_id is not None and model is Answer:
-            query = query.join(Question, Question.id == Answer.question_id).join(User, User.id == Question.recipient_id).where(User.bot_id == self.bot_id)
+            query = (
+                query.join(Question, Question.id == Answer.question_id)
+                .join(User, User.id == Question.recipient_id)
+                .where(User.bot_id == self.bot_id)
+            )
         query = query.where(column >= left, column < right)
         return int(await self.session.scalar(query) or 0)
 
@@ -537,14 +552,17 @@ class Stage29Repository:
         current = await self._payment_count(start, kinds=kinds, success_only=True)
         previous = 0
         if start is not None and previous_start is not None:
+            filters = [
+                PaymentAttempt.created_at >= previous_start,
+                PaymentAttempt.created_at < start,
+                PaymentAttempt.status.in_(SUCCESS_STATUSES),
+                PaymentAttempt.attempt_kind.in_(kinds),
+            ]
+            if self.bot_id is not None:
+                filters.append(PaymentAttempt.bot_id == self.bot_id)
             previous = int(
                 await self.session.scalar(
-                    select(func.count(PaymentAttempt.id)).where(
-                        PaymentAttempt.created_at >= previous_start,
-                        PaymentAttempt.created_at < start,
-                        PaymentAttempt.status.in_(SUCCESS_STATUSES),
-                        PaymentAttempt.attempt_kind.in_(kinds),
-                    )
+                    select(func.count(PaymentAttempt.id)).where(*filters)
                 )
                 or 0
             )
@@ -573,38 +591,49 @@ class Stage29Repository:
             filters.append(PaymentAttempt.created_at >= start)
         return int(
             await self.session.scalar(
-                select(func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0))
-                .where(*filters)
+                select(func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0)).where(
+                    *filters
+                )
             )
             or 0
         )
 
     async def _payment_sum_between(self, left, right):
+        filters = [
+            PaymentAttempt.status.in_(SUCCESS_STATUSES),
+            PaymentAttempt.created_at >= left,
+            PaymentAttempt.created_at < right,
+        ]
+        if self.bot_id is not None:
+            filters.append(PaymentAttempt.bot_id == self.bot_id)
         return int(
             await self.session.scalar(
-                select(func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0))
-                .where(
-                    PaymentAttempt.status.in_(SUCCESS_STATUSES),
-                    PaymentAttempt.created_at >= left,
-                    PaymentAttempt.created_at < right,
-                    *([PaymentAttempt.bot_id == self.bot_id] if self.bot_id is not None else []),
+                select(func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0)).where(
+                    *filters
                 )
             )
             or 0
         )
 
     async def _dead_users(self):
+        filters = [
+            DeliveryOutbox.status == "failed",
+            or_(
+                *(DeliveryOutbox.last_error.ilike(p) for p in PERMANENT_ERRORS)
+            ),
+        ]
+        if self.bot_id is not None:
+            filters.extend(
+                (
+                    DeliveryOutbox.bot_id == self.bot_id,
+                    User.bot_id == self.bot_id,
+                )
+            )
         return int(
             await self.session.scalar(
                 select(func.count(func.distinct(User.id)))
                 .join(DeliveryOutbox, DeliveryOutbox.chat_id == User.telegram_id)
-                .where(
-                    DeliveryOutbox.status == "failed",
-                    *([DeliveryOutbox.bot_id == self.bot_id] if self.bot_id is not None else []),
-                    or_(
-                        *(DeliveryOutbox.last_error.ilike(p) for p in PERMANENT_ERRORS)
-                    ),
-                )
+                .where(*filters)
             )
             or 0
         )
