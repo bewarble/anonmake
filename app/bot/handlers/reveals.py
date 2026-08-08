@@ -13,33 +13,19 @@ from app.bot.keyboards.reveals import (
     reveal_consent_keyboard,
 )
 from app.core import texts
+from app.core.bot_context import require_current_bot
 from app.core.config import load_settings
 from app.repositories import QuestionRepository, UserRepository
 from app.repositories.billing import BillingRepository
 from app.repositories.reveals import RevealRepository
 from app.services.crm_tracking import CrmTrackingService
-from app.services.impaya import ImpayaClient
+from app.services.impaya_factory import create_impaya_client, load_impaya_config
 from app.services.reveal_checkout import RevealCheckoutService
 from app.services.sender_identity import resolve_current_sender
 from app.services.vip import has_active_vip
 
 router = Router(name="reveals")
 logger = logging.getLogger(__name__)
-
-
-def build_client(settings) -> ImpayaClient:
-    return ImpayaClient(
-        settings.impaya_api_url,
-        settings.impaya_api_token,
-        settings.impaya_binding_terminal_name or settings.impaya_terminal_name,
-        auth_header=settings.impaya_auth_header,
-        auth_prefix=settings.impaya_auth_prefix,
-        protocol_version=settings.impaya_protocol_version,
-        recurrent_terminal_name=(
-            settings.impaya_recurrent_terminal_name
-            or settings.impaya_terminal_name
-        ),
-    )
 
 
 async def _load_reveal_context(
@@ -171,7 +157,6 @@ async def close_reveal(callback: CallbackQuery) -> None:
         try:
             await callback.message.delete()
         except TelegramBadRequest:
-            # Repeated taps / old messages are normal user behavior, not incidents.
             pass
 
 
@@ -203,8 +188,6 @@ async def confirm_reveal(
         await callback.answer(texts.ANSWER_NOT_FOUND, show_alert=True)
         return
 
-    # The user may return to an old consent button after payment already finished.
-    # In that case reveal immediately instead of attempting another checkout.
     subscription = await BillingRepository(session).subscription_for_user(buyer.id)
     if has_active_vip(subscription):
         await _deliver_identity(
@@ -221,9 +204,12 @@ async def confirm_reveal(
     if not settings.billing_enabled:
         await callback.answer(texts.VIP_PAYMENT_UNAVAILABLE, show_alert=True)
         return
+
+    current_bot = require_current_bot()
+    impaya_config = await load_impaya_config(session, settings, current_bot.id)
     if (
-        not settings.impaya_api_token.strip()
-        or not settings.impaya_payment_form_url_template.strip()
+        not impaya_config.api_token.strip()
+        or not impaya_config.payment_form_url_template.strip()
         or not settings.public_base_url.strip()
     ):
         await callback.answer(texts.VIP_CONFIGURATION_ERROR, show_alert=True)
@@ -237,12 +223,12 @@ async def confirm_reveal(
     success_url = f"{public_base}/payments/return/success/{checkout.token}"
     fail_url = f"{public_base}/payments/return/fail/{checkout.token}"
 
-    client = build_client(settings)
+    client = create_impaya_client(impaya_config)
     try:
         payment_url = await RevealCheckoutService(
             session,
             client,
-            payment_form_url_template=settings.impaya_payment_form_url_template,
+            payment_form_url_template=impaya_config.payment_form_url_template,
             trial_amount=settings.trial_price_kopecks,
             trial_duration=timedelta(hours=settings.trial_duration_hours),
         ).create(
@@ -254,7 +240,10 @@ async def confirm_reveal(
     except Exception:
         logger.exception(
             "Could not create reveal checkout",
-            extra={"telegram_user_id": callback.from_user.id},
+            extra={
+                "telegram_user_id": callback.from_user.id,
+                "bot_id": current_bot.id,
+            },
         )
         await callback.answer(texts.VIP_PAYMENT_UNAVAILABLE, show_alert=True)
         return
@@ -269,7 +258,5 @@ async def confirm_reveal(
                 reply_markup=reveal_checkout_keyboard(payment_url=payment_url),
             )
         except TelegramBadRequest as exc:
-            # "message is not modified" after a double tap is benign. Other edit
-            # failures should still be visible in logs and global diagnostics.
             if "message is not modified" not in str(exc).lower():
                 raise
