@@ -147,12 +147,13 @@ class BillingRepository:
         self,
         subscription_id: int,
     ) -> PaymentAttempt | None:
-        """Return unresolved recurrent work before creating another charge.
+        """Return unresolved charge work before creating another operation.
 
-        This deliberately ignores the calendar billing-cycle key. A payment can
-        become pending shortly before midnight and still be the same external
-        operation after the date changes; issuing a new operation at that point
-        could charge the customer twice.
+        The lookup deliberately ignores the calendar billing-cycle key. A charge
+        can become pending shortly before midnight and remain the same external
+        operation after the date changes. Manual/test MIT charges are included
+        too: while their provider outcome is unknown, an automatic recurrent
+        charge must not be issued for the same subscription.
         """
         result = await self.session.execute(
             select(PaymentAttempt)
@@ -160,7 +161,16 @@ class BillingRepository:
                 PaymentAttempt.bot_id == require_current_bot().id,
                 PaymentAttempt.subscription_id == subscription_id,
                 PaymentAttempt.status == "pending",
-                PaymentAttempt.attempt_kind.in_(("primary", "fallback")),
+                PaymentAttempt.attempt_kind.in_(
+                    (
+                        "primary",
+                        "fallback",
+                        "admin_primary",
+                        "admin_fallback",
+                        "test_primary",
+                        "test_fallback",
+                    )
+                ),
             )
             .order_by(PaymentAttempt.id.desc())
             .limit(1)
@@ -174,9 +184,6 @@ class BillingRepository:
         cancelled_at: datetime,
     ) -> Subscription:
         await self.lock_subscription_transaction(subscription.id)
-        # The object may have been loaded before we waited for an in-flight
-        # recurrent charge. Refresh it so cancellation always applies to the
-        # authoritative post-charge state instead of overwriting stale values.
         await self.session.refresh(subscription)
         subscription.auto_renew = False
         subscription.next_charge_at = None
