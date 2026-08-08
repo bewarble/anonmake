@@ -9,7 +9,7 @@ from app.models.platform_admin import AdminProjectAccess, AdminUser, PaymentGate
 from app.models.project_setup import ProjectProfile, ProjectSetupDraft
 from app.models.question import Question
 from app.models.reveal import RevealCheckout
-from app.models.user import User
+from app.models.user import User, UserPublicCodeAlias
 
 __all__ = (
     "AdminAuditLog",
@@ -35,4 +35,5 @@ __all__ = (
     "Subscription",
     "TrafficSource",
     "User",
+    "UserPublicCodeAlias",
 )
