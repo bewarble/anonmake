@@ -4,7 +4,7 @@ from app.models.answer import Answer
 from app.models.billing import PaymentAttempt, PaymentMethod, Subscription
 from app.models.crm import CrmEvent, CrmNote, CrmTag, CrmUserTag
 from app.models.delivery import DeliveryOutbox
-from app.models.marketing import Broadcast, SourceAttribution, TrafficSource
+from app.models.marketing import Broadcast, SourceAttribution, SourceClick, TrafficSource
 from app.models.platform_admin import AdminProjectAccess, AdminUser, PaymentGatewayConfig
 from app.models.project_setup import ProjectProfile, ProjectSetupDraft
 from app.models.question import Question
@@ -31,6 +31,7 @@ __all__ = (
     "Question",
     "RevealCheckout",
     "SourceAttribution",
+    "SourceClick",
     "Subscription",
     "TrafficSource",
     "User",
