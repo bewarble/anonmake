@@ -218,20 +218,21 @@ async def referral_details(callback: CallbackQuery, session: AsyncSession, bot: 
     cpu = "Н/д" if not attributed else money(int(stats["cpa_kopecks"]))
     text = (
         f"Название ссылки: <b>{escape(source.name)}</b>\n\n"
-        "📊 <b>Статистика:</b>\n\n"
+        "📊 <b>Статистика:</b>\n"
         f"• Всего перешли — {number(clicks)}\n"
         f"• Из них уникальны — {number(attributed)}\n"
         f"• Из них живы — {number(int(stats['alive']))}\n\n"
-        "👤 <b>Статистика по времени:</b>\n\n"
+        "👤 <b>Статистика по времени:</b>\n"
         f"• Сегодня — {number(int(stats['today']))}\n"
         f"• За последние 7 дней — {number(int(stats['week']))}\n"
         f"• За последние 31 день — {number(int(stats['month']))}\n\n"
-        "💰 <b>Цены:</b>\n\n"
+        "💰 <b>Цены:</b>\n"
         f"• Цена ссылки — {money(int(stats['spend_kopecks']))} ₽\n"
         f"• Цена за переход — {cpc}{' ₽' if cpc != 'Н/д' else ''}\n"
         f"• Цена за уникального — {cpu}{' ₽' if cpu != 'Н/д' else ''}\n\n"
-        f"Ссылка: <code>{escape(link)}</code>\n"
-        f"Активных карт по рефке: {number(int(stats['active_cards']))}"
+        f"Ссылка: {escape(link)}\n\n"
+        f"⚡️ Всего карт: {number(int(stats['total_cards']))}\n"
+        f"💳 Активных карт: {number(int(stats['active_cards']))}"
     )
     if callback.message:
         await callback.message.edit_text(
