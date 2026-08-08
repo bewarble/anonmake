@@ -22,6 +22,9 @@ def main() -> None:
     assert "token_fingerprint" in managed
     assert "dispatcher.include_router(build_router())" in managed
 
+    model = (ROOT / "app/models/bot_instance.py").read_text(encoding="utf-8")
+    assert 'default="managed", server_default="managed"' in model
+
     credentials = (ROOT / "app/services/bot_credentials.py").read_text(encoding="utf-8")
     assert "if instance.token_encrypted:" in credentials
     assert "settings.bot_tokens().get(instance.code)" in credentials
@@ -32,17 +35,23 @@ def main() -> None:
     for legacy in ("restart bot ", "bot-two", "bot-three", "bot-four"):
         assert legacy not in makefile, legacy
 
+    deploy = (ROOT / "scripts/deploy.py").read_text(encoding="utf-8")
+    assert '("--profile", "multibot")' not in deploy
+    assert '"--remove-orphans"' in deploy
+
     migration = (ROOT / "migrations/versions/20260808_0025_unified_bot_runtime.py").read_text(encoding="utf-8")
     assert 'revision = "20260808_0025"' in migration
     assert 'down_revision = "20260808_0024"' in migration
     assert "UPDATE bot_instances SET runtime_mode = 'managed'" in migration
+    assert 'server_default="managed"' in migration
 
     print("Stage 64 check: OK")
     print("All Telegram projects: one managed-bots runtime")
     print("Legacy bot/bot-two/bot-three/bot-four polling services: removed")
+    print("BotInstance runtime default: managed")
     print("Admin-encrypted and legacy environment credentials: supported")
     print("Token changes: hot-restarted inside managed runtime")
-    print("docker-up removes orphaned legacy bot containers")
+    print("docker-up/deploy remove orphaned legacy bot containers")
 
 
 if __name__ == "__main__":
