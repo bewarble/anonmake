@@ -132,7 +132,7 @@ services:
         "--port",
         "8000",
         "--proxy-headers",
-        "--forwarded-allow-ips=*"
+        "--forwarded-allow-ips=${FORWARDED_ALLOW_IPS:-127.0.0.1,172.16.0.0/12}"
       ]
     ports:
       - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8000}:8000"
