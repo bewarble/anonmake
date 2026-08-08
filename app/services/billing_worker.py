@@ -167,28 +167,30 @@ class BillingWorker:
                     stats.skipped += 1
                     return
 
-                instance = await session.get(BotInstance, subscription.bot_id)
+                bot_id = int(subscription.bot_id)
+                user_id = int(subscription.user_id)
+                stable_subscription_id = int(subscription.id)
+
+                instance = await session.get(BotInstance, bot_id)
                 if instance is None:
                     stats.failed += 1
                     logger.error(
                         "Billing project not found subscription=%s bot_id=%s",
-                        subscription.id,
-                        subscription.bot_id,
+                        stable_subscription_id,
+                        bot_id,
                     )
                     return
 
-                context_token = set_current_bot(
-                    CurrentBot(
-                        instance.id,
-                        instance.code,
-                        instance.username,
-                        instance.display_name,
-                    )
+                bot_code = str(instance.code)
+                current_bot = CurrentBot(
+                    int(instance.id),
+                    bot_code,
+                    instance.username,
+                    instance.display_name,
                 )
+                context_token = set_current_bot(current_bot)
                 try:
-                    method = await repo.payment_method_for_user(
-                        subscription.user_id
-                    )
+                    method = await repo.payment_method_for_user(user_id)
                     if (
                         method is None
                         or not method.is_active
@@ -204,7 +206,7 @@ class BillingWorker:
                         client = self.client
                         if self.client_factory is not None:
                             owned_client = await self.client_factory(
-                                session, subscription.bot_id
+                                session, bot_id
                             )
                             client = owned_client
                         if client is None:
@@ -219,29 +221,31 @@ class BillingWorker:
                         stats.failed += 1
                         logger.exception(
                             "Subscription renewal failed subscription=%s bot=%s",
-                            subscription.id,
-                            instance.code,
+                            stable_subscription_id,
+                            bot_code,
                         )
                         return
                     finally:
                         if owned_client is not None:
                             await owned_client.close()
 
-                    if result.decision == ChargeDecision.SUCCESS:
+                    result_attempt_id = int(result.attempt.id)
+                    result_decision = result.decision
+                    if result_decision == ChargeDecision.SUCCESS:
                         stats.success += 1
-                    elif result.decision == ChargeDecision.INSUFFICIENT:
+                    elif result_decision == ChargeDecision.INSUFFICIENT:
                         stats.insufficient += 1
-                    elif result.decision == ChargeDecision.PENDING:
+                    elif result_decision == ChargeDecision.PENDING:
                         stats.pending += 1
                     else:
                         stats.failed += 1
 
                     logger.info(
                         "Renewal processed subscription=%s bot=%s decision=%s attempt=%s",
-                        subscription.id,
-                        instance.code,
-                        result.decision.value,
-                        result.attempt.id,
+                        stable_subscription_id,
+                        bot_code,
+                        result_decision.value,
+                        result_attempt_id,
                     )
                 finally:
                     reset_current_bot(context_token)
