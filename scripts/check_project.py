@@ -44,6 +44,8 @@ def check_local_imports() -> None:
 
 def check_router_registry() -> None:
     text = (ROOT / "app/bot/handlers/__init__.py").read_text(encoding="utf-8")
+    assert "def _fresh_router(router: Router) -> Router:" in text
+    assert "return deepcopy(router)" in text
     required = (
         "admin_router",
         "admin_marketing_router",
@@ -57,7 +59,7 @@ def check_router_registry() -> None:
         "errors_router",
     )
     for name in required:
-        assert text.count(f"include_router({name})") == 1, name
+        assert text.count(f"include_router(_fresh_router({name}))") == 1, name
 
 
 def check_no_artifacts() -> None:
@@ -157,7 +159,7 @@ def main() -> None:
     print("Project check: OK")
     print(f"Python files parsed: {count}")
     print("Local imports: verified")
-    print("Router registry: clean")
+    print("Router registry: isolated and clean")
     print("Development artifacts: removed")
     print("Admin UI registry: synchronized")
     print("Runtime and security guards: verified")
