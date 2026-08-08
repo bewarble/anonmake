@@ -20,7 +20,7 @@ class BotInstance(Base):
     )
     display_name: Mapped[str] = mapped_column(String(96), nullable=False)
     runtime_mode: Mapped[str] = mapped_column(
-        String(24), nullable=False, default="external", server_default="external", index=True
+        String(24), nullable=False, default="managed", server_default="managed", index=True
     )
     telegram_bot_id: Mapped[int | None] = mapped_column(BigInteger)
     token_encrypted: Mapped[str | None] = mapped_column(Text)
