@@ -60,9 +60,9 @@ def main() -> None:
         "router.include_router(_fresh_router(navigation_fallback_router))",
     )
     require("app/managed_bots.py", "dispatcher.include_router(build_router())")
-    require("Makefile", "docker-up:", "$(COMPOSE) up -d --build", "restart bot bot-two bot-three bot-four managed-bots")
-    reject("Makefile", "docker-up-multibot", "--profile multibot")
-    reject("compose.yaml", 'profiles: ["multibot"]')
+    require("Makefile", "docker-up:", "$(COMPOSE) up -d --build --remove-orphans", "restart managed-bots web worker delivery-worker broadcast-worker")
+    reject("Makefile", "docker-up-multibot", "--profile multibot", "restart bot bot-two bot-three bot-four")
+    reject("compose.yaml", 'profiles: ["multibot"]', "  bot-two:", "  bot-three:", "  bot-four:")
     require("app/core/texts.py", "UNKNOWN_INPUT")
     reject("app/core/texts.py", "/menu", "/help", "отменить текущее действие", "PERSONAL_LINK_SHARE")
     assert not list((ROOT / "migrations/versions").glob("*stage_58*"))
@@ -70,7 +70,7 @@ def main() -> None:
     print("/start installs the persistent one-action reply keyboard")
     print("Personal-link cards expose native copy and exact Telegram share text")
     print("Managed bot instances use isolated copies of the shared router tree")
-    print("Single docker-up path rebuilds all bot services")
+    print("Single docker-up path rebuilds the unified managed bot runtime")
     print("/cancel remains reserved for subscription auto-renew cancellation in every FSM state")
     print("No Stage 58 migration required")
 
