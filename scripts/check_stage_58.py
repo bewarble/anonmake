@@ -55,7 +55,9 @@ def main() -> None:
         "app/bot/handlers/__init__.py",
         "navigation_router",
         "navigation_fallback_router",
-        "router.include_router(navigation_fallback_router)",
+        "def _fresh_router(router: Router) -> Router:",
+        "return deepcopy(router)",
+        "router.include_router(_fresh_router(navigation_fallback_router))",
     )
     require("app/managed_bots.py", "dispatcher.include_router(build_router())")
     require("Makefile", "docker-up:", "$(COMPOSE) up -d --build", "restart bot bot-two bot-three bot-four managed-bots")
@@ -67,7 +69,7 @@ def main() -> None:
     print("Stage 58 check: OK")
     print("/start installs the persistent one-action reply keyboard")
     print("Personal-link cards expose native copy and exact Telegram share text")
-    print("Shared router is used by managed bot instances")
+    print("Managed bot instances use isolated copies of the shared router tree")
     print("Single docker-up path rebuilds all bot services")
     print("/cancel remains reserved for subscription auto-renew cancellation in every FSM state")
     print("No Stage 58 migration required")
