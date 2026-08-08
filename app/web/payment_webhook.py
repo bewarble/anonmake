@@ -64,7 +64,14 @@ async def impaya_webhook(payload: WebhookPayload, request: Request, x_webhook_se
     operation_id = await _operation_id(payload, request)
     async with SessionFactory() as session:
         bot_id, checkout = await _owner_for_operation(session, operation_id)
-        config = await load_impaya_config(session, settings, bot_id)
+        # Disabling a gateway blocks new charges, but callbacks for transactions
+        # created before the switch must still authenticate and finalize.
+        config = await load_impaya_config(
+            session,
+            settings,
+            bot_id,
+            allow_inactive=True,
+        )
         _verify_project_secret(x_webhook_secret, config.webhook_secret)
         if checkout is not None:
             result = await finalize_checkout_and_notify(
