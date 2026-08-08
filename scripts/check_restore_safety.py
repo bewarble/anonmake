@@ -9,7 +9,9 @@ def main() -> None:
     source = (ROOT / "scripts/restore_database.py").read_text(encoding="utf-8")
 
     assert "POSTGRES_CUSTOM_MAGIC" in source
+    assert 'BACKUPS_ROOT = ROOT / "backups"' in source
     assert "relative_to(allowed_root)" in source
+    assert "SAFE_DATABASE_NAME" in source
     assert "--confirm" in source
     assert "validate_restore_in_temporary_database(path)" in source
     assert 'backup_database(f"restore-{timestamp}")' in source
@@ -22,14 +24,21 @@ def main() -> None:
     assert 'compose("up"' not in source
 
     scheduled = (ROOT / "scripts/backup_postgres.sh").read_text(encoding="utf-8")
-    assert "gzip -t" in scheduled
-    assert 'mv "$TMP_GZ" "$FILE"' in scheduled
+    assert 'FILE="$BACKUP_DIR/anonmake-$TIMESTAMP.dump"' in scheduled
+    assert "--format=custom" in scheduled
+    assert "pg_restore --list" in scheduled
+    assert '"PGDMP"' in scheduled
+    assert 'mv "$TMP" "$FILE"' in scheduled
+
+    compose_backup = (ROOT / "compose.backup.yaml").read_text(encoding="utf-8")
+    assert "./backups/scheduled:/backups" in compose_backup
 
     deploy = (ROOT / "scripts/deploy.py").read_text(encoding="utf-8")
     assert "POSTGRES_CUSTOM_MAGIC = b\"PGDMP\"" in deploy
     assert "backup_database(timestamp)" in deploy
 
     print("Database restore safety check: OK")
+    print("Deploy and scheduled backups use PostgreSQL custom format")
     print("Restore validates dump in an isolated database before production replacement")
     print("A fresh pre-restore backup is mandatory")
     print("Application services remain stopped after destructive restore")
