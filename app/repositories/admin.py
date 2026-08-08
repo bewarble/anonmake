@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bot_context import require_current_bot
 from app.models import Answer, Question, User
 from app.models.admin import AdminAuditLog
 from app.models.billing import PaymentAttempt, Subscription
@@ -15,23 +16,47 @@ class AdminRepository:
         self.session = session
 
     async def dashboard(self) -> dict[str, int]:
+        bot_id = require_current_bot().id
         now = datetime.now(timezone.utc)
         day_ago = now - timedelta(days=1)
+        bot_users = select(User.id).where(User.bot_id == bot_id)
 
-        users = await self.session.scalar(select(func.count(User.id)))
-        questions = await self.session.scalar(select(func.count(Question.id)))
-        answers = await self.session.scalar(select(func.count(Answer.id)))
+        users = await self.session.scalar(
+            select(func.count(User.id)).where(User.bot_id == bot_id)
+        )
+        questions = await self.session.scalar(
+            select(func.count(Question.id)).where(
+                Question.sender_id.in_(bot_users),
+                Question.recipient_id.in_(bot_users),
+            )
+        )
+        answers = await self.session.scalar(
+            select(func.count(Answer.id))
+            .join(Question, Answer.question_id == Question.id)
+            .where(
+                Question.sender_id.in_(bot_users),
+                Question.recipient_id.in_(bot_users),
+            )
+        )
         vip = await self.session.scalar(
             select(func.count(Subscription.id)).where(
+                Subscription.bot_id == bot_id,
                 Subscription.access_until.is_not(None),
                 Subscription.access_until > now,
             )
         )
         new_users = await self.session.scalar(
-            select(func.count(User.id)).where(User.created_at >= day_ago)
+            select(func.count(User.id)).where(
+                User.bot_id == bot_id,
+                User.created_at >= day_ago,
+            )
         )
         new_questions = await self.session.scalar(
-            select(func.count(Question.id)).where(Question.created_at >= day_ago)
+            select(func.count(Question.id)).where(
+                Question.sender_id.in_(bot_users),
+                Question.recipient_id.in_(bot_users),
+                Question.created_at >= day_ago,
+            )
         )
 
         return {
@@ -44,24 +69,29 @@ class AdminRepository:
         }
 
     async def payments(self) -> dict[str, int]:
+        bot_id = require_current_bot().id
         success_amount = await self.session.scalar(
             select(func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0)).where(
-                PaymentAttempt.status == "success"
+                PaymentAttempt.bot_id == bot_id,
+                PaymentAttempt.status == "success",
             )
         )
         success_count = await self.session.scalar(
             select(func.count(PaymentAttempt.id)).where(
-                PaymentAttempt.status == "success"
+                PaymentAttempt.bot_id == bot_id,
+                PaymentAttempt.status == "success",
             )
         )
         failed_count = await self.session.scalar(
             select(func.count(PaymentAttempt.id)).where(
-                PaymentAttempt.status == "failed"
+                PaymentAttempt.bot_id == bot_id,
+                PaymentAttempt.status == "failed",
             )
         )
         pending_count = await self.session.scalar(
             select(func.count(PaymentAttempt.id)).where(
-                PaymentAttempt.status == "pending"
+                PaymentAttempt.bot_id == bot_id,
+                PaymentAttempt.status == "pending",
             )
         )
         return {
@@ -72,36 +102,41 @@ class AdminRepository:
         }
 
     async def find_user(self, query: str) -> User | None:
-        normalized = query.strip()
-        if normalized.startswith("@"):
-            normalized = normalized[1:]
-
+        bot_id = require_current_bot().id
+        normalized = query.strip().lstrip("@")
         conditions = [func.lower(User.username) == normalized.casefold()]
         if normalized.isdigit():
             conditions.extend(
-                [
-                    User.telegram_id == int(normalized),
-                    User.id == int(normalized),
-                ]
+                [User.telegram_id == int(normalized), User.id == int(normalized)]
             )
-
         result = await self.session.execute(
-            select(User).where(or_(*conditions)).limit(1)
+            select(User).where(User.bot_id == bot_id, or_(*conditions)).limit(1)
         )
         return result.scalar_one_or_none()
 
     async def subscription_for_user(self, user_id: int) -> Subscription | None:
+        bot_id = require_current_bot().id
         result = await self.session.execute(
-            select(Subscription).where(Subscription.user_id == user_id)
+            select(Subscription).where(
+                Subscription.bot_id == bot_id,
+                Subscription.user_id == user_id,
+            )
         )
         return result.scalar_one_or_none()
 
     async def grant_vip(self, user_id: int, days: int) -> Subscription:
+        bot_id = require_current_bot().id
+        user = await self.session.scalar(
+            select(User).where(User.id == user_id, User.bot_id == bot_id)
+        )
+        if user is None:
+            raise ValueError("User does not belong to the current bot")
+
         now = datetime.now(timezone.utc)
         subscription = await self.subscription_for_user(user_id)
-
         if subscription is None:
             subscription = Subscription(
+                bot_id=bot_id,
                 user_id=user_id,
                 status="admin_granted",
                 auto_renew=False,
@@ -128,7 +163,6 @@ class AdminRepository:
         subscription = await self.subscription_for_user(user_id)
         if subscription is None:
             return None
-
         subscription.access_until = datetime.now(timezone.utc)
         subscription.auto_renew = False
         subscription.next_charge_at = None
@@ -144,18 +178,25 @@ class AdminRepository:
         target: str | None = None,
         details: str | None = None,
     ) -> None:
+        bot = require_current_bot()
+        scoped_details = f"bot_id={bot.id};bot_code={bot.code}"
+        if details:
+            scoped_details += f";{details}"
         self.session.add(
             AdminAuditLog(
                 admin_telegram_id=admin_telegram_id,
                 action=action,
                 target=target,
-                details=details,
+                details=scoped_details,
             )
         )
 
     async def recent_audit(self, limit: int = 10) -> list[AdminAuditLog]:
+        bot = require_current_bot()
+        prefix = f"bot_id={bot.id};bot_code={bot.code}%"
         result = await self.session.execute(
             select(AdminAuditLog)
+            .where(AdminAuditLog.details.like(prefix))
             .order_by(AdminAuditLog.created_at.desc())
             .limit(limit)
         )
