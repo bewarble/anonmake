@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
+from app.core.bot_context import require_current_bot
 from app.models.question import Question
+from app.models.user import User
 
 
 class QuestionRepository:
@@ -21,6 +23,16 @@ class QuestionRepository:
         media_file_id: str | None = None,
         media_caption: str | None = None,
     ) -> Question:
+        bot_id = require_current_bot().id
+        sender = await self.session.scalar(
+            select(User).where(User.id == sender_id, User.bot_id == bot_id)
+        )
+        recipient = await self.session.scalar(
+            select(User).where(User.id == recipient_id, User.bot_id == bot_id)
+        )
+        if sender is None or recipient is None:
+            raise ValueError("Question participants must belong to the current bot")
+
         question = Question(
             sender_id=sender_id,
             recipient_id=recipient_id,
@@ -39,9 +51,18 @@ class QuestionRepository:
         *,
         for_update: bool = False,
     ) -> Question | None:
+        bot_id = require_current_bot().id
+        sender = aliased(User)
+        recipient = aliased(User)
         statement = (
             select(Question)
-            .where(Question.id == question_id)
+            .join(sender, Question.sender_id == sender.id)
+            .join(recipient, Question.recipient_id == recipient.id)
+            .where(
+                Question.id == question_id,
+                sender.bot_id == bot_id,
+                recipient.bot_id == bot_id,
+            )
             .options(
                 selectinload(Question.sender),
                 selectinload(Question.recipient),
