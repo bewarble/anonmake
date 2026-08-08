@@ -16,6 +16,7 @@ from app.repositories import QuestionRepository, UserRepository
 from app.services.bot_credentials import resolve_bot_token
 from app.services.crm_tracking import CrmTrackingService
 from app.services.impaya import ImpayaClient
+from app.services.impaya_factory import create_impaya_client, load_impaya_config
 from app.services.reveal_checkout import RevealCheckoutService
 from app.services.sender_identity import resolve_current_sender
 
@@ -32,10 +33,12 @@ async def finalize_checkout_and_notify(
 ) -> str:
     """Finalize a reveal payment in the bot/project that owns the checkout.
 
-    `bot` is kept in the signature for compatibility with the existing web callback
-    layer. Delivery intentionally uses a bot resolved from checkout ownership.
+    ``bot``, ``client`` and the template argument remain in the signature for
+    callback compatibility. The authoritative Telegram token and Impaya gateway
+    are resolved from checkout ownership so one project can never finalize or
+    notify through another project's credentials.
     """
-    del bot
+    del bot, client, payment_form_url_template
     settings = load_settings()
 
     buyer_row = await session.get(User, checkout.buyer_id)
@@ -51,15 +54,17 @@ async def finalize_checkout_and_notify(
         return "notification_failed"
 
     token = await resolve_bot_token(session, settings, instance)
+    impaya_config = await load_impaya_config(session, settings, instance.id)
     runtime_bot = Bot(token=token)
+    runtime_client = create_impaya_client(impaya_config)
     context_token = set_current_bot(
         CurrentBot(instance.id, instance.code, instance.username, instance.display_name)
     )
     try:
         paid = await RevealCheckoutService(
             session,
-            client,
-            payment_form_url_template=payment_form_url_template,
+            runtime_client,
+            payment_form_url_template=impaya_config.payment_form_url_template,
             trial_amount=settings.trial_price_kopecks,
             trial_duration=timedelta(hours=settings.trial_duration_hours),
         ).finalize(checkout, user_id=checkout.buyer_id)
@@ -124,4 +129,5 @@ async def finalize_checkout_and_notify(
         return "notified"
     finally:
         reset_current_bot(context_token)
+        await runtime_client.close()
         await runtime_bot.session.close()
