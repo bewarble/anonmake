@@ -34,6 +34,10 @@ def main() -> None:
 
     repository = function_source("app/repositories/platform_admin.py", "admin_count")
     assert "func.count(AdminUser.id)" in repository
+    roster_lock = function_source("app/repositories/platform_admin.py", "lock_superadmin_roster")
+    assert "AdminUser.role == 'superadmin'" in roster_lock
+    assert "AdminUser.is_active.is_(True)" in roster_lock
+    assert "with_for_update" in roster_lock
 
     scope = function_source("app/web/admin_scope.py", "load_admin_bot_scope")
     assert "principal.admin_id is None" in scope
@@ -64,6 +68,10 @@ def main() -> None:
     assert "app.router.routes[:]" in installer
     assert "secure_admin_login_installed" in installer
 
+    platform = "app/web/admin_platform.py"
+    assert "await repo.lock_superadmin_roster()" in function_source(platform, "update_admin_account")
+    assert "await repo.lock_superadmin_roster()" in function_source(platform, "delete_admin_account")
+
     system = (ROOT / "app/web/admin_system.py").read_text(encoding="utf-8")
     assert "from app.web.admin_login_security import install_secure_admin_login" in system
     assert "install_secure_admin_login(web_app)" in system
@@ -74,6 +82,7 @@ def main() -> None:
     print("Unknown DB usernames pay a dummy PBKDF2 verification cost")
     print("Redis-backed per-user and per-IP login rate limits are installed")
     print("DB admin sessions are bound to the current password hash")
+    print("Active superadmin roster mutations are row-lock serialized")
 
 
 if __name__ == "__main__":
