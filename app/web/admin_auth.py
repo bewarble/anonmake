@@ -19,6 +19,11 @@ DUMMY_PASSWORD_HASH = (
     "pbkdf2_sha256$310000$YW5vbm1ha2UtYWRtaW4tZHVtbXk=$"
     "zkPEwbUk5cc-1vtbQhwIMQYWCz34za55hLx-A7_Oz_U="
 )
+BOOTSTRAP_CREDENTIAL_STAMP = "bootstrap"
+
+
+def password_fingerprint(password_hash: str) -> str:
+    return hashlib.sha256(password_hash.encode("utf-8")).hexdigest()[:24]
 
 
 @dataclass(slots=True, frozen=True)
@@ -26,6 +31,7 @@ class AdminSession:
     admin_id: int | None
     username: str
     role: str
+    credential_stamp: str
     issued_at: datetime
     expires_at: datetime
 
@@ -63,11 +69,13 @@ class AdminAuth:
             if admin is not None:
                 password_ok = verify_password(password, admin.password_hash)
                 if password_ok:
+                    credential_stamp = password_fingerprint(admin.password_hash)
                     await repo.mark_login(admin)
                     return AdminSession(
                         admin_id=admin.id,
                         username=admin.email,
                         role=admin.role,
+                        credential_stamp=credential_stamp,
                         issued_at=now,
                         expires_at=now,
                     )
@@ -89,6 +97,7 @@ class AdminAuth:
                 admin_id=None,
                 username=self.settings.web_admin_username.strip(),
                 role="superadmin",
+                credential_stamp=BOOTSTRAP_CREDENTIAL_STAMP,
                 issued_at=now,
                 expires_at=now,
             )
@@ -104,7 +113,8 @@ class AdminAuth:
         admin_id = principal.admin_id or 0
         payload = (
             f"{admin_id}|{principal.username}|{principal.role}|"
-            f"{int(issued_at.timestamp())}|{int(expires_at.timestamp())}|{nonce}"
+            f"{principal.credential_stamp}|{int(issued_at.timestamp())}|"
+            f"{int(expires_at.timestamp())}|{nonce}"
         )
         return f"{payload}|{self._sign(payload)}"
 
@@ -116,14 +126,15 @@ class AdminAuth:
                 admin_raw,
                 username,
                 role,
+                credential_stamp,
                 issued_raw,
                 expires_raw,
                 nonce,
                 signature,
-            ) = token.split("|", 6)
+            ) = token.split("|", 7)
             payload = (
-                f"{admin_raw}|{username}|{role}|{issued_raw}|"
-                f"{expires_raw}|{nonce}"
+                f"{admin_raw}|{username}|{role}|{credential_stamp}|"
+                f"{issued_raw}|{expires_raw}|{nonce}"
             )
             if not hmac.compare_digest(signature, self._sign(payload)):
                 return None
@@ -139,6 +150,7 @@ class AdminAuth:
             admin_id=admin_id,
             username=username,
             role=role,
+            credential_stamp=credential_stamp,
             issued_at=issued_at,
             expires_at=expires_at,
         )
