@@ -52,8 +52,9 @@ class SourceDetails:
 
 
 class WebCrmRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, bot_id: int | None = None) -> None:
         self.session = session
+        self.bot_id = bot_id
 
     @staticmethod
     def permanent_error_condition():
@@ -66,15 +67,18 @@ class WebCrmRepository:
         start = (now - timedelta(days=days - 1)).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
+        failure_filters = [
+            DeliveryOutbox.status == "failed",
+            self.permanent_error_condition(),
+        ]
+        if self.bot_id is not None:
+            failure_filters.append(DeliveryOutbox.bot_id == self.bot_id)
         first_failure = (
             select(
                 DeliveryOutbox.chat_id.label("chat_id"),
                 func.min(DeliveryOutbox.updated_at).label("blocked_at"),
             )
-            .where(
-                DeliveryOutbox.status == "failed",
-                self.permanent_error_condition(),
-            )
+            .where(*failure_filters)
             .group_by(DeliveryOutbox.chat_id)
             .subquery()
         )
@@ -84,13 +88,23 @@ class WebCrmRepository:
             left = start + timedelta(days=offset)
             right = left + timedelta(days=1)
 
+            registration_filters = [
+                User.created_at >= left,
+                User.created_at < right,
+            ]
+            revenue_filters = [
+                PaymentAttempt.status.in_(SUCCESS_STATUSES),
+                PaymentAttempt.created_at >= left,
+                PaymentAttempt.created_at < right,
+            ]
+            if self.bot_id is not None:
+                registration_filters.append(User.bot_id == self.bot_id)
+                revenue_filters.append(PaymentAttempt.bot_id == self.bot_id)
             registrations = int(
                 await self.session.scalar(
-                    select(func.count(User.id)).where(
-                        User.created_at >= left,
-                        User.created_at < right,
-                    )
-                ) or 0
+                    select(func.count(User.id)).where(*registration_filters)
+                )
+                or 0
             )
             blocked = int(
                 await self.session.scalar(
@@ -98,17 +112,15 @@ class WebCrmRepository:
                         first_failure.c.blocked_at >= left,
                         first_failure.c.blocked_at < right,
                     )
-                ) or 0
+                )
+                or 0
             )
             revenue = int(
                 await self.session.scalar(
                     select(func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0))
-                    .where(
-                        PaymentAttempt.status.in_(SUCCESS_STATUSES),
-                        PaymentAttempt.created_at >= left,
-                        PaymentAttempt.created_at < right,
-                    )
-                ) or 0
+                    .where(*revenue_filters)
+                )
+                or 0
             )
             points.append(
                 ChartPoint(
@@ -132,6 +144,8 @@ class WebCrmRepository:
     ) -> tuple[list[CrmUserRow], int]:
         now = datetime.now(timezone.utc)
         filters = []
+        if self.bot_id is not None:
+            filters.append(User.bot_id == self.bot_id)
         cleaned = query.strip().lstrip("@")
 
         if cleaned:
@@ -152,15 +166,15 @@ class WebCrmRepository:
                 )
 
         vip_subscription = aliased(Subscription)
-
+        vip_filters = [
+            vip_subscription.user_id == User.id,
+            vip_subscription.access_until.is_not(None),
+            vip_subscription.access_until > now,
+        ]
+        if self.bot_id is not None:
+            vip_filters.append(vip_subscription.bot_id == self.bot_id)
         active_vip = exists(
-            select(vip_subscription.id)
-            .select_from(vip_subscription)
-            .where(
-                vip_subscription.user_id == User.id,
-                vip_subscription.access_until.is_not(None),
-                vip_subscription.access_until > now,
-            )
+            select(vip_subscription.id).select_from(vip_subscription).where(*vip_filters)
         )
         if vip == "active":
             filters.append(active_vip)
@@ -168,20 +182,20 @@ class WebCrmRepository:
             filters.append(~active_vip)
 
         failed_delivery = aliased(DeliveryOutbox)
-
+        dead_filters = [
+            failed_delivery.chat_id == User.telegram_id,
+            failed_delivery.status == "failed",
+            or_(
+                *(
+                    failed_delivery.last_error.ilike(pattern)
+                    for pattern in PERMANENT_ERRORS
+                )
+            ),
+        ]
+        if self.bot_id is not None:
+            dead_filters.append(failed_delivery.bot_id == self.bot_id)
         dead_user = exists(
-            select(failed_delivery.id)
-            .select_from(failed_delivery)
-            .where(
-                failed_delivery.chat_id == User.telegram_id,
-                failed_delivery.status == "failed",
-                or_(
-                    *(
-                        failed_delivery.last_error.ilike(pattern)
-                        for pattern in PERMANENT_ERRORS
-                    )
-                ),
-            )
+            select(failed_delivery.id).select_from(failed_delivery).where(*dead_filters)
         )
         if health == "alive":
             filters.append(~dead_user)
@@ -190,25 +204,40 @@ class WebCrmRepository:
 
         if source_id is not None:
             source_attribution_filter = aliased(SourceAttribution)
-
-            filters.append(
-                exists(
-                    select(source_attribution_filter.id)
-                    .select_from(source_attribution_filter)
-                    .where(
-                        source_attribution_filter.user_id == User.id,
-                        source_attribution_filter.source_id == source_id,
-                    )
+            source_filter = exists(
+                select(TrafficSource.id).where(
+                    TrafficSource.id == source_id,
+                    *(
+                        [TrafficSource.bot_id == self.bot_id]
+                        if self.bot_id is not None
+                        else []
+                    ),
+                )
+            )
+            filters.extend(
+                (
+                    source_filter,
+                    exists(
+                        select(source_attribution_filter.id)
+                        .select_from(source_attribution_filter)
+                        .where(
+                            source_attribution_filter.user_id == User.id,
+                            source_attribution_filter.source_id == source_id,
+                        )
+                    ),
                 )
             )
 
         total = int(
-            await self.session.scalar(
-                select(func.count(User.id)).where(*filters)
-            ) or 0
+            await self.session.scalar(select(func.count(User.id)).where(*filters)) or 0
         )
 
         source_name = TrafficSource.name.label("source_name")
+        subscription_join = Subscription.user_id == User.id
+        source_join = TrafficSource.id == SourceAttribution.source_id
+        if self.bot_id is not None:
+            subscription_join = subscription_join & (Subscription.bot_id == self.bot_id)
+            source_join = source_join & (TrafficSource.bot_id == self.bot_id)
         result = await self.session.execute(
             select(
                 User.id,
@@ -220,9 +249,9 @@ class WebCrmRepository:
                 source_name,
                 dead_user.label("is_dead"),
             )
-            .outerjoin(Subscription, Subscription.user_id == User.id)
+            .outerjoin(Subscription, subscription_join)
             .outerjoin(SourceAttribution, SourceAttribution.user_id == User.id)
-            .outerjoin(TrafficSource, TrafficSource.id == SourceAttribution.source_id)
+            .outerjoin(TrafficSource, source_join)
             .where(*filters)
             .order_by(User.id.desc())
             .offset(page * page_size)
@@ -244,22 +273,28 @@ class WebCrmRepository:
         return rows, total
 
     async def sources(self) -> list[TrafficSource]:
-        result = await self.session.execute(
-            select(TrafficSource).order_by(TrafficSource.id.desc())
-        )
+        query = select(TrafficSource)
+        if self.bot_id is not None:
+            query = query.where(TrafficSource.bot_id == self.bot_id)
+        result = await self.session.execute(query.order_by(TrafficSource.id.desc()))
         return list(result.scalars())
 
     async def user_timeline(self, user_id: int, limit: int = 100) -> list[CrmEvent]:
+        query = select(CrmEvent).join(User, User.id == CrmEvent.user_id).where(
+            CrmEvent.user_id == user_id
+        )
+        if self.bot_id is not None:
+            query = query.where(User.bot_id == self.bot_id)
         result = await self.session.execute(
-            select(CrmEvent)
-            .where(CrmEvent.user_id == user_id)
-            .order_by(CrmEvent.occurred_at.desc(), CrmEvent.id.desc())
-            .limit(limit)
+            query.order_by(CrmEvent.occurred_at.desc(), CrmEvent.id.desc()).limit(limit)
         )
         return list(result.scalars())
 
     async def source_details(self, source_id: int) -> SourceDetails | None:
-        source = await self.session.get(TrafficSource, source_id)
+        source_query = select(TrafficSource).where(TrafficSource.id == source_id)
+        if self.bot_id is not None:
+            source_query = source_query.where(TrafficSource.bot_id == self.bot_id)
+        source = await self.session.scalar(source_query)
         if source is None:
             return None
 
@@ -268,7 +303,8 @@ class WebCrmRepository:
                 select(func.count(SourceAttribution.id)).where(
                     SourceAttribution.source_id == source.id
                 )
-            ) or 0
+            )
+            or 0
         )
         active_users_30d = int(
             await self.session.scalar(
@@ -278,19 +314,25 @@ class WebCrmRepository:
                     SourceAttribution.source_id == source.id,
                     CrmEvent.occurred_at >= datetime.now(timezone.utc) - timedelta(days=30),
                 )
-            ) or 0
+            )
+            or 0
         )
         now = datetime.now(timezone.utc)
         vip_users = int(
             await self.session.scalar(
                 select(func.count(func.distinct(SourceAttribution.user_id)))
-                .join(Subscription, Subscription.user_id == SourceAttribution.user_id)
+                .join(
+                    Subscription,
+                    (Subscription.user_id == SourceAttribution.user_id)
+                    & (Subscription.bot_id == source.bot_id),
+                )
                 .where(
                     SourceAttribution.source_id == source.id,
                     Subscription.access_until.is_not(None),
                     Subscription.access_until > now,
                 )
-            ) or 0
+            )
+            or 0
         )
         return SourceDetails(
             source=source,
@@ -302,9 +344,15 @@ class WebCrmRepository:
         )
 
     async def broadcasts(self, page: int, page_size: int):
-        total = int(await self.session.scalar(select(func.count(Broadcast.id))) or 0)
+        filters = []
+        if self.bot_id is not None:
+            filters.append(Broadcast.bot_id == self.bot_id)
+        total = int(
+            await self.session.scalar(select(func.count(Broadcast.id)).where(*filters)) or 0
+        )
         result = await self.session.execute(
             select(Broadcast)
+            .where(*filters)
             .order_by(Broadcast.id.desc())
             .offset(page * page_size)
             .limit(page_size)
