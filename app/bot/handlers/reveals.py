@@ -19,7 +19,11 @@ from app.repositories import QuestionRepository, UserRepository
 from app.repositories.billing import BillingRepository
 from app.repositories.reveals import RevealRepository
 from app.services.crm_tracking import CrmTrackingService
-from app.services.impaya_factory import create_impaya_client, load_impaya_config
+from app.services.impaya_factory import (
+    PaymentGatewayDisabledError,
+    create_impaya_client,
+    load_impaya_config,
+)
 from app.services.reveal_checkout import RevealCheckoutService
 from app.services.sender_identity import resolve_current_sender
 from app.services.vip import has_active_vip
@@ -206,7 +210,12 @@ async def confirm_reveal(
         return
 
     current_bot = require_current_bot()
-    impaya_config = await load_impaya_config(session, settings, current_bot.id)
+    try:
+        impaya_config = await load_impaya_config(session, settings, current_bot.id)
+    except PaymentGatewayDisabledError:
+        await callback.answer(texts.VIP_PAYMENT_UNAVAILABLE, show_alert=True)
+        return
+
     if (
         not impaya_config.api_token.strip()
         or not impaya_config.payment_form_url_template.strip()
