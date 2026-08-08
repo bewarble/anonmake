@@ -23,6 +23,33 @@ def generate_public_code() -> str:
     )
 
 
+class UserPublicCodeAlias(Base):
+    __tablename__ = "user_public_code_aliases"
+    __table_args__ = (
+        UniqueConstraint(
+            "bot_id",
+            "public_code",
+            name="uq_user_public_code_alias_bot_code",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    bot_id: Mapped[int] = mapped_column(
+        ForeignKey("bot_instances.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    public_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
