@@ -64,12 +64,22 @@ def main() -> None:
     assert '"admin_primary"' in service_text
     assert '"admin_fallback"' in service_text
 
+    test_charge = function_source("app/bot/handlers/recurrent_test.py", "confirm_test_charge")
+    assert "load_impaya_config" in test_charge
+    assert "subscription.bot_id" in test_charge
+    assert "create_impaya_client" in test_charge
+    assert "try_subscription_lock(subscription.id)" in test_charge
+    assert "release_subscription_lock(subscription.id)" in test_charge
+    assert "session.refresh(subscription)" in test_charge
+    assert "session.refresh(method)" in test_charge
+
     print("Billing concurrency and pending recovery check: OK")
     print("Cancel mutation serializes with recurrent worker")
     print("Post-charge refresh prevents stale subscription overwrite")
     print("Late recurrent success preserves explicit auto-renew cancellation")
     print("Pending automatic/manual/test charge is recovered before a new cycle")
     print("Late admin_primary confirmation keeps the primary access period")
+    print("Telegram test MIT charge uses owning gateway and subscription lock")
 
 
 if __name__ == "__main__":
