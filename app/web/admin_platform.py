@@ -158,6 +158,10 @@ async def update_admin_account(
 
     async with SessionFactory() as session:
         repo = PlatformAdminRepository(session)
+        # Serialize every roster mutation before reading the target. Without
+        # this two concurrent superadmins could both observe count=2 and remove
+        # each other, leaving the platform with no active superadmin.
+        await repo.lock_superadmin_roster()
         admin = await repo.admin_by_id(admin_id)
         if admin is None:
             raise HTTPException(status_code=404, detail="Аккаунт не найден")
@@ -210,6 +214,7 @@ async def delete_admin_account(request: Request, admin_id: int):
 
     async with SessionFactory() as session:
         repo = PlatformAdminRepository(session)
+        await repo.lock_superadmin_roster()
         admin = await repo.admin_by_id(admin_id)
         if admin is None:
             raise HTTPException(status_code=404, detail="Аккаунт не найден")
