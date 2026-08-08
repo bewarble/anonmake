@@ -100,15 +100,28 @@ class MarketingRepository:
                 ) or 0
             )
 
-        active_cards = int(
+        total_cards = int(
             await self.session.scalar(
-                select(func.count(PaymentMethod.id)).where(
+                select(func.count(func.distinct(PaymentMethod.user_id))).where(
                     PaymentMethod.bot_id == bot_id,
                     PaymentMethod.user_id.in_(attributed_users),
-                    PaymentMethod.is_active.is_(True),
-                    PaymentMethod.is_recurrent.is_(True),
                     PaymentMethod.binding_id.is_not(None),
-                    PaymentMethod.blocked_at.is_(None),
+                )
+            ) or 0
+        )
+        active_cards = int(
+            await self.session.scalar(
+                select(func.count(func.distinct(PaymentMethod.user_id)))
+                .join(
+                    Subscription,
+                    (Subscription.bot_id == PaymentMethod.bot_id)
+                    & (Subscription.user_id == PaymentMethod.user_id),
+                )
+                .where(
+                    PaymentMethod.bot_id == bot_id,
+                    PaymentMethod.user_id.in_(attributed_users),
+                    PaymentMethod.binding_id.is_not(None),
+                    Subscription.auto_renew.is_(True),
                 )
             ) or 0
         )
@@ -125,6 +138,7 @@ class MarketingRepository:
             "spend_kopecks": source.spend_kopecks,
             "cpc_kopecks": cpc_kopecks,
             "cpa_kopecks": cpu_kopecks,
+            "total_cards": total_cards,
             "active_cards": active_cards,
             "conversion_percent": attributed / clicks * 100 if clicks else 0.0,
         }
