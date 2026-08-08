@@ -8,6 +8,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.bot_context import require_current_bot
+from app.models.bot_instance import BotInstance
 from app.models.delivery import DeliveryOutbox
 
 
@@ -76,10 +77,15 @@ class DeliveryRepository:
     ) -> list[DeliveryOutbox]:
         now = datetime.now(timezone.utc)
         stale_before = now - timedelta(seconds=stale_after_seconds)
+        deliverable_bot_ids = select(BotInstance.id).where(
+            BotInstance.is_active.is_(True),
+            BotInstance.is_maintenance.is_(False),
+        )
 
         statement = (
             select(DeliveryOutbox)
             .where(
+                DeliveryOutbox.bot_id.in_(deliverable_bot_ids),
                 DeliveryOutbox.status.in_(("pending", "retry")),
                 or_(
                     DeliveryOutbox.next_attempt_at.is_(None),
@@ -134,6 +140,20 @@ class DeliveryRepository:
         job.locked_at = None
         job.locked_by = None
         job.last_error = error[:1000]
+
+    async def mark_paused(
+        self,
+        job: DeliveryOutbox,
+        *,
+        reason: str,
+        delay_seconds: int = 30,
+    ) -> None:
+        """Return a claimed job to the queue without consuming a retry attempt."""
+        job.status = "retry"
+        job.next_attempt_at = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+        job.locked_at = None
+        job.locked_by = None
+        job.last_error = reason[:1000]
 
     async def mark_failed(
         self,
