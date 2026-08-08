@@ -10,6 +10,10 @@ from app.repositories.platform_admin import PlatformAdminRepository
 from app.services.impaya import ImpayaClient
 
 
+class PaymentGatewayDisabledError(RuntimeError):
+    """Raised when a project explicitly disabled its own payment gateway."""
+
+
 @dataclass(slots=True, frozen=True)
 class ImpayaRuntimeConfig:
     api_url: str
@@ -29,7 +33,19 @@ async def load_impaya_config(
     settings: Settings,
     bot_id: int,
 ) -> ImpayaRuntimeConfig:
-    item = await PlatformAdminRepository(session).gateway_for_bot(bot_id)
+    repo = PlatformAdminRepository(session)
+    item = await repo.gateway_for_bot_any(bot_id)
+
+    # A stored project gateway is authoritative. Disabling it must disable
+    # payments for that project rather than silently falling back to the
+    # platform-wide legacy IMPAYA_* credentials.
+    if item is not None and not item.is_active:
+        raise PaymentGatewayDisabledError(
+            f"Impaya gateway is disabled for bot_id={bot_id}"
+        )
+
+    # Legacy fallback is retained only for projects that have never received a
+    # per-project gateway configuration.
     if item is None:
         return ImpayaRuntimeConfig(
             api_url=settings.impaya_api_url,
