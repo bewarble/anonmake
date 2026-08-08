@@ -19,7 +19,14 @@ class UserRepository:
         self.session = session
 
     async def get_by_id(self, user_id: int) -> User | None:
-        return await self.session.get(User, user_id)
+        bot_id = require_current_bot().id
+        result = await self.session.execute(
+            select(User).where(
+                User.id == user_id,
+                User.bot_id == bot_id,
+            )
+        )
+        return result.scalar_one_or_none()
 
     async def get_by_telegram_id(self, telegram_id: int) -> User | None:
         bot_id = require_current_bot().id
