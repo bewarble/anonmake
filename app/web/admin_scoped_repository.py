@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import func, or_, select
 
 from app.models import Answer, Question, User
@@ -9,6 +11,7 @@ from app.models.delivery import DeliveryOutbox
 from app.models.marketing import SourceAttribution, TrafficSource
 from app.models.reveal import RevealCheckout
 from app.web.admin_repository import (
+    Dashboard,
     PERMANENT_DELIVERY_ERRORS,
     SUCCESS_PAYMENT_STATUSES,
     SourceRow,
@@ -28,6 +31,157 @@ class ScopedWebAdminRepository(WebAdminRepository):
     def __init__(self, session, *, bot_id: int | None) -> None:
         super().__init__(session)
         self.bot_id = bot_id
+
+    async def dashboard(self) -> Dashboard:
+        if self.bot_id is None:
+            return await super().dashboard()
+
+        now = datetime.now(timezone.utc)
+        day = now - timedelta(days=1)
+
+        users_total = int(
+            await self.session.scalar(
+                select(func.count(User.id)).where(User.bot_id == self.bot_id)
+            )
+            or 0
+        )
+        users_today = int(
+            await self.session.scalar(
+                select(func.count(User.id)).where(
+                    User.bot_id == self.bot_id,
+                    User.created_at >= day,
+                )
+            )
+            or 0
+        )
+        dead_condition = or_(
+            *(
+                DeliveryOutbox.last_error.ilike(pattern)
+                for pattern in PERMANENT_DELIVERY_ERRORS
+            )
+        )
+        users_dead = int(
+            await self.session.scalar(
+                select(func.count(func.distinct(User.id)))
+                .join(
+                    DeliveryOutbox,
+                    DeliveryOutbox.chat_id == User.telegram_id,
+                )
+                .where(
+                    User.bot_id == self.bot_id,
+                    DeliveryOutbox.bot_id == self.bot_id,
+                    DeliveryOutbox.status == "failed",
+                    dead_condition,
+                )
+            )
+            or 0
+        )
+        questions_today = int(
+            await self.session.scalar(
+                select(func.count(Question.id))
+                .join(User, User.id == Question.recipient_id)
+                .where(
+                    User.bot_id == self.bot_id,
+                    Question.created_at >= day,
+                )
+            )
+            or 0
+        )
+        answers_today = int(
+            await self.session.scalar(
+                select(func.count(Answer.id))
+                .join(Question, Question.id == Answer.question_id)
+                .join(User, User.id == Question.recipient_id)
+                .where(
+                    User.bot_id == self.bot_id,
+                    Answer.created_at >= day,
+                )
+            )
+            or 0
+        )
+        active_vip = int(
+            await self.session.scalar(
+                select(func.count(Subscription.id)).where(
+                    Subscription.bot_id == self.bot_id,
+                    Subscription.access_until.is_not(None),
+                    Subscription.access_until > now,
+                )
+            )
+            or 0
+        )
+        active_cards = int(
+            await self.session.scalar(
+                select(func.count(PaymentMethod.id)).where(
+                    PaymentMethod.bot_id == self.bot_id,
+                    PaymentMethod.is_active.is_(True),
+                    PaymentMethod.is_recurrent.is_(True),
+                    PaymentMethod.binding_id.is_not(None),
+                    PaymentMethod.blocked_at.is_(None),
+                )
+            )
+            or 0
+        )
+        revenue_today = int(
+            await self.session.scalar(
+                select(func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0)).where(
+                    PaymentAttempt.bot_id == self.bot_id,
+                    PaymentAttempt.status.in_(SUCCESS_PAYMENT_STATUSES),
+                    PaymentAttempt.created_at >= day,
+                )
+            )
+            or 0
+        )
+        revenue_total = int(
+            await self.session.scalar(
+                select(func.coalesce(func.sum(PaymentAttempt.amount_kopecks), 0)).where(
+                    PaymentAttempt.bot_id == self.bot_id,
+                    PaymentAttempt.status.in_(SUCCESS_PAYMENT_STATUSES),
+                )
+            )
+            or 0
+        )
+        delivery_pending = int(
+            await self.session.scalar(
+                select(func.count(DeliveryOutbox.id)).where(
+                    DeliveryOutbox.bot_id == self.bot_id,
+                    DeliveryOutbox.status.in_(("pending", "processing")),
+                )
+            )
+            or 0
+        )
+        delivery_failed = int(
+            await self.session.scalar(
+                select(func.count(DeliveryOutbox.id)).where(
+                    DeliveryOutbox.bot_id == self.bot_id,
+                    DeliveryOutbox.status == "failed",
+                )
+            )
+            or 0
+        )
+        active_sources = int(
+            await self.session.scalar(
+                select(func.count(TrafficSource.id)).where(
+                    TrafficSource.bot_id == self.bot_id,
+                    TrafficSource.is_active.is_(True),
+                )
+            )
+            or 0
+        )
+
+        return Dashboard(
+            users_total=users_total,
+            users_today=users_today,
+            users_dead=users_dead,
+            questions_today=questions_today,
+            answers_today=answers_today,
+            active_vip=active_vip,
+            active_cards=active_cards,
+            revenue_today_kopecks=revenue_today,
+            revenue_total_kopecks=revenue_total,
+            delivery_pending=delivery_pending,
+            delivery_failed=delivery_failed,
+            active_sources=active_sources,
+        )
 
     async def users(self, *, query: str, page: int, page_size: int):
         if self.bot_id is None:
