@@ -16,6 +16,7 @@ INSUFFICIENT_FUNDS_CODES = {"AMOUNT_EXCEED", "INSUFFICIENT_FUNDS", "NOT_ENOUGH_F
 BLOCKING_CODES = {"CARD_BLOCKED", "CARD_EXPIRED", "LOST_CARD", "STOLEN_CARD", "BINDING_INACTIVE", "PAYMENT_OPTION_DISABLED"}
 SUCCESS_STATES = {"COMPLETED", "CONFIRMED", "PAID", "SUCCESS", "SUCCEEDED", "CHARGED"}
 DUPLICATE_OPERATION_CODES = {"DUPLICATE_PROCESSING_ORDER_ID"}
+ZERO_TRANSACTION_IDS = {"", "00000000-0000-0000-0000-000000000000"}
 
 
 class ChargeDecision(StrEnum):
@@ -35,6 +36,17 @@ class ChargeResult:
     @property
     def successful(self) -> bool:
         return self.decision == ChargeDecision.SUCCESS
+
+
+def _transaction_id(data: dict, current: str | None = None) -> str | None:
+    transaction = data.get("transaction") or {}
+    value = transaction.get("transaction_id") or data.get("transaction_id")
+    if value is None:
+        return current
+    normalized = str(value).strip()
+    if normalized in ZERO_TRANSACTION_IDS:
+        return current
+    return normalized
 
 
 class BillingService:
@@ -57,11 +69,7 @@ class BillingService:
         self.fallback_amount = fallback_amount
         self.fallback_duration = fallback_duration
 
-    async def renew(
-        self,
-        subscription: Subscription,
-        method: PaymentMethod,
-    ) -> ChargeResult:
+    async def renew(self, subscription: Subscription, method: PaymentMethod) -> ChargeResult:
         cycle = datetime.now(timezone.utc).date().isoformat()
         primary = await self._charge(
             subscription,
@@ -114,20 +122,13 @@ class BillingService:
             return True, attempt, False
 
         result = await self.client.state(
-            customer_operation_id=customer_operation_id
+            customer_operation_id=customer_operation_id,
+            recurrent=True,
         )
         attempt.raw_response = json.dumps(result.data, ensure_ascii=False)
         transaction = result.data.get("transaction") or {}
-        state = str(
-            transaction.get("state")
-            or result.data.get("state")
-            or ""
-        ).upper()
-        attempt.transaction_id = (
-            transaction.get("transaction_id")
-            or result.data.get("transaction_id")
-            or attempt.transaction_id
-        )
+        state = str(transaction.get("state") or result.data.get("state") or "").upper()
+        attempt.transaction_id = _transaction_id(result.data, attempt.transaction_id)
 
         if not result.success or state not in SUCCESS_STATES:
             attempt.error_code = result.error_code
@@ -135,10 +136,7 @@ class BillingService:
             await self.session.commit()
             return False, attempt, False
 
-        subscription = await self.session.get(
-            Subscription,
-            attempt.subscription_id,
-        )
+        subscription = await self.session.get(Subscription, attempt.subscription_id)
         if subscription is None:
             return False, attempt, False
 
@@ -147,12 +145,7 @@ class BillingService:
             if attempt.attempt_kind in {"primary", "test_primary"}
             else self.fallback_duration
         )
-        self._mark_success(
-            subscription,
-            attempt,
-            period,
-            datetime.now(timezone.utc),
-        )
+        self._mark_success(subscription, attempt, period, datetime.now(timezone.utc))
         await self.session.commit()
         return True, attempt, True
 
@@ -165,7 +158,8 @@ class BillingService:
         now: datetime,
     ) -> ChargeResult:
         verification = await self.client.state(
-            customer_operation_id=attempt.customer_operation_id
+            customer_operation_id=attempt.customer_operation_id,
+            recurrent=True,
         )
         transaction = verification.data.get("transaction") or {}
         state = str(
@@ -177,19 +171,13 @@ class BillingService:
             {"state": verification.data},
             ensure_ascii=False,
         )
-        attempt.transaction_id = (
-            transaction.get("transaction_id")
-            or verification.data.get("transaction_id")
-            or attempt.transaction_id
+        attempt.transaction_id = _transaction_id(
+            verification.data,
+            attempt.transaction_id,
         )
 
         if verification.success and state in SUCCESS_STATES:
-            self._mark_success(
-                subscription,
-                attempt,
-                access_period,
-                now,
-            )
+            self._mark_success(subscription, attempt, access_period, now)
             await self.session.commit()
             return ChargeResult(
                 ChargeDecision.SUCCESS,
@@ -221,11 +209,7 @@ class BillingService:
         cycle: str,
     ) -> ChargeResult:
         now = datetime.now(timezone.utc)
-        existing = await self.repo.attempt(
-            subscription.id,
-            cycle,
-            kind,
-        )
+        existing = await self.repo.attempt(subscription.id, cycle, kind)
         if existing is not None:
             existing_code = (existing.error_code or "").upper()
             if (
@@ -271,7 +255,7 @@ class BillingService:
             merchant_user_id=method.merchant_user_id,
         )
         attempt.raw_response = json.dumps(result.data, ensure_ascii=False)
-        attempt.transaction_id = result.data.get("transaction_id")
+        attempt.transaction_id = _transaction_id(result.data, attempt.transaction_id)
 
         if result.success:
             return await self._recover_known_operation(
@@ -285,9 +269,6 @@ class BillingService:
         attempt.error_code = result.error_code
         attempt.error_message = result.error_message
 
-        # A duplicate operation id means Impaya has already accepted an operation
-        # with this id. Never create a fresh id and risk a double charge; recover
-        # the authoritative result via /state instead.
         if code in DUPLICATE_OPERATION_CODES:
             return await self._recover_known_operation(
                 subscription,
@@ -333,11 +314,7 @@ class BillingService:
             decision = ChargeDecision.RETRY_LATER
 
         await self.session.commit()
-        return ChargeResult(
-            decision,
-            attempt,
-            subscription.access_until,
-        )
+        return ChargeResult(decision, attempt, subscription.access_until)
 
     def _mark_success(
         self,
@@ -363,10 +340,7 @@ class BillingService:
         attempt.error_message = None
 
     @staticmethod
-    def _tomorrow(
-        subscription: Subscription,
-        now: datetime,
-    ) -> None:
+    def _tomorrow(subscription: Subscription, now: datetime) -> None:
         subscription.next_charge_at = now + timedelta(days=1)
 
     @staticmethod
