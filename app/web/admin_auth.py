@@ -62,11 +62,14 @@ class AdminAuth:
                     role=admin.role,
                     expires_at=datetime.now(timezone.utc),
                 )
+            admin_count = await repo.admin_count()
 
-        # Legacy bootstrap login remains available until the first DB account
-        # is created, preserving production compatibility.
+        # The environment bootstrap credential is a one-time bootstrap path.
+        # As soon as any DB administrator exists, DB accounts are authoritative
+        # and the legacy superadmin credential must no longer authenticate.
         if (
-            self.settings.web_admin_username.strip()
+            admin_count == 0
+            and self.settings.web_admin_username.strip()
             and self.settings.web_admin_password
             and hmac.compare_digest(
                 normalized,
