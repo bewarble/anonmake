@@ -95,6 +95,22 @@ class PlatformAdminRepository:
             ).scalars()
         )
 
+    async def lock_superadmin_roster(self) -> list[int]:
+        """Serialize mutations that could remove an active superadmin."""
+        return list(
+            (
+                await self.session.execute(
+                    select(AdminUser.id)
+                    .where(
+                        AdminUser.role == "superadmin",
+                        AdminUser.is_active.is_(True),
+                    )
+                    .order_by(AdminUser.id)
+                    .with_for_update()
+                )
+            ).scalars()
+        )
+
     async def update_admin(
         self,
         admin: AdminUser,
