@@ -35,21 +35,41 @@ def main() -> None:
     assert "subscription.auto_renew = False" in success
     assert "subscription.next_charge_at = None" in success
     assert 'subscription.status = "cancelled_active"' in success
+    assert "PRIMARY_ACCESS_KINDS" in success
 
     pending = function_source(repo_path, "pending_recurrent_attempt")
     assert 'PaymentAttempt.status == "pending"' in pending
-    assert 'PaymentAttempt.attempt_kind.in_(("primary", "fallback"))' in pending
+    for kind in (
+        "primary",
+        "fallback",
+        "admin_primary",
+        "admin_fallback",
+        "test_primary",
+        "test_fallback",
+    ):
+        assert repr(kind) in pending or f'"{kind}"' in pending, kind
 
     renew = function_source(service_path, "renew")
     assert "pending_recurrent_attempt" in renew
     assert "_recover_known_operation" in renew
+    assert "_period_for_attempt" in renew
     assert renew.index("pending_recurrent_attempt") < renew.index("cycle =")
+
+    finalize = function_source(service_path, "finalize_operation")
+    assert "_period_for_attempt(attempt)" in finalize
+    period = function_source(service_path, "_period_for_attempt")
+    assert "PRIMARY_ACCESS_KINDS" in period
+
+    service_text = (ROOT / service_path).read_text(encoding="utf-8")
+    assert '"admin_primary"' in service_text
+    assert '"admin_fallback"' in service_text
 
     print("Billing concurrency and pending recovery check: OK")
     print("Cancel mutation serializes with recurrent worker")
     print("Post-charge refresh prevents stale subscription overwrite")
     print("Late recurrent success preserves explicit auto-renew cancellation")
-    print("Pending recurrent operation is recovered before a new calendar cycle")
+    print("Pending automatic/manual/test charge is recovered before a new cycle")
+    print("Late admin_primary confirmation keeps the primary access period")
 
 
 if __name__ == "__main__":
