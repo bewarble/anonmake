@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from app.core.config import load_settings
 from app.database.session import SessionFactory
 from app.web.admin_auth import AdminAuth, COOKIE_NAME
-from app.web.admin_repository import WebAdminRepository
+from app.web.admin_scoped_repository import ScopedWebAdminRepository
 from app.web import admin_ui
 
 
@@ -46,6 +46,11 @@ templates.env.globals.update(
 
 
 money = admin_ui.money
+
+
+def selected_bot_id(request: Request) -> int | None:
+    scope = getattr(request.state, "admin_bot_scope", None)
+    return scope.bot_id if scope is not None else None
 
 
 def page_context(
@@ -157,6 +162,7 @@ async def dashboard(request: Request):
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
+
 @router.get("/users", response_class=HTMLResponse)
 async def users(
     request: Request,
@@ -169,7 +175,9 @@ async def users(
     page = max(page, 0)
     page_size = 50
     async with SessionFactory() as session:
-        rows, total = await WebAdminRepository(session).users(
+        rows, total = await ScopedWebAdminRepository(
+            session, bot_id=selected_bot_id(request)
+        ).users(
             query=q,
             page=page,
             page_size=page_size,
@@ -197,7 +205,9 @@ async def user_details(request: Request, user_id: int):
         return login_redirect(request)
 
     async with SessionFactory() as session:
-        details = await WebAdminRepository(session).user_details(user_id)
+        details = await ScopedWebAdminRepository(
+            session, bot_id=selected_bot_id(request)
+        ).user_details(user_id)
 
     if details is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -228,7 +238,9 @@ async def payments(
     page = max(page, 0)
     page_size = 50
     async with SessionFactory() as session:
-        rows, total = await WebAdminRepository(session).payments(
+        rows, total = await ScopedWebAdminRepository(
+            session, bot_id=selected_bot_id(request)
+        ).payments(
             page=page,
             page_size=page_size,
             query=q,
@@ -260,7 +272,9 @@ async def payment_details(request: Request, attempt_id: int):
         return login_redirect(request)
 
     async with SessionFactory() as session:
-        row = await WebAdminRepository(session).payment_details(attempt_id)
+        row = await ScopedWebAdminRepository(
+            session, bot_id=selected_bot_id(request)
+        ).payment_details(attempt_id)
 
     if row is None:
         raise HTTPException(status_code=404, detail="Payment attempt not found")
@@ -287,7 +301,9 @@ async def sources(request: Request):
         return login_redirect(request)
 
     async with SessionFactory() as session:
-        rows = await WebAdminRepository(session).sources()
+        rows = await ScopedWebAdminRepository(
+            session, bot_id=selected_bot_id(request)
+        ).sources()
 
     return templates.TemplateResponse(
         request=request,
@@ -309,7 +325,9 @@ async def delivery(request: Request, page: int = 0):
     page = max(page, 0)
     page_size = 50
     async with SessionFactory() as session:
-        rows, total = await WebAdminRepository(session).delivery(
+        rows, total = await ScopedWebAdminRepository(
+            session, bot_id=selected_bot_id(request)
+        ).delivery(
             page=page,
             page_size=page_size,
         )
@@ -337,7 +355,11 @@ async def audit(request: Request, page: int = 0):
     page = max(page, 0)
     page_size = 50
     async with SessionFactory() as session:
-        rows, total = await WebAdminRepository(session).audit(
+        # AdminAuditLog predates multibot and has no bot_id. Keep this platform-wide
+        # until the audit schema gains explicit project ownership.
+        rows, total = await ScopedWebAdminRepository(
+            session, bot_id=selected_bot_id(request)
+        ).audit(
             page=page,
             page_size=page_size,
         )
