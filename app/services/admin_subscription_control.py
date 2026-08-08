@@ -78,11 +78,6 @@ class AdminSubscriptionControl:
 
         try:
             await self.session.refresh(subscription)
-            if not subscription.auto_renew and subscription.cancelled_at is not None:
-                return AdminActionResult(
-                    False,
-                    "Автопродление отключено пользователем. Для ручного списания сначала включите его явно.",
-                )
 
             if plan == "primary":
                 amount = self.primary_amount
