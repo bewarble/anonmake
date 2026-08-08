@@ -39,14 +39,30 @@ def main() -> None:
     assert "app.add_api_route" in installer
     assert "project_impaya_webhook_installed" in installer
 
+    payment_return = "app/web/payment_return.py"
+    process = function_source(payment_return, "process_checkout")
+    assert "RevealRepository(session).get_by_token" in process
+    assert "finalize_checkout_and_notify" in process
+    assert "require_bot_token" not in process
+    assert "make_impaya_client" not in process
+    assert "ImpayaClient" not in process
+    return_installer = function_source(payment_return, "install_payment_return")
+    assert "app.router.routes[:]" in return_installer
+    assert "SUCCESS_PATH" in return_installer
+    assert "app.add_api_route" in return_installer
+    assert "project_payment_return_installed" in return_installer
+
     system = (ROOT / "app/web/admin_system.py").read_text(encoding="utf-8")
     assert "from app.web.payment_webhook import install_impaya_webhook" in system
     assert "install_impaya_webhook(web_app)" in system
+    assert "from app.web.payment_return import install_payment_return" in system
+    assert "install_payment_return(web_app)" in system
 
-    print("Payment webhook project isolation check: OK")
+    print("Payment webhook/return project isolation check: OK")
     print("Operation owner is resolved before webhook authentication")
     print("Owning project Impaya secret authenticates the callback")
-    print("Legacy global-secret route is replaced, not duplicated")
+    print("Legacy global-secret webhook route is replaced, not duplicated")
+    print("Reveal success return no longer depends on global bot/payment credentials")
 
 
 if __name__ == "__main__":
