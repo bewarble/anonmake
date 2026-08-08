@@ -96,70 +96,8 @@ services:
     networks:
       - anonmake
 
-  bot:
-    <<: *app-common
-    command: ["python", "-m", "app.main"]
-    healthcheck:
-      test: ["CMD", "python", "-m", "scripts.healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-
-  bot-two:
-    <<: *app-common
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-anonmake}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-anonmake}
-      REDIS_URL: redis://redis:6379/0
-      WORKER_HEARTBEAT_DIR: /tmp/anonmake-health
-      BOT_CODE: ${BOT_TWO_CODE:-secondary}
-      BOT_TOKEN: ${BOT_TWO_TOKEN:?Set BOT_TWO_TOKEN in .env}
-      BOT_USERNAME: ${BOT_TWO_USERNAME:?Set BOT_TWO_USERNAME in .env}
-      BOT_DISPLAY_NAME: ${BOT_TWO_DISPLAY_NAME:-Second Bot}
-    command: ["python", "-m", "app.main"]
-    healthcheck:
-      test: ["CMD", "python", "-m", "scripts.healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-
-  bot-three:
-    <<: *app-common
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-anonmake}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-anonmake}
-      REDIS_URL: redis://redis:6379/0
-      WORKER_HEARTBEAT_DIR: /tmp/anonmake-health
-      BOT_CODE: ${BOT_THREE_CODE:-third}
-      BOT_TOKEN: ${BOT_THREE_TOKEN:?Set BOT_THREE_TOKEN in .env}
-      BOT_USERNAME: ${BOT_THREE_USERNAME:?Set BOT_THREE_USERNAME in .env}
-      BOT_DISPLAY_NAME: ${BOT_THREE_DISPLAY_NAME:-Third Bot}
-    command: ["python", "-m", "app.main"]
-    healthcheck:
-      test: ["CMD", "python", "-m", "scripts.healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-
-  bot-four:
-    <<: *app-common
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-anonmake}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-anonmake}
-      REDIS_URL: redis://redis:6379/0
-      WORKER_HEARTBEAT_DIR: /tmp/anonmake-health
-      BOT_CODE: ${BOT_FOUR_CODE:-fourth}
-      BOT_TOKEN: ${BOT_FOUR_TOKEN:?Set BOT_FOUR_TOKEN in .env}
-      BOT_USERNAME: ${BOT_FOUR_USERNAME:?Set BOT_FOUR_USERNAME in .env}
-      BOT_DISPLAY_NAME: ${BOT_FOUR_DISPLAY_NAME:-Fourth Bot}
-    command: ["python", "-m", "app.main"]
-    healthcheck:
-      test: ["CMD", "python", "-m", "scripts.healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-
+  # Stage 64 unified Telegram runtime. All active BotInstance rows are polled
+  # inside this one service; no per-project Docker service is required.
   managed-bots:
     <<: *app-common
     depends_on:
