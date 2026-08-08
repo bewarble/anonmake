@@ -144,12 +144,20 @@ class ImpayaClient:
         }
         return await self._request("POST", "/order/pay", json=payload)
 
-    async def state(self, *, customer_operation_id: str) -> ImpayaResult:
+    async def state(
+        self,
+        *,
+        customer_operation_id: str,
+        recurrent: bool = False,
+    ) -> ImpayaResult:
+        terminal_name = (
+            self.recurrent_terminal_name if recurrent else self.terminal_name
+        )
         return await self._request(
             "GET",
             "/order/state/extended",
             params={
-                "terminal_name": self.terminal_name,
+                "terminal_name": terminal_name,
                 "customer_operation_id": customer_operation_id,
             },
         )
