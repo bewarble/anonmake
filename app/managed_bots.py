@@ -34,6 +34,13 @@ def token_fingerprint(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def credential_revision(instance: BotInstance) -> str:
+    """Detect operator edits without exposing encrypted credentials."""
+    verified = instance.token_verified_at.isoformat() if instance.token_verified_at else ""
+    updated = instance.updated_at.isoformat() if instance.updated_at else ""
+    return f"{instance.token_hint or ''}|{verified}|{updated}"
+
+
 def restart_backoff_seconds(failure_count: int) -> int:
     exponent = max(0, min(failure_count - 1, 10))
     return min(RECONCILE_SECONDS * (2**exponent), MAX_RESTART_BACKOFF_SECONDS)
@@ -104,7 +111,9 @@ async def main() -> None:
     configure_logging(settings.log_level, settings.json_logs)
     await init_database()
     tasks: dict[int, asyncio.Task] = {}
-    task_token_fingerprints: dict[int, str] = {}
+    running_fingerprints: dict[int, str] = {}
+    last_resolved_fingerprints: dict[int, str] = {}
+    last_credential_revisions: dict[int, str] = {}
     task_started_at: dict[int, float] = {}
     failure_counts: dict[int, int] = {}
     retry_after: dict[int, float] = {}
@@ -134,8 +143,6 @@ async def main() -> None:
                         instance = known_instances.get(bot_id)
                         if not task.cancelled():
                             exc = task.exception()
-                            # start_polling returning by itself is also an
-                            # unexpected runtime stop and must not tight-loop.
                             if exc is None:
                                 exc = RuntimeError("Managed polling stopped unexpectedly")
                                 setattr(exc, "managed_runtime_stage", "polling")
@@ -153,31 +160,37 @@ async def main() -> None:
                                 delay,
                             )
                         tasks.pop(bot_id, None)
-                        task_token_fingerprints.pop(bot_id, None)
+                        running_fingerprints.pop(bot_id, None)
                         task_started_at.pop(bot_id, None)
                         continue
 
                     if bot_id not in active_ids:
                         await stop_task(task)
                         tasks.pop(bot_id, None)
-                        task_token_fingerprints.pop(bot_id, None)
+                        running_fingerprints.pop(bot_id, None)
                         task_started_at.pop(bot_id, None)
                         failure_counts.pop(bot_id, None)
                         retry_after.pop(bot_id, None)
+                        last_resolved_fingerprints.pop(bot_id, None)
+                        last_credential_revisions.pop(bot_id, None)
 
-                # Remove retry state for projects no longer owned by this
-                # supervisor so a later re-enable starts cleanly.
                 for bot_id in set(failure_counts) - active_ids:
                     failure_counts.pop(bot_id, None)
                     retry_after.pop(bot_id, None)
+                    last_resolved_fingerprints.pop(bot_id, None)
+                    last_credential_revisions.pop(bot_id, None)
 
                 for item in instances:
+                    revision = credential_revision(item)
+                    previous_revision = last_credential_revisions.get(item.id)
+                    if previous_revision is not None and previous_revision != revision:
+                        failure_counts.pop(item.id, None)
+                        retry_after.pop(item.id, None)
+                    last_credential_revisions[item.id] = revision
+
                     try:
                         token = await resolve_bot_token(session, settings, item)
                     except Exception as exc:
-                        # Credential-resolution failures are subject to the same
-                        # backoff as polling crashes; otherwise a bad encrypted
-                        # token would fill logs/audit every reconciliation tick.
                         if now_monotonic < retry_after.get(item.id, 0.0):
                             continue
                         crash_count += 1
@@ -188,28 +201,25 @@ async def main() -> None:
                         continue
 
                     fingerprint = token_fingerprint(token)
+                    previous_resolved = last_resolved_fingerprints.get(item.id)
+                    if previous_resolved is not None and previous_resolved != fingerprint:
+                        # A repaired/rotated credential must override a stale
+                        # crash backoff, even when no task is currently alive.
+                        failure_counts.pop(item.id, None)
+                        retry_after.pop(item.id, None)
+                    last_resolved_fingerprints[item.id] = fingerprint
+
                     running_task = tasks.get(item.id)
-                    previous_fingerprint = task_token_fingerprints.get(item.id)
-                    credential_changed = (
-                        previous_fingerprint is not None
-                        and previous_fingerprint != fingerprint
-                    )
-                    if running_task is not None and credential_changed:
+                    running_fingerprint = running_fingerprints.get(item.id)
+                    if running_task is not None and running_fingerprint != fingerprint:
                         logger.info(
                             "Managed project credential changed; restarting",
                             extra={"bot_code": item.code},
                         )
                         await stop_task(running_task)
                         tasks.pop(item.id, None)
-                        task_token_fingerprints.pop(item.id, None)
+                        running_fingerprints.pop(item.id, None)
                         task_started_at.pop(item.id, None)
-                        failure_counts.pop(item.id, None)
-                        retry_after.pop(item.id, None)
-
-                    # If credentials can be resolved again after a prior
-                    # resolution failure, do not make the operator wait for an
-                    # old failure backoff after they fixed the secret.
-                    if previous_fingerprint is not None and previous_fingerprint != fingerprint:
                         failure_counts.pop(item.id, None)
                         retry_after.pop(item.id, None)
 
@@ -220,7 +230,7 @@ async def main() -> None:
                             run_instance(item, token, settings),
                             name=f"managed-bot-{item.code}",
                         )
-                        task_token_fingerprints[item.id] = fingerprint
+                        running_fingerprints[item.id] = fingerprint
                         task_started_at[item.id] = now_monotonic
                         logger.info("Managed project started", extra={"bot_code": item.code})
 
