@@ -63,7 +63,14 @@ async def finalize_checkout_and_notify(
         return "notification_failed"
 
     token = await resolve_bot_token(session, settings, instance)
-    impaya_config = await load_impaya_config(session, settings, instance.id)
+    # This function only verifies/finalizes an existing checkout. A gateway
+    # disabled after invoice creation must not strand an already paid user.
+    impaya_config = await load_impaya_config(
+        session,
+        settings,
+        instance.id,
+        allow_inactive=True,
+    )
     runtime_bot = Bot(token=token)
     runtime_client = create_impaya_client(impaya_config)
     context_token = set_current_bot(CurrentBot(instance.id, instance.code, instance.username, instance.display_name))
