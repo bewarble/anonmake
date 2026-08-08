@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.bot_context import require_current_bot
 from app.models.billing import PaymentAttempt, PaymentMethod, Subscription
+from app.models.platform_admin import PaymentGatewayConfig
 
 
 class BillingRepository:
@@ -40,6 +41,19 @@ class BillingRepository:
         )
         return result.scalar_one_or_none()
 
+    @staticmethod
+    def _gateway_not_explicitly_disabled():
+        disabled_gateway = (
+            select(PaymentGatewayConfig.id)
+            .where(
+                PaymentGatewayConfig.bot_id == Subscription.bot_id,
+                PaymentGatewayConfig.provider == "impaya",
+                PaymentGatewayConfig.is_active.is_(False),
+            )
+            .exists()
+        )
+        return ~disabled_gateway
+
     async def due_subscriptions(self, now: datetime, limit: int = 100) -> list[Subscription]:
         result = await self.session.execute(
             select(Subscription)
@@ -48,6 +62,7 @@ class BillingRepository:
                 Subscription.next_charge_at.is_not(None),
                 Subscription.next_charge_at <= now,
                 Subscription.status.not_in(("cancelled", "payment_method_blocked")),
+                self._gateway_not_explicitly_disabled(),
             )
             .order_by(Subscription.next_charge_at)
             .limit(limit)
@@ -75,6 +90,7 @@ class BillingRepository:
                         "payment_method_blocked",
                     )
                 ),
+                self._gateway_not_explicitly_disabled(),
             )
             .order_by(Subscription.next_charge_at, Subscription.id)
             .limit(limit)
