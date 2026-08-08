@@ -10,7 +10,7 @@ from app.core.config import load_settings
 from app.database.session import SessionFactory
 from app.models.bot_instance import BotInstance
 from app.services.bot_credentials import resolve_bot_token
-from app.services.impaya_factory import load_impaya_config
+from app.services.impaya_factory import PaymentGatewayDisabledError, load_impaya_config
 
 EXPECTED_COMMANDS = ["start", "cancel"]
 
@@ -39,10 +39,14 @@ async def check_active_projects() -> None:
             assert (me.username or "").lower() == instance.username.lstrip("@").lower(), f"bot username mismatch for {instance.code}: database={instance.username}, telegram={me.username}"
 
             if settings.billing_enabled:
-                config = await load_impaya_config(session, settings, instance.id)
-                assert config.api_token.strip(), f"Impaya API token is missing for project {instance.code}"
-                assert config.payment_form_url_template.strip(), f"Impaya payment form URL is missing for project {instance.code}"
-                assert config.webhook_secret.strip(), f"Impaya webhook secret is missing for project {instance.code}"
+                try:
+                    config = await load_impaya_config(session, settings, instance.id)
+                except PaymentGatewayDisabledError:
+                    print(f"Stage 62 runtime: payments intentionally disabled for project {instance.code}")
+                else:
+                    assert config.api_token.strip(), f"Impaya API token is missing for project {instance.code}"
+                    assert config.payment_form_url_template.strip(), f"Impaya payment form URL is missing for project {instance.code}"
+                    assert config.webhook_secret.strip(), f"Impaya webhook secret is missing for project {instance.code}"
 
             checked += 1
             print(f"Stage 62 runtime: @{me.username} commands OK: /start, /cancel")
@@ -60,7 +64,7 @@ def check_runtime_config() -> None:
         assert settings.primary_duration_days == 3
         assert settings.fallback_price_kopecks == 9900
         assert settings.fallback_duration_days == 1
-        print("Stage 62 runtime: billing copy/config contract OK; gateway credentials checked per project")
+        print("Stage 62 runtime: billing copy/config contract OK; enabled gateway credentials checked per project")
     else:
         print("Stage 62 runtime: billing disabled (allowed for runtime smoke; launch-check is stricter)")
 
