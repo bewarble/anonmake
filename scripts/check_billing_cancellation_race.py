@@ -36,10 +36,20 @@ def main() -> None:
     assert "subscription.next_charge_at = None" in success
     assert 'subscription.status = "cancelled_active"' in success
 
-    print("Billing cancellation race check: OK")
+    pending = function_source(repo_path, "pending_recurrent_attempt")
+    assert 'PaymentAttempt.status == "pending"' in pending
+    assert 'PaymentAttempt.attempt_kind.in_(("primary", "fallback"))' in pending
+
+    renew = function_source(service_path, "renew")
+    assert "pending_recurrent_attempt" in renew
+    assert "_recover_known_operation" in renew
+    assert renew.index("pending_recurrent_attempt") < renew.index("cycle =")
+
+    print("Billing concurrency and pending recovery check: OK")
     print("Cancel mutation serializes with recurrent worker")
     print("Post-charge refresh prevents stale subscription overwrite")
     print("Late recurrent success preserves explicit auto-renew cancellation")
+    print("Pending recurrent operation is recovered before a new calendar cycle")
 
 
 if __name__ == "__main__":
