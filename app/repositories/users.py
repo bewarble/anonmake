@@ -103,24 +103,23 @@ class UserRepository:
 
         bot_id = require_current_bot().id
         for _ in range(PUBLIC_CODE_CREATE_ATTEMPTS):
-            public_code = generate_public_code()
-            alias_owner = await self.session.scalar(
-                select(UserPublicCodeAlias.user_id).where(
-                    UserPublicCodeAlias.bot_id == bot_id,
-                    UserPublicCodeAlias.public_code == public_code,
-                )
-            )
-            if alias_owner is not None:
-                continue
             user = User(
                 bot_id=bot_id,
                 telegram_id=telegram_user.id,
-                public_code=public_code,
+                public_code=generate_public_code(),
                 username=telegram_user.username,
                 first_name=telegram_user.first_name,
                 last_name=telegram_user.last_name,
                 is_blocked=False,
             )
+            alias_owner = await self.session.scalar(
+                select(UserPublicCodeAlias.user_id).where(
+                    UserPublicCodeAlias.bot_id == bot_id,
+                    UserPublicCodeAlias.public_code == user.public_code,
+                )
+            )
+            if alias_owner is not None:
+                continue
             try:
                 async with self.session.begin_nested():
                     self.session.add(user)
@@ -131,6 +130,8 @@ class UserRepository:
                     self._sync_telegram_fields(existing, telegram_user)
                     await self.session.flush()
                     return existing, False
+                # The telegram id is still free, so this was most likely a
+                # public-code collision. Generate another short code.
                 continue
             return user, True
 
