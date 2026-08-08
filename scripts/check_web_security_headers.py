@@ -21,9 +21,19 @@ def main() -> None:
     assert "from app.web.security_headers import install_security_headers" in system
     assert "install_security_headers(web_app)" in system
 
+    compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
+    assert '"--proxy-headers"' in compose
+    assert "FORWARDED_ALLOW_IPS" in compose
+    assert '"--forwarded-allow-ips=*"' not in compose
+    assert "127.0.0.1,172.16.0.0/12" in compose
+
+    example = (ROOT / ".env.example").read_text(encoding="utf-8")
+    assert "FORWARDED_ALLOW_IPS=" in example
+
     print("Web security headers check: OK")
     print("Admin responses are non-cacheable and protected from framing")
     print("HTTPS responses advertise HSTS")
+    print("Forwarded headers are not trusted from arbitrary peers")
 
 
 if __name__ == "__main__":
