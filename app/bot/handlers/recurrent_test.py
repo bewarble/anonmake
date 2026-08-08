@@ -14,7 +14,7 @@ from app.core.config import load_settings
 from app.repositories.billing import BillingRepository
 from app.repositories.users import UserRepository
 from app.services.billing import BillingService, ChargeDecision
-from app.services.impaya import ImpayaClient
+from app.services.impaya_factory import create_impaya_client, load_impaya_config
 
 router = Router(name="recurrent_test")
 logger = logging.getLogger(__name__)
@@ -22,24 +22,6 @@ logger = logging.getLogger(__name__)
 
 def is_admin(telegram_id: int) -> bool:
     return telegram_id in load_settings().admin_ids_set
-
-
-def make_client(settings) -> ImpayaClient:
-    return ImpayaClient(
-        settings.impaya_api_url,
-        settings.impaya_api_token,
-        (
-            settings.impaya_binding_terminal_name
-            or settings.impaya_terminal_name
-        ),
-        auth_header=settings.impaya_auth_header,
-        auth_prefix=settings.impaya_auth_prefix,
-        protocol_version=settings.impaya_protocol_version,
-        recurrent_terminal_name=(
-            settings.impaya_recurrent_terminal_name
-            or settings.impaya_terminal_name
-        ),
-    )
 
 
 async def payment_context(session: AsyncSession, telegram_id: int):
@@ -157,7 +139,12 @@ async def confirm_test_charge(
         await callback.message.edit_text("⏳ Отправляю MIT-запрос…")
     await callback.answer()
 
-    client = make_client(settings)
+    impaya_config = await load_impaya_config(
+        session,
+        settings,
+        subscription.bot_id,
+    )
+    client = create_impaya_client(impaya_config)
     try:
         result = await BillingService(
             session,
