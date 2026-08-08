@@ -57,6 +57,16 @@ CHECKS = {
         WHERE buyer.bot_id <> sender.bot_id
            OR buyer.bot_id <> recipient.bot_id
     """,
+    "duplicate_telegram_bot_ids": """
+        SELECT count(*)
+        FROM (
+            SELECT telegram_bot_id
+            FROM bot_instances
+            WHERE telegram_bot_id IS NOT NULL
+            GROUP BY telegram_bot_id
+            HAVING count(*) > 1
+        ) duplicates
+    """,
     "zero_transaction_ids": """
         SELECT count(*)
         FROM payment_attempts
