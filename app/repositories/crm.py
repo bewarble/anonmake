@@ -164,11 +164,11 @@ class CrmRepository:
     ) -> CrmEvent | None:
         user = await self._require_user(user_id)
         if external_key:
+            # The database constraint is globally unique. Ownership is already
+            # validated above; keep the dedupe lookup global so a duplicated key
+            # remains idempotent instead of surfacing as an IntegrityError.
             existing = await self.session.scalar(
-                select(CrmEvent).where(
-                    CrmEvent.user_id == user.id,
-                    CrmEvent.external_key == external_key,
-                )
+                select(CrmEvent).where(CrmEvent.external_key == external_key)
             )
             if existing is not None:
                 return None
