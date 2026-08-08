@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import hmac
 import logging
@@ -10,9 +11,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.core.bot_context import CurrentBot, reset_current_bot, set_current_bot
 from app.core.config import load_settings
 from app.database.session import SessionFactory
 from app.models.billing import Subscription
+from app.models.bot_instance import BotInstance
 from app.models.marketing import TrafficSource
 from app.repositories.marketing import MarketingRepository
 from app.web.admin import login_redirect, page_context, require_session, templates
@@ -50,8 +53,50 @@ def parse_period(value: str) -> int | None:
         return 1
 
 
-def source_referral_url(source: TrafficSource) -> str:
-    username = settings.bot_username.strip().lstrip("@")
+def _scope_bot_id(request: Request) -> int | None:
+    return getattr(request.state.admin_bot_scope, "bot_id", None)
+
+
+def _selected_bot(request: Request) -> BotInstance:
+    selected = getattr(request.state.admin_bot_scope, "selected", None)
+    if selected is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Выберите проект для выполнения этого действия",
+        )
+    return selected
+
+
+@contextmanager
+def _bot_context(instance: BotInstance):
+    token = set_current_bot(
+        CurrentBot(
+            instance.id,
+            instance.code,
+            instance.username,
+            instance.display_name,
+        )
+    )
+    try:
+        yield
+    finally:
+        reset_current_bot(token)
+
+
+async def _scoped_source(
+    session,
+    request: Request,
+    source_id: int,
+) -> TrafficSource | None:
+    statement = select(TrafficSource).where(TrafficSource.id == source_id)
+    bot_id = _scope_bot_id(request)
+    if bot_id is not None:
+        statement = statement.where(TrafficSource.bot_id == bot_id)
+    return await session.scalar(statement)
+
+
+def source_referral_url(source: TrafficSource, bot_username: str) -> str:
+    username = bot_username.strip().lstrip("@")
     payload = f"src_{source.code}"
     if not username:
         return payload
@@ -67,7 +112,7 @@ async def business_dashboard(request: Request, period: str = "1"):
     chart_days = 7 if days in (None, 1) else min(max(days, 7), 90)
 
     async with SessionFactory() as session:
-        repository = Stage29Repository(session, bot_id=getattr(request.state.admin_bot_scope, "bot_id", None))
+        repository = Stage29Repository(session, bot_id=_scope_bot_id(request))
         snapshot = await repository.dashboard(days)
         chart = await repository.chart(chart_days)
         sources = await repository.sources()
@@ -117,7 +162,7 @@ async def business_users(
     page_size = 50
 
     async with SessionFactory() as session:
-        repository = Stage29Repository(session, bot_id=getattr(request.state.admin_bot_scope, "bot_id", None))
+        repository = Stage29Repository(session, bot_id=_scope_bot_id(request))
         rows, total = await repository.users(
             query=q,
             vip=vip,
@@ -154,7 +199,10 @@ async def business_sources(request: Request):
         return login_redirect(request)
 
     async with SessionFactory() as session:
-        rows = await Stage29Repository(session, bot_id=getattr(request.state.admin_bot_scope, "bot_id", None)).sources()
+        rows = await Stage29Repository(
+            session,
+            bot_id=_scope_bot_id(request),
+        ).sources()
 
     return templates.TemplateResponse(
         request=request,
@@ -172,6 +220,7 @@ async def business_sources(request: Request):
 async def source_new_page(request: Request):
     if require_session(request) is None:
         return login_redirect(request)
+    _selected_bot(request)
 
     return templates.TemplateResponse(
         request=request,
@@ -199,6 +248,7 @@ async def source_new_submit(
     if require_session(request) is None:
         return login_redirect(request)
     verify_csrf(request, "source-create", csrf)
+    selected_bot = _selected_bot(request)
 
     name = name.strip()
     source_url = source_url.strip()
@@ -236,12 +286,13 @@ async def source_new_submit(
         )
 
     async with SessionFactory() as session:
-        source = await MarketingRepository(session).create_source(
-            name=name,
-            source_url=source_url,
-            spend_kopecks=spend_kopecks,
-            admin_telegram_id=next(iter(settings.admin_ids_set), 0),
-        )
+        with _bot_context(selected_bot):
+            source = await MarketingRepository(session).create_source(
+                name=name,
+                source_url=source_url,
+                spend_kopecks=spend_kopecks,
+                admin_telegram_id=next(iter(settings.admin_ids_set), 0),
+            )
         await session.commit()
         source_id = source.id
 
@@ -257,13 +308,21 @@ async def source_details(request: Request, source_id: int):
         return login_redirect(request)
 
     async with SessionFactory() as session:
-        source = await session.get(TrafficSource, source_id)
-        rows = await Stage29Repository(session, bot_id=getattr(request.state.admin_bot_scope, "bot_id", None)).sources()
+        source = await _scoped_source(session, request, source_id)
+        if source is None:
+            raise HTTPException(status_code=404, detail="Source not found")
+        owner = await session.get(BotInstance, source.bot_id)
+        rows = await Stage29Repository(
+            session,
+            bot_id=_scope_bot_id(request),
+        ).sources()
 
-    if source is None:
-        raise HTTPException(status_code=404, detail="Source not found")
+    if owner is None:
+        raise HTTPException(status_code=404, detail="Source project not found")
 
     row = next((item for item in rows if item.source.id == source_id), None)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Source not found")
     return templates.TemplateResponse(
         request=request,
         name="business_source_details.html",
@@ -272,7 +331,7 @@ async def source_details(request: Request, source_id: int):
             title=source.name,
             section="sources",
             row=row,
-            referral_url=source_referral_url(source),
+            referral_url=source_referral_url(source, owner.username),
             csrf_edit=csrf_token(request, f"source-edit-{source_id}"),
             csrf_delete=csrf_token(request, f"source-delete-{source_id}"),
         ),
@@ -299,7 +358,7 @@ async def source_edit(
         raise HTTPException(status_code=422, detail="Invalid spend") from exc
 
     async with SessionFactory() as session:
-        source = await session.get(TrafficSource, source_id)
+        source = await _scoped_source(session, request, source_id)
         if source is None:
             raise HTTPException(status_code=404)
         source.name = name.strip()
@@ -325,7 +384,7 @@ async def source_delete(
     verify_csrf(request, f"source-delete-{source_id}", csrf)
 
     async with SessionFactory() as session:
-        source = await session.get(TrafficSource, source_id)
+        source = await _scoped_source(session, request, source_id)
         if source is not None:
             await session.delete(source)
             await session.commit()
@@ -337,18 +396,20 @@ async def source_delete(
 async def broadcasts_page(request: Request, created: int = 0):
     if require_session(request) is None:
         return login_redirect(request)
+    selected_bot = _selected_bot(request)
 
     async with SessionFactory() as session:
-        marketing = MarketingRepository(session)
-        rows = await marketing.recent_broadcasts(limit=50)
-        broadcast_stats = {
-            row.id: await marketing.broadcast_delivery_stats(row.id)
-            for row in rows
-        }
-        audience_counts = {
-            key: await marketing.broadcast_audience_count(key)
-            for key in ("all", "vip", "non_vip")
-        }
+        with _bot_context(selected_bot):
+            marketing = MarketingRepository(session)
+            rows = await marketing.recent_broadcasts(limit=50)
+            broadcast_stats = {
+                row.id: await marketing.broadcast_delivery_stats(row.id)
+                for row in rows
+            }
+            audience_counts = {
+                key: await marketing.broadcast_audience_count(key)
+                for key in ("all", "vip", "non_vip")
+            }
 
     return templates.TemplateResponse(
         request=request,
@@ -377,6 +438,7 @@ async def broadcast_create(
     if require_session(request) is None:
         return login_redirect(request)
     verify_csrf(request, "broadcast-create", csrf)
+    selected_bot = _selected_bot(request)
 
     audience = audience if audience in {"all", "vip", "non_vip"} else "all"
     text = text.strip()
@@ -391,12 +453,13 @@ async def broadcast_create(
     if error is None:
         try:
             async with SessionFactory() as session:
-                await MarketingRepository(session).create_broadcast(
-                    kind="anonymous",
-                    audience=audience,
-                    text=text,
-                    admin_telegram_id=next(iter(settings.admin_ids_set), 0),
-                )
+                with _bot_context(selected_bot):
+                    await MarketingRepository(session).create_broadcast(
+                        kind="anonymous",
+                        audience=audience,
+                        text=text,
+                        admin_telegram_id=next(iter(settings.admin_ids_set), 0),
+                    )
                 await session.commit()
             return RedirectResponse(
                 "/admin/business/broadcasts?created=1",
@@ -407,16 +470,17 @@ async def broadcast_create(
             error = "Не удалось создать рассылку. Ошибка записана в журнал web."
 
     async with SessionFactory() as session:
-        marketing = MarketingRepository(session)
-        rows = await marketing.recent_broadcasts(limit=50)
-        broadcast_stats = {
-            row.id: await marketing.broadcast_delivery_stats(row.id)
-            for row in rows
-        }
-        audience_counts = {
-            key: await marketing.broadcast_audience_count(key)
-            for key in ("all", "vip", "non_vip")
-        }
+        with _bot_context(selected_bot):
+            marketing = MarketingRepository(session)
+            rows = await marketing.recent_broadcasts(limit=50)
+            broadcast_stats = {
+                row.id: await marketing.broadcast_delivery_stats(row.id)
+                for row in rows
+            }
+            audience_counts = {
+                key: await marketing.broadcast_audience_count(key)
+                for key in ("all", "vip", "non_vip")
+            }
 
     return templates.TemplateResponse(
         request=request,
@@ -444,7 +508,10 @@ async def chart_api(request: Request, days: int = 30):
 
     days = min(max(days, 7), 90)
     async with SessionFactory() as session:
-        rows = await Stage29Repository(session).chart(days)
+        rows = await Stage29Repository(
+            session,
+            bot_id=_scope_bot_id(request),
+        ).chart(days)
 
     return {
         "items": [
