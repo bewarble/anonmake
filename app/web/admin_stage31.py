@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import timedelta
 from math import ceil
 from urllib.parse import urlencode
@@ -8,39 +9,41 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, or_, select
 
+from app.core.bot_context import CurrentBot, reset_current_bot, set_current_bot
 from app.core.config import load_settings
 from app.database.session import SessionFactory
 from app.models import User
 from app.models.billing import PaymentMethod, Subscription
+from app.models.bot_instance import BotInstance
 from app.services.admin_subscription_control import AdminSubscriptionControl
 from app.services.impaya import ImpayaClient
+from app.services.impaya_factory import create_impaya_client, load_impaya_config
 from app.web.admin import (
     login_redirect,
     page_context,
     require_session,
     templates,
 )
-from app.web.admin_repository import WebAdminRepository
-from app.web.admin_repository_stage27 import WebCrmRepository
 
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 settings = load_settings()
 
 
-def make_client() -> ImpayaClient:
-    return ImpayaClient(
-        settings.impaya_api_url,
-        settings.impaya_api_token,
-        settings.impaya_binding_terminal_name or settings.impaya_terminal_name,
-        auth_header=settings.impaya_auth_header,
-        auth_prefix=settings.impaya_auth_prefix,
-        protocol_version=settings.impaya_protocol_version,
-        recurrent_terminal_name=(
-            settings.impaya_recurrent_terminal_name
-            or settings.impaya_terminal_name
-        ),
+def selected_bot_id(request: Request) -> int | None:
+    scope = getattr(request.state, "admin_bot_scope", None)
+    return getattr(scope, "bot_id", None)
+
+
+@contextmanager
+def bot_context(bot: BotInstance):
+    token = set_current_bot(
+        CurrentBot(bot.id, bot.code, bot.username, bot.display_name)
     )
+    try:
+        yield
+    finally:
+        reset_current_bot(token)
 
 
 def back_to_user(user_id: int, *, message: str = "", level: str = "success"):
@@ -52,18 +55,30 @@ def back_to_user(user_id: int, *, message: str = "", level: str = "success"):
     )
 
 
-async def load_entities(session, user_id: int):
-    user = await session.get(User, user_id)
+async def load_entities(session, user_id: int, *, bot_id: int | None):
+    filters = [User.id == user_id]
+    if bot_id is not None:
+        filters.append(User.bot_id == bot_id)
+    user = await session.scalar(select(User).where(*filters))
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
     subscription = await session.scalar(
-        select(Subscription).where(Subscription.user_id == user_id)
+        select(Subscription).where(
+            Subscription.bot_id == user.bot_id,
+            Subscription.user_id == user.id,
+        )
     )
     method = await session.scalar(
-        select(PaymentMethod).where(PaymentMethod.user_id == user_id)
+        select(PaymentMethod).where(
+            PaymentMethod.bot_id == user.bot_id,
+            PaymentMethod.user_id == user.id,
+        )
     )
-    return user, subscription, method
+    bot = await session.get(BotInstance, user.bot_id)
+    if bot is None:
+        raise HTTPException(status_code=409, detail="Owning project is missing")
+    return user, subscription, method, bot
 
 
 @router.get("/crm/users/{user_id}/control", response_class=HTMLResponse)
@@ -84,7 +99,11 @@ async def user_control(request: Request, user_id: int, action: str):
         raise HTTPException(status_code=404, detail="Unknown action")
 
     async with SessionFactory() as session:
-        user, subscription, method = await load_entities(session, user_id)
+        user, subscription, method, _ = await load_entities(
+            session,
+            user_id,
+            bot_id=selected_bot_id(request),
+        )
 
     labels = {
         "charge_primary": ("Списать 299 ₽", "Будет выполнено реальное MIT-списание по сохранённой карте."),
@@ -134,7 +153,11 @@ async def user_control_submit(
     client: ImpayaClient | None = None
     try:
         async with SessionFactory() as session:
-            user, subscription, method = await load_entities(session, user_id)
+            user, subscription, method, owner_bot = await load_entities(
+                session,
+                user_id,
+                bot_id=selected_bot_id(request),
+            )
             if subscription is None:
                 return back_to_user(
                     user_id,
@@ -143,7 +166,8 @@ async def user_control_submit(
                 )
 
             if action.startswith("charge_"):
-                client = make_client()
+                config = await load_impaya_config(session, settings, owner_bot.id)
+                client = create_impaya_client(config)
 
             service = AdminSubscriptionControl(
                 session,
@@ -155,20 +179,21 @@ async def user_control_submit(
                 fallback_days=settings.fallback_duration_days,
             )
 
-            if action == "charge_primary":
-                result = await service.charge(subscription, method, plan="primary")
-            elif action == "charge_fallback":
-                result = await service.charge(subscription, method, plan="fallback")
-            elif action == "enable_auto_renew":
-                result = await service.set_auto_renew(subscription, enabled=True)
-            elif action == "disable_auto_renew":
-                result = await service.set_auto_renew(subscription, enabled=False)
-            elif action == "extend_1":
-                result = await service.extend_access(subscription, days=1)
-            elif action == "extend_3":
-                result = await service.extend_access(subscription, days=3)
-            else:
-                raise HTTPException(status_code=404, detail="Unknown action")
+            with bot_context(owner_bot):
+                if action == "charge_primary":
+                    result = await service.charge(subscription, method, plan="primary")
+                elif action == "charge_fallback":
+                    result = await service.charge(subscription, method, plan="fallback")
+                elif action == "enable_auto_renew":
+                    result = await service.set_auto_renew(subscription, enabled=True)
+                elif action == "disable_auto_renew":
+                    result = await service.set_auto_renew(subscription, enabled=False)
+                elif action == "extend_1":
+                    result = await service.extend_access(subscription, days=1)
+                elif action == "extend_3":
+                    result = await service.extend_access(subscription, days=3)
+                else:
+                    raise HTTPException(status_code=404, detail="Unknown action")
 
             if result.attempt_id is not None:
                 return RedirectResponse(
@@ -201,7 +226,10 @@ async def subscriptions(
 
     page = max(page, 0)
     page_size = 50
+    bot_id = selected_bot_id(request)
     filters = []
+    if bot_id is not None:
+        filters.extend((Subscription.bot_id == bot_id, User.bot_id == bot_id))
     cleaned = q.strip().lstrip("@")
     if cleaned:
         if cleaned.isdigit():
@@ -219,20 +247,28 @@ async def subscriptions(
         filters.append(Subscription.auto_renew.is_(auto_renew == "yes"))
 
     async with SessionFactory() as session:
+        base = (
+            select(Subscription, User, PaymentMethod)
+            .join(
+                User,
+                (Subscription.user_id == User.id)
+                & (Subscription.bot_id == User.bot_id),
+            )
+            .outerjoin(
+                PaymentMethod,
+                (PaymentMethod.user_id == User.id)
+                & (PaymentMethod.bot_id == User.bot_id),
+            )
+            .where(*filters)
+        )
         total = int(
             await session.scalar(
-                select(func.count(Subscription.id))
-                .join(User, Subscription.user_id == User.id)
-                .where(*filters)
+                select(func.count()).select_from(base.subquery())
             )
             or 0
         )
         result = await session.execute(
-            select(Subscription, User, PaymentMethod)
-            .join(User, Subscription.user_id == User.id)
-            .outerjoin(PaymentMethod, PaymentMethod.user_id == User.id)
-            .where(*filters)
-            .order_by(Subscription.updated_at.desc(), Subscription.id.desc())
+            base.order_by(Subscription.updated_at.desc(), Subscription.id.desc())
             .offset(page * page_size)
             .limit(page_size)
         )
