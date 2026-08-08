@@ -22,7 +22,11 @@ class BotInstance(Base):
     runtime_mode: Mapped[str] = mapped_column(
         String(24), nullable=False, default="managed", server_default="managed", index=True
     )
-    telegram_bot_id: Mapped[int | None] = mapped_column(BigInteger)
+    telegram_bot_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        unique=True,
+        index=True,
+    )
     token_encrypted: Mapped[str | None] = mapped_column(Text)
     token_hint: Mapped[str | None] = mapped_column(String(32))
     token_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
