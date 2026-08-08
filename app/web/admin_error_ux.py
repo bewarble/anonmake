@@ -82,6 +82,7 @@ def decode_error_event(row: AdminAuditLog) -> dict:
 async def record_admin_error(request: Request, *, error_id: str, status_code: int) -> None:
     principal = auth.session_from_request(request)
     scope = getattr(request.state, "admin_bot_scope", None)
+    bot_id = getattr(scope, "bot_id", None)
     details = {
         "status": status_code,
         "method": request.method,
@@ -89,12 +90,13 @@ async def record_admin_error(request: Request, *, error_id: str, status_code: in
         "admin": principal.username[:200] if principal else None,
         "admin_id": principal.admin_id if principal else None,
         "project": getattr(scope, "code", None),
-        "project_id": getattr(scope, "bot_id", None),
+        "project_id": bot_id,
     }
     try:
         async with SessionFactory() as session:
             session.add(
                 AdminAuditLog(
+                    bot_id=bot_id,
                     admin_telegram_id=0,
                     action="web_error",
                     target=error_id,
