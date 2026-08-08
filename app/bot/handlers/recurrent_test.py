@@ -139,13 +139,25 @@ async def confirm_test_charge(
         await callback.message.edit_text("⏳ Отправляю MIT-запрос…")
     await callback.answer()
 
-    impaya_config = await load_impaya_config(
-        session,
-        settings,
-        subscription.bot_id,
-    )
-    client = create_impaya_client(impaya_config)
+    repository = BillingRepository(session)
+    locked = await repository.try_subscription_lock(subscription.id)
+    if not locked:
+        if callback.message:
+            await callback.message.edit_text(
+                "Подписка уже обрабатывается другим платёжным процессом. Повторите позже."
+            )
+        return
+
+    client = None
     try:
+        await session.refresh(subscription)
+        await session.refresh(method)
+        impaya_config = await load_impaya_config(
+            session,
+            settings,
+            subscription.bot_id,
+        )
+        client = create_impaya_client(impaya_config)
         result = await BillingService(
             session,
             client,
@@ -174,7 +186,10 @@ async def confirm_test_charge(
             )
         return
     finally:
-        await client.close()
+        if client is not None:
+            await client.close()
+        await repository.release_subscription_lock(subscription.id)
+        await session.commit()
 
     if result.decision == ChargeDecision.SUCCESS:
         text = (
