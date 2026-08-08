@@ -47,6 +47,8 @@ class ProjectRow:
     active_broadcasts: int
     payment_pending: int
     impaya_ready: bool
+    telegram_ok: bool
+    telegram_error: str | None
     last_delivery_at: datetime | None
     last_payment_at: datetime | None
     last_user_at: datetime | None
@@ -58,6 +60,8 @@ class ProjectRow:
             return "Отключён"
         if self.bot.is_maintenance:
             return "Обслуживание"
+        if not self.telegram_ok:
+            return "Ошибка Telegram"
         if self.failed:
             return "Есть ошибки"
         if self.pending:
@@ -70,6 +74,8 @@ class ProjectRow:
             return "inactive"
         if self.bot.is_maintenance:
             return "maintenance"
+        if not self.telegram_ok:
+            return "warning"
         if self.failed:
             return "warning"
         if self.pending:
@@ -103,6 +109,21 @@ async def _question_count(session, bot_id: int, start: datetime | None = None) -
     return int(await session.scalar(statement) or 0)
 
 
+async def _telegram_health(session, bot: BotInstance) -> tuple[bool, str | None]:
+    if not bot.is_active:
+        return False, "Проект отключён"
+    try:
+        token = await resolve_bot_token(session, settings, bot)
+        me = await asyncio.wait_for(verify_telegram_token(token), timeout=3.0)
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+    expected = bot.username.lstrip("@").lower()
+    actual = (me.username or "").lstrip("@").lower()
+    if actual != expected:
+        return False, f"Telegram username mismatch: database=@{expected}, telegram=@{actual or 'unknown'}"
+    return True, None
+
+
 async def _project_row(session, bot: BotInstance, now: datetime) -> ProjectRow:
     day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week = now - timedelta(days=7)
@@ -123,6 +144,7 @@ async def _project_row(session, bot: BotInstance, now: datetime) -> ProjectRow:
             PaymentGatewayConfig.is_active.is_(True),
         )
     )
+    telegram_ok, telegram_error = await _telegram_health(session, bot)
     return ProjectRow(
         bot=bot,
         users=await _count(session, User, User.bot_id == bot.id),
@@ -145,6 +167,8 @@ async def _project_row(session, bot: BotInstance, now: datetime) -> ProjectRow:
         active_broadcasts=await _count(session, Broadcast, Broadcast.bot_id == bot.id, Broadcast.status.in_(("draft", "scheduled", "processing"))),
         payment_pending=await _count(session, PaymentAttempt, PaymentAttempt.bot_id == bot.id, PaymentAttempt.status == "pending"),
         impaya_ready=gateway is not None,
+        telegram_ok=telegram_ok,
+        telegram_error=telegram_error,
         last_delivery_at=await session.scalar(select(func.max(DeliveryOutbox.delivered_at)).where(DeliveryOutbox.bot_id == bot.id)),
         last_payment_at=await session.scalar(select(func.max(PaymentAttempt.created_at)).where(PaymentAttempt.bot_id == bot.id)),
         last_user_at=await session.scalar(select(func.max(User.created_at)).where(User.bot_id == bot.id)),
@@ -177,7 +201,7 @@ async def projects_overview(request: Request):
             total_users=sum(row.users for row in rows),
             total_vip=sum(row.active_vip for row in rows),
             total_revenue=sum(row.revenue_month for row in rows),
-            total_errors=sum(row.failed for row in rows),
+            total_errors=sum(row.failed + (0 if row.telegram_ok else 1) for row in rows),
             drafts=drafts,
         ),
     )
@@ -246,7 +270,7 @@ async def project_details(request: Request, code: str, tab: str = "overview"):
     health = {
         "database": True,
         "redis": redis_ok,
-        "telegram": bool(bot.is_active and (bot.token_verified_at or bot.runtime_mode == "external")),
+        "telegram": row.telegram_ok,
         "delivery": row.failed == 0,
         "payments": row.impaya_ready or bool(settings.impaya_api_token),
     }
@@ -356,21 +380,21 @@ async def check_project_telegram(request: Request, code: str):
     item = next((bot for bot in allowed if bot.code == code), None)
     if item is None:
         raise HTTPException(status_code=403, detail="Доступ к проекту запрещён")
-    try:
-        async with SessionFactory() as session:
-            item = await session.scalar(select(BotInstance).where(BotInstance.code == code))
-            if item is None:
-                raise HTTPException(status_code=404, detail="Проект не найден")
+    async with SessionFactory() as session:
+        item = await session.scalar(select(BotInstance).where(BotInstance.code == code))
+        if item is None:
+            raise HTTPException(status_code=404, detail="Проект не найден")
+        try:
             token = await resolve_bot_token(session, settings, item)
             me = await verify_telegram_token(token)
-            item.username = me.username
-            item.telegram_bot_id = me.id
-            item.token_verified_at = datetime.now(timezone.utc)
+        except Exception:
+            item.token_verified_at = None
             await session.commit()
-    except HTTPException:
-        raise
-    except Exception:
-        return RedirectResponse(f"/admin/projects/{code}?tab=telegram&notice=token_error", status_code=303)
+            return RedirectResponse(f"/admin/projects/{code}?tab=telegram&notice=token_error", status_code=303)
+        item.username = me.username
+        item.telegram_bot_id = me.id
+        item.token_verified_at = datetime.now(timezone.utc)
+        await session.commit()
     return RedirectResponse(f"/admin/projects/{code}?tab=telegram&notice=telegram_ok", status_code=303)
 
 
