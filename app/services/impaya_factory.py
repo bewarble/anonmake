@@ -11,7 +11,7 @@ from app.services.impaya import ImpayaClient
 
 
 class PaymentGatewayDisabledError(RuntimeError):
-    """Raised when a project explicitly disabled its own payment gateway."""
+    """Raised when a project explicitly disabled new payment operations."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -32,14 +32,16 @@ async def load_impaya_config(
     session: AsyncSession,
     settings: Settings,
     bot_id: int,
+    *,
+    allow_inactive: bool = False,
 ) -> ImpayaRuntimeConfig:
     repo = PlatformAdminRepository(session)
     item = await repo.gateway_for_bot_any(bot_id)
 
-    # A stored project gateway is authoritative. Disabling it must disable
-    # payments for that project rather than silently falling back to the
-    # platform-wide legacy IMPAYA_* credentials.
-    if item is not None and not item.is_active:
+    # A stored project gateway is authoritative. Disabling it blocks all new
+    # invoices/MIT charges. Finalizers may opt in to the stored credentials so
+    # an already initiated transaction can still be verified and fulfilled.
+    if item is not None and not item.is_active and not allow_inactive:
         raise PaymentGatewayDisabledError(
             f"Impaya gateway is disabled for bot_id={bot_id}"
         )
