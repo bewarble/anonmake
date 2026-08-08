@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.bot_context import require_current_bot
+from app.core.bot_context import get_current_bot, require_current_bot
 from app.models.bot_instance import BotInstance
 from app.models.delivery import DeliveryOutbox
 
@@ -27,7 +27,14 @@ class DeliveryRepository:
         payload: dict | None = None,
         bot_id: int | None = None,
     ) -> DeliveryOutbox:
-        resolved_bot_id = bot_id or require_current_bot().id
+        current_bot = get_current_bot()
+        if bot_id is None:
+            resolved_bot_id = require_current_bot().id
+        else:
+            resolved_bot_id = int(bot_id)
+            if current_bot is not None and resolved_bot_id != current_bot.id:
+                raise ValueError("Delivery job must belong to the current bot")
+
         bind = self.session.get_bind()
         dialect = bind.dialect.name
         if dialect == "postgresql":
