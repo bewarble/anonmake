@@ -61,7 +61,6 @@ def compose(*args: str, capture: bool = False, check: bool = True):
     command = ["docker", "compose"]
     for file_name in COMPOSE_FILES:
         command.extend(("-f", file_name))
-    command.extend(("--profile", "multibot"))
     command.extend(args)
     return run(command, capture=capture, check=check)
 
@@ -299,7 +298,7 @@ def main() -> None:
         step("Миграции", run_migrations)
         step(
             "Пересоздание сервисов",
-            lambda: compose("up", "-d", "--force-recreate", "--no-deps", *services),
+            lambda: compose("up", "-d", "--force-recreate", "--no-deps", "--remove-orphans", *services),
         )
         step("Web healthcheck", lambda: wait_for_web(args.health_timeout))
         service_state = step(
