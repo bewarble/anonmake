@@ -36,6 +36,17 @@ def main() -> None:
     assert "PaymentGatewayConfig.provider == provider" in repository
     assert "PaymentGatewayConfig.is_active" not in repository
 
+    due_ids = function_source("app/repositories/billing.py", "due_subscription_ids")
+    due_filter = function_source("app/repositories/billing.py", "_gateway_not_explicitly_disabled")
+    assert "self._gateway_not_explicitly_disabled()" in due_ids
+    assert "PaymentGatewayConfig.bot_id == Subscription.bot_id" in due_filter
+    assert 'PaymentGatewayConfig.provider == "impaya"' in due_filter
+    assert "PaymentGatewayConfig.is_active.is_(False)" in due_filter
+
+    worker_entry = (ROOT / "app/worker.py").read_text(encoding="utf-8")
+    assert "client_factory=client_factory" in worker_entry
+    assert "ImpayaClient(" not in worker_entry
+
     admin = (ROOT / "app/web/admin_platform.py").read_text(encoding="utf-8")
     assert "repo.gateway_for_bot_any(bot.id)" in admin
     assert "current = await repo.gateway_for_bot_any(bot_id)" in admin
@@ -70,6 +81,8 @@ def main() -> None:
 
     print("Project payment gateway disable check: OK")
     print("Inactive project gateway blocks new invoices and recurrent charges")
+    print("Disabled projects cannot occupy or starve automatic billing batches")
+    print("Production billing uses only project-owned Impaya clients")
     print("In-flight transactions can still be authenticated and finalized")
     print("Legacy global Impaya fallback is used only when no project gateway exists")
     print("Admin editing preserves encrypted credentials while gateway is disabled")
