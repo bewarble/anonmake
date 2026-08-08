@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import time
 
 from aiogram import Bot, Dispatcher
 from sqlalchemy import select
@@ -23,10 +24,19 @@ from app.services.bot_credentials import resolve_bot_token
 
 logger = logging.getLogger(__name__)
 
+RECONCILE_SECONDS = 20
+MAX_RESTART_BACKOFF_SECONDS = 600
+STABLE_RUNTIME_SECONDS = 300
+
 
 def token_fingerprint(token: str) -> str:
     """Compare credentials without keeping or logging the token itself."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def restart_backoff_seconds(failure_count: int) -> int:
+    exponent = max(0, min(failure_count - 1, 10))
+    return min(RECONCILE_SECONDS * (2**exponent), MAX_RESTART_BACKOFF_SECONDS)
 
 
 async def run_instance(instance: BotInstance, token: str, settings) -> None:
@@ -95,14 +105,15 @@ async def main() -> None:
     await init_database()
     tasks: dict[int, asyncio.Task] = {}
     task_token_fingerprints: dict[int, str] = {}
+    task_started_at: dict[int, float] = {}
+    failure_counts: dict[int, int] = {}
+    retry_after: dict[int, float] = {}
     known_instances: dict[int, BotInstance] = {}
     mark_worker_heartbeat("managed-bots", state="started", active_count=0)
     try:
         while True:
+            now_monotonic = time.monotonic()
             async with SessionFactory() as session:
-                # Stage 64: every active Telegram project is owned by this single
-                # runtime. A token may live encrypted in DB or, for legacy projects
-                # during migration, still come from the existing environment.
                 instances = list((await session.execute(
                     select(BotInstance).where(
                         BotInstance.runtime_mode == "managed",
@@ -112,35 +123,78 @@ async def main() -> None:
                 known_instances.update({item.id: item for item in instances})
                 active_ids = {item.id for item in instances}
                 crash_count = 0
+
                 for bot_id, task in list(tasks.items()):
+                    started_at = task_started_at.get(bot_id, now_monotonic)
+                    if not task.done() and now_monotonic - started_at >= STABLE_RUNTIME_SECONDS:
+                        failure_counts.pop(bot_id, None)
+                        retry_after.pop(bot_id, None)
+
                     if task.done():
+                        instance = known_instances.get(bot_id)
                         if not task.cancelled():
                             exc = task.exception()
-                            instance = known_instances.get(bot_id)
-                            if exc is not None and instance is not None:
+                            # start_polling returning by itself is also an
+                            # unexpected runtime stop and must not tight-loop.
+                            if exc is None:
+                                exc = RuntimeError("Managed polling stopped unexpectedly")
+                                setattr(exc, "managed_runtime_stage", "polling")
+                            if instance is not None:
                                 crash_count += 1
                                 await record_runtime_crash(instance, exc)
+                            failures = failure_counts.get(bot_id, 0) + 1
+                            failure_counts[bot_id] = failures
+                            delay = restart_backoff_seconds(failures)
+                            retry_after[bot_id] = now_monotonic + delay
+                            logger.warning(
+                                "Managed project restart backed off bot_id=%s failures=%s delay_seconds=%s",
+                                bot_id,
+                                failures,
+                                delay,
+                            )
                         tasks.pop(bot_id, None)
                         task_token_fingerprints.pop(bot_id, None)
+                        task_started_at.pop(bot_id, None)
                         continue
+
                     if bot_id not in active_ids:
                         await stop_task(task)
                         tasks.pop(bot_id, None)
                         task_token_fingerprints.pop(bot_id, None)
+                        task_started_at.pop(bot_id, None)
+                        failure_counts.pop(bot_id, None)
+                        retry_after.pop(bot_id, None)
+
+                # Remove retry state for projects no longer owned by this
+                # supervisor so a later re-enable starts cleanly.
+                for bot_id in set(failure_counts) - active_ids:
+                    failure_counts.pop(bot_id, None)
+                    retry_after.pop(bot_id, None)
 
                 for item in instances:
                     try:
                         token = await resolve_bot_token(session, settings, item)
                     except Exception as exc:
+                        # Credential-resolution failures are subject to the same
+                        # backoff as polling crashes; otherwise a bad encrypted
+                        # token would fill logs/audit every reconciliation tick.
+                        if now_monotonic < retry_after.get(item.id, 0.0):
+                            continue
                         crash_count += 1
                         await record_runtime_crash(item, exc)
+                        failures = failure_counts.get(item.id, 0) + 1
+                        failure_counts[item.id] = failures
+                        retry_after[item.id] = now_monotonic + restart_backoff_seconds(failures)
                         continue
+
                     fingerprint = token_fingerprint(token)
                     running_task = tasks.get(item.id)
-                    if (
-                        running_task is not None
-                        and task_token_fingerprints.get(item.id) != fingerprint
-                    ):
+                    previous_fingerprint = task_token_fingerprints.get(item.id)
+                    credential_changed = (
+                        previous_fingerprint is not None
+                        and previous_fingerprint != fingerprint
+                    )
+                    if running_task is not None and credential_changed:
                         logger.info(
                             "Managed project credential changed; restarting",
                             extra={"bot_code": item.code},
@@ -148,22 +202,42 @@ async def main() -> None:
                         await stop_task(running_task)
                         tasks.pop(item.id, None)
                         task_token_fingerprints.pop(item.id, None)
+                        task_started_at.pop(item.id, None)
+                        failure_counts.pop(item.id, None)
+                        retry_after.pop(item.id, None)
+
+                    # If credentials can be resolved again after a prior
+                    # resolution failure, do not make the operator wait for an
+                    # old failure backoff after they fixed the secret.
+                    if previous_fingerprint is not None and previous_fingerprint != fingerprint:
+                        failure_counts.pop(item.id, None)
+                        retry_after.pop(item.id, None)
 
                     if item.id not in tasks:
+                        if now_monotonic < retry_after.get(item.id, 0.0):
+                            continue
                         tasks[item.id] = asyncio.create_task(
                             run_instance(item, token, settings),
                             name=f"managed-bot-{item.code}",
                         )
                         task_token_fingerprints[item.id] = fingerprint
+                        task_started_at[item.id] = now_monotonic
                         logger.info("Managed project started", extra={"bot_code": item.code})
+
+                backoff_count = sum(
+                    1
+                    for bot_id in active_ids
+                    if now_monotonic < retry_after.get(bot_id, 0.0)
+                )
                 mark_worker_heartbeat(
                     "managed-bots",
                     state="polling",
                     configured_count=len(instances),
                     active_count=len(tasks),
+                    backoff_count=backoff_count,
                     crash_count=crash_count,
                 )
-            await asyncio.sleep(20)
+            await asyncio.sleep(RECONCILE_SECONDS)
     finally:
         mark_worker_heartbeat("managed-bots", state="stopping", active_count=len(tasks))
         for task in tasks.values():
