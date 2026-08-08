@@ -37,7 +37,7 @@ def decode_bot_error_event(row: AdminAuditLog) -> dict[str, Any]:
         "update_id": details.get("update_id"),
         "update_type": details.get("update_type") or "—",
         "request_id": details.get("request_id") or "—",
-        "bot_id": details.get("bot_id"),
+        "bot_id": row.bot_id or details.get("bot_id"),
         "bot_code": details.get("bot_code") or "—",
         "bot_username": details.get("bot_username") or "—",
     }
@@ -79,6 +79,7 @@ async def record_bot_error(
         async with SessionFactory() as session:
             session.add(
                 AdminAuditLog(
+                    bot_id=bot.id if bot else None,
                     admin_telegram_id=0,
                     action="bot_error",
                     target=error_id,
