@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 import logging
 import time
 
+from app.core.bot_context import CurrentBot, reset_current_bot, set_current_bot
 from app.core.performance import WORKER_BATCHES, WORKER_BATCH_SIZE
 from app.core.worker_health import mark_worker_heartbeat
 from app.database.session import SessionFactory
 from app.models.billing import Subscription
+from app.models.bot_instance import BotInstance
 from app.repositories.billing import BillingRepository
 from app.services.billing import BillingService, ChargeDecision
 from app.services.impaya import ImpayaClient
@@ -165,61 +167,84 @@ class BillingWorker:
                     stats.skipped += 1
                     return
 
-                method = await repo.payment_method_for_user(
-                    subscription.user_id
-                )
-                if (
-                    method is None
-                    or not method.is_active
-                    or not method.is_recurrent
-                    or not method.binding_id
-                    or not method.impaya_user_id
-                ):
-                    stats.skipped += 1
-                    return
-
-                owned_client = None
-                try:
-                    client = self.client
-                    if self.client_factory is not None:
-                        owned_client = await self.client_factory(
-                            session, subscription.bot_id
-                        )
-                        client = owned_client
-                    if client is None:
-                        raise RuntimeError("Impaya client is not configured")
-                    result = await BillingService(
-                        session,
-                        client,
-                        **self.options,
-                    ).renew(subscription, method)
-                except Exception:
-                    await session.rollback()
+                instance = await session.get(BotInstance, subscription.bot_id)
+                if instance is None:
                     stats.failed += 1
-                    logger.exception(
-                        "Subscription renewal failed subscription=%s",
+                    logger.error(
+                        "Billing project not found subscription=%s bot_id=%s",
                         subscription.id,
+                        subscription.bot_id,
                     )
                     return
-                finally:
-                    if owned_client is not None:
-                        await owned_client.close()
 
-                if result.decision == ChargeDecision.SUCCESS:
-                    stats.success += 1
-                elif result.decision == ChargeDecision.INSUFFICIENT:
-                    stats.insufficient += 1
-                elif result.decision == ChargeDecision.PENDING:
-                    stats.pending += 1
-                else:
-                    stats.failed += 1
-
-                logger.info(
-                    "Renewal processed subscription=%s decision=%s attempt=%s",
-                    subscription.id,
-                    result.decision.value,
-                    result.attempt.id,
+                context_token = set_current_bot(
+                    CurrentBot(
+                        instance.id,
+                        instance.code,
+                        instance.username,
+                        instance.display_name,
+                    )
                 )
+                try:
+                    method = await repo.payment_method_for_user(
+                        subscription.user_id
+                    )
+                    if (
+                        method is None
+                        or not method.is_active
+                        or not method.is_recurrent
+                        or not method.binding_id
+                        or not method.impaya_user_id
+                    ):
+                        stats.skipped += 1
+                        return
+
+                    owned_client = None
+                    try:
+                        client = self.client
+                        if self.client_factory is not None:
+                            owned_client = await self.client_factory(
+                                session, subscription.bot_id
+                            )
+                            client = owned_client
+                        if client is None:
+                            raise RuntimeError("Impaya client is not configured")
+                        result = await BillingService(
+                            session,
+                            client,
+                            **self.options,
+                        ).renew(subscription, method)
+                    except Exception:
+                        await session.rollback()
+                        stats.failed += 1
+                        logger.exception(
+                            "Subscription renewal failed subscription=%s bot=%s",
+                            subscription.id,
+                            instance.code,
+                        )
+                        return
+                    finally:
+                        if owned_client is not None:
+                            await owned_client.close()
+
+                    if result.decision == ChargeDecision.SUCCESS:
+                        stats.success += 1
+                    elif result.decision == ChargeDecision.INSUFFICIENT:
+                        stats.insufficient += 1
+                    elif result.decision == ChargeDecision.PENDING:
+                        stats.pending += 1
+                    else:
+                        stats.failed += 1
+
+                    logger.info(
+                        "Renewal processed subscription=%s bot=%s decision=%s attempt=%s",
+                        subscription.id,
+                        instance.code,
+                        result.decision.value,
+                        result.attempt.id,
+                    )
+                finally:
+                    reset_current_bot(context_token)
             finally:
                 try:
                     await repo.release_subscription_lock(subscription_id)
