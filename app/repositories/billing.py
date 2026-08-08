@@ -55,7 +55,6 @@ class BillingRepository:
         )
         return list(result.scalars())
 
-
     async def due_subscription_ids(
         self,
         now: datetime,
@@ -101,6 +100,22 @@ class BillingRepository:
             {"key": int(subscription_id)},
         )
 
+    async def lock_subscription_transaction(self, subscription_id: int) -> None:
+        """Serialize user/admin mutations with the recurrent-charge worker.
+
+        The worker owns a session advisory lock while an external charge is in
+        flight. Mutations use the transaction-scoped variant of the same key so
+        they either win before charging starts or wait for the in-flight charge
+        to finish. The xact lock is released automatically on commit/rollback.
+        """
+        bind = self.session.get_bind()
+        if bind.dialect.name != "postgresql":
+            return
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:key)"),
+            {"key": int(subscription_id)},
+        )
+
     async def expire_finished_access(self, now: datetime) -> int:
         result = await self.session.execute(
             update(Subscription)
@@ -128,13 +143,17 @@ class BillingRepository:
         )
         return result.scalar_one_or_none()
 
-
     async def cancel_auto_renew(
         self,
         subscription: Subscription,
         *,
         cancelled_at: datetime,
     ) -> Subscription:
+        await self.lock_subscription_transaction(subscription.id)
+        # The object may have been loaded before we waited for an in-flight
+        # recurrent charge. Refresh it so cancellation always applies to the
+        # authoritative post-charge state instead of overwriting stale values.
+        await self.session.refresh(subscription)
         subscription.auto_renew = False
         subscription.next_charge_at = None
         subscription.cancelled_at = cancelled_at
