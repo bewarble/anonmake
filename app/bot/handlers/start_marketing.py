@@ -35,7 +35,7 @@ async def track_start_source(
         marketing = MarketingRepository(session)
         source = await marketing.source_by_code(payload.removeprefix("src_"))
         if source is not None:
-            await marketing.record_source_click(source)
+            await marketing.record_source_click(source, user)
             if is_new_user:
                 attributed = await marketing.register_source_start(
                     source=source,
