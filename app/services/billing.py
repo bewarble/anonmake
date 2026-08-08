@@ -70,7 +70,22 @@ class BillingService:
         self.fallback_duration = fallback_duration
 
     async def renew(self, subscription: Subscription, method: PaymentMethod) -> ChargeResult:
-        cycle = datetime.now(timezone.utc).date().isoformat()
+        now = datetime.now(timezone.utc)
+        pending = await self.repo.pending_recurrent_attempt(subscription.id)
+        if pending is not None:
+            period = (
+                self.primary_duration
+                if pending.attempt_kind == "primary"
+                else self.fallback_duration
+            )
+            return await self._recover_known_operation(
+                subscription,
+                pending,
+                access_period=period,
+                now=now,
+            )
+
+        cycle = now.date().isoformat()
         primary = await self._charge(
             subscription,
             method,
