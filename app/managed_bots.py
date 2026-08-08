@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 
 from aiogram import Bot, Dispatcher
@@ -21,6 +22,11 @@ from app.models.bot_instance import BotInstance
 from app.services.bot_credentials import resolve_bot_token
 
 logger = logging.getLogger(__name__)
+
+
+def token_fingerprint(token: str) -> str:
+    """Compare credentials without keeping or logging the token itself."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 async def run_instance(instance: BotInstance, token: str, settings) -> None:
@@ -64,11 +70,17 @@ async def record_runtime_crash(instance: BotInstance, exc: BaseException) -> Non
     )
 
 
+async def stop_task(task: asyncio.Task) -> None:
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+
+
 async def main() -> None:
     settings = load_settings()
     configure_logging(settings.log_level, settings.json_logs)
     await init_database()
     tasks: dict[int, asyncio.Task] = {}
+    task_token_fingerprints: dict[int, str] = {}
     known_instances: dict[int, BotInstance] = {}
     mark_worker_heartbeat("managed-bots", state="started", active_count=0)
     try:
@@ -93,17 +105,35 @@ async def main() -> None:
                                 crash_count += 1
                                 await record_runtime_crash(instance, exc)
                         tasks.pop(bot_id, None)
+                        task_token_fingerprints.pop(bot_id, None)
                         continue
                     if bot_id not in active_ids:
-                        task.cancel()
+                        await stop_task(task)
                         tasks.pop(bot_id, None)
+                        task_token_fingerprints.pop(bot_id, None)
+
                 for item in instances:
+                    token = await resolve_bot_token(session, settings, item)
+                    fingerprint = token_fingerprint(token)
+                    running_task = tasks.get(item.id)
+                    if (
+                        running_task is not None
+                        and task_token_fingerprints.get(item.id) != fingerprint
+                    ):
+                        logger.info(
+                            "Managed project credential changed; restarting",
+                            extra={"bot_code": item.code},
+                        )
+                        await stop_task(running_task)
+                        tasks.pop(item.id, None)
+                        task_token_fingerprints.pop(item.id, None)
+
                     if item.id not in tasks:
-                        token = await resolve_bot_token(session, settings, item)
                         tasks[item.id] = asyncio.create_task(
                             run_instance(item, token, settings),
                             name=f"managed-bot-{item.code}",
                         )
+                        task_token_fingerprints[item.id] = fingerprint
                         logger.info("Managed project started", extra={"bot_code": item.code})
                 mark_worker_heartbeat(
                     "managed-bots",
