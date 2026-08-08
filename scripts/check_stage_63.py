@@ -161,6 +161,9 @@ def main() -> None:
         "User.is_blocked.is_(True)",
         "User.blocked_at >= left",
         "PaymentMethod.bot_id == bot_id",
+        "total_cards: int",
+        "PaymentMethod.binding_id.is_not(None)",
+        "Subscription.auto_renew.is_(True)",
     )
     require(
         "app/core/admin_metrics.py",
@@ -192,22 +195,40 @@ def main() -> None:
         "User.bot_id == item.bot_id",
         "Subscription.bot_id == item.bot_id",
         "bot_id=item.bot_id",
+        'payload={"parse_mode": "HTML"}',
+        "escape(question.text)",
     )
     require(
         "app/bot/handlers/admin_stage25_1.py",
         "• Живые —",
         "• Мертвые —",
-        "♻️ <b>Прирост</b>",
-        "📈 <b>Саморост</b>",
+        "📈 <b>Прирост</b>",
+        "♻️ <b>Саморост</b>",
+        "⚡️ Всего карт:",
+        "💳 Активные карты:",
+        "text_prompt_message_id=prompt.message_id",
         "async def delete_message_quietly",
         "await delete_message_quietly(message)",
         "await delete_message_quietly(callback.message)",
         "await callback.message.answer_document",
-        "await callback.message.answer(admin_texts.BROADCAST_TEXT_PROMPT",
+    )
+    require(
+        "app/core/admin_texts.py",
+        'BROADCAST_TEXT_PROMPT = "✍️ Отправьте текст рассылки."',
+    )
+    require(
+        "app/bot/keyboards/marketing.py",
+        'text="← Назад"',
+        'callback_data="adminm:broadcast:back_audience"',
     )
     require(
         "app/bot/handlers/admin_marketing.py",
         "async def delete_message_quietly",
+        "async def broadcast_back_audience",
+        "text_prompt_message_id",
+        "delete_message_id_quietly",
+        'parse_mode="HTML"',
+        "escape(text)",
         "await delete_message_quietly(callback.message)",
         "await callback.message.answer(admin_texts.BROADCAST_QUEUED.format",
     )
@@ -215,6 +236,10 @@ def main() -> None:
         "app/bot/handlers/source_management.py",
         "async def delete_message_quietly",
         "await delete_message_quietly(callback.message)",
+    )
+    reject(
+        "app/core/admin_texts.py",
+        "Чтобы выйти, нажмите «Отмена» или отправьте /cancel.",
     )
     reject("app/bot/handlers/admin_marketing.py", "edit_text(admin_texts.BROADCAST_CANCELLED)")
     require(
@@ -234,6 +259,8 @@ def main() -> None:
     print("Telegram admin statistics/export/profit/sources/broadcasts: scoped to current bot")
     print("Telegram admin navigation: replace-style messages; cancel deletes silently")
     print("Alive/dead users: live Telegram my_chat_member state with delivery fallback")
+    print("Admin statistics: total saved tokens + active auto-renew cards")
+    print("Broadcast UX: back to audience, clean prompt, HTML-safe delivery")
     print("Admin charts: labeled daily users/blocked and turnover series")
     print("Reveal consent: Mooncloud terms/privacy/pricing links")
     print("Question and answer UX: final")
