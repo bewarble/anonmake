@@ -98,12 +98,36 @@ def main() -> None:
     for model in ("User", "PaymentAttempt", "PaymentMethod", "TrafficSource"):
         assert f"_scope_filter(request, {model})" in search_route, model
 
+    # Stage31 support controls can trigger real MIT charges and therefore must
+    # bind user/subscription/card/gateway to the selected/owning project.
+    stage31 = "app/web/admin_stage31.py"
+    entities = function_source(stage31, "load_entities")
+    assert "User.bot_id == bot_id" in entities
+    assert "Subscription.bot_id == user.bot_id" in entities
+    assert "PaymentMethod.bot_id == user.bot_id" in entities
+    assert "session.get(User" not in entities
+    control = function_source(stage31, "user_control_submit")
+    assert "bot_id=selected_bot_id(request)" in control.replace(" ", "")
+    assert "load_impaya_config(session, settings, owner_bot.id)" in control
+    assert "create_impaya_client(config)" in control
+    assert "with bot_context(owner_bot)" in control
+    subscriptions = function_source(stage31, "subscriptions")
+    assert "Subscription.bot_id == bot_id" in subscriptions
+    assert "User.bot_id == bot_id" in subscriptions
+
+    support = "app/services/admin_subscription_control.py"
+    assert "require_current_bot().id" in function_source(support, "_require_current_subscription")
+    assert "lock_subscription_transaction" in function_source(support, "set_auto_renew")
+    assert "cancel_auto_renew" in function_source(support, "set_auto_renew")
+    assert "lock_subscription_transaction" in function_source(support, "extend_access")
+
     print("Admin project isolation check: OK")
     print("Stage29 source IDOR and metrics: isolated")
     print("Stage27 CRM/users/sources/broadcasts: isolated")
     print("Stage28 overview/source creation: isolated")
     print("Scoped legacy dashboard: isolated")
     print("Admin cross-entity search: selected-project scoped")
+    print("Stage31 subscription support actions and gateway: isolated")
 
 
 if __name__ == "__main__":
