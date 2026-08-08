@@ -11,7 +11,7 @@ from app.core.bot_context import get_current_bot, require_current_bot
 from app.models.billing import PaymentMethod, Subscription
 from app.models.bot_instance import BotInstance
 from app.models.delivery import DeliveryOutbox
-from app.models.marketing import Broadcast, SourceAttribution, TrafficSource
+from app.models.marketing import Broadcast, SourceAttribution, SourceClick, TrafficSource
 from app.models.user import User
 
 
@@ -42,9 +42,17 @@ class MarketingRepository:
             )
         )
 
-    async def record_source_click(self, source: TrafficSource) -> None:
+    async def record_source_click(self, source: TrafficSource, user: User) -> bool:
+        click = SourceClick(source_id=source.id, user_id=user.id)
+        try:
+            async with self.session.begin_nested():
+                self.session.add(click)
+                await self.session.flush()
+        except IntegrityError:
+            return False
         source.clicks = int(source.clicks or 0) + 1
         await self.session.flush()
+        return True
 
     async def register_source_start(self, *, source: TrafficSource, user: User) -> bool:
         existing = await self.session.scalar(select(SourceAttribution.id).where(SourceAttribution.user_id == user.id))
