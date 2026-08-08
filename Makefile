@@ -7,7 +7,7 @@ COMPOSE = docker compose \
 .PHONY: docker-config docker-build docker-up docker-down docker-restart \
 	docker-status docker-logs docker-logs-all docker-migrate docker-check \
 	docker-check-dependencies docker-shell docker-reset-db stabilize-check \
-	stabilize-apply stage50-check stage51-check stage52-check stage53-check stage54-check stage55-check stage56-check stage57-check stage58-check stage59-check stage60-check stage61-check stage62-check stage63-check release-check release-check-runtime launch-check deploy
+	stabilize-apply stage50-check stage51-check stage52-check stage53-check stage54-check stage55-check stage56-check stage57-check stage58-check stage59-check stage60-check stage61-check stage62-check stage63-check stage64-check release-check release-check-runtime launch-check deploy
 
 docker-config:
 	$(COMPOSE) config --quiet
@@ -16,19 +16,19 @@ docker-build:
 	$(COMPOSE) build
 
 docker-up:
-	$(COMPOSE) up -d --build
+	$(COMPOSE) up -d --build --remove-orphans
 
 docker-down:
 	$(COMPOSE) down
 
 docker-restart:
-	$(COMPOSE) restart bot bot-two bot-three bot-four managed-bots web worker delivery-worker broadcast-worker
+	$(COMPOSE) restart managed-bots web worker delivery-worker broadcast-worker
 
 docker-status:
 	$(COMPOSE) ps
 
 docker-logs:
-	$(COMPOSE) logs --tail=200 -f bot
+	$(COMPOSE) logs --tail=200 -f managed-bots
 
 docker-logs-all:
 	$(COMPOSE) logs --tail=200 -f
@@ -37,14 +37,14 @@ docker-migrate:
 	$(COMPOSE) run --rm migrate
 
 docker-check:
-	$(COMPOSE) run --rm bot python -m scripts.check_project
-	$(COMPOSE) run --rm bot python -m scripts.check_migration_head
+	$(COMPOSE) run --rm web python -m scripts.check_project
+	$(COMPOSE) run --rm web python -m scripts.check_migration_head
 
 docker-check-dependencies:
-	$(COMPOSE) run --rm bot python -m scripts.check_dependencies
+	$(COMPOSE) run --rm web python -m scripts.check_dependencies
 
 docker-shell:
-	$(COMPOSE) run --rm bot sh
+	$(COMPOSE) run --rm web sh
 
 # Destructive: removes PostgreSQL, Redis and backup volumes.
 docker-reset-db:
@@ -82,6 +82,8 @@ stage62-check:
 	python3 -m scripts.check_stage_62
 stage63-check:
 	python3 -m scripts.check_stage_63
+stage64-check:
+	python3 -m scripts.check_stage_64
 release-check:
 	python3 -m scripts.release_check
 release-check-runtime:
