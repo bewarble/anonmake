@@ -46,7 +46,23 @@ async def load_admin_bot_scope(request: Request) -> AdminBotScope:
     principal = auth.session_from_request(request)
     current_admin = None
     async with SessionFactory() as session:
-        if principal is None or principal.admin_id is None:
+        repo = PlatformAdminRepository(session)
+        if principal is None:
+            bots = list(
+                (
+                    await session.execute(
+                        select(BotInstance)
+                        .where(BotInstance.is_active.is_(True))
+                        .order_by(BotInstance.id)
+                    )
+                ).scalars()
+            )
+        elif principal.admin_id is None:
+            # Bootstrap sessions are valid only while the platform has no DB
+            # administrators. Creating the first DB account immediately
+            # invalidates every previously issued environment-superadmin cookie.
+            if await repo.admin_count() > 0:
+                return AdminBotScope((), None, denied=True)
             bots = list(
                 (
                     await session.execute(
@@ -57,7 +73,6 @@ async def load_admin_bot_scope(request: Request) -> AdminBotScope:
                 ).scalars()
             )
         else:
-            repo = PlatformAdminRepository(session)
             current_admin = await repo.admin_by_id(principal.admin_id)
             # The database is authoritative for account status and role. A signed
             # cookie may still be cryptographically valid after an admin is
