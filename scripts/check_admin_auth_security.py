@@ -24,6 +24,13 @@ def main() -> None:
     assert "hmac.compare_digest" in auth
     assert "DUMMY_PASSWORD_HASH" in auth_file
     assert "verify_password(password, DUMMY_PASSWORD_HASH)" in auth
+    assert "credential_stamp = password_fingerprint(admin.password_hash)" in auth
+
+    token_create = function_source("app/web/admin_auth.py", "create_token")
+    token_parse = function_source("app/web/admin_auth.py", "parse_token")
+    assert "principal.credential_stamp" in token_create
+    assert "credential_stamp" in token_parse
+    assert "issued_at" in token_parse
 
     repository = function_source("app/repositories/platform_admin.py", "admin_count")
     assert "func.count(AdminUser.id)" in repository
@@ -32,6 +39,9 @@ def main() -> None:
     assert "principal.admin_id is None" in scope
     assert "await repo.admin_count() > 0" in scope
     assert "AdminBotScope((), None, denied=True)" in scope
+    assert "password_fingerprint(current_admin.password_hash)" in scope
+    assert "principal.credential_stamp" in scope
+    assert "hmac.compare_digest" in scope
 
     runtime = function_source("scripts/check_web_admin_runtime.py", "check_bootstrap_admin")
     assert "admin_count > 0" in runtime
@@ -63,6 +73,7 @@ def main() -> None:
     print("Existing bootstrap sessions are invalidated after first DB admin creation")
     print("Unknown DB usernames pay a dummy PBKDF2 verification cost")
     print("Redis-backed per-user and per-IP login rate limits are installed")
+    print("DB admin sessions are bound to the current password hash")
 
 
 if __name__ == "__main__":
