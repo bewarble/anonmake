@@ -13,6 +13,13 @@ from app.web.admin import login_redirect, page_context, require_session, templat
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
 
+def _scope_filter(request: Request, model):
+    bot_id = getattr(request.state.admin_bot_scope, "bot_id", None)
+    if bot_id is None:
+        return None
+    return model.bot_id == bot_id
+
+
 @router.get("/search", response_class=HTMLResponse)
 async def global_search(request: Request, q: str = ""):
     if require_session(request) is None:
@@ -35,13 +42,14 @@ async def global_search(request: Request, q: str = ""):
                 user_filters.append(User.telegram_id == numeric)
                 if numeric <= 2**31 - 1:
                     user_filters.append(User.id == numeric)
+            user_scope = _scope_filter(request, User)
+            user_query = select(User).where(or_(*user_filters))
+            if user_scope is not None:
+                user_query = user_query.where(user_scope)
             users = list(
                 (
                     await session.execute(
-                        select(User)
-                        .where(or_(*user_filters))
-                        .order_by(User.id.desc())
-                        .limit(25)
+                        user_query.order_by(User.id.desc()).limit(25)
                     )
                 ).scalars()
             )
@@ -52,47 +60,50 @@ async def global_search(request: Request, q: str = ""):
             ]
             if query.isdigit() and int(query) <= 2**31 - 1:
                 payment_filters.append(PaymentAttempt.id == int(query))
+            payment_scope = _scope_filter(request, PaymentAttempt)
+            payment_query = select(PaymentAttempt).where(or_(*payment_filters))
+            if payment_scope is not None:
+                payment_query = payment_query.where(payment_scope)
             payments = list(
                 (
                     await session.execute(
-                        select(PaymentAttempt)
-                        .where(or_(*payment_filters))
-                        .order_by(PaymentAttempt.id.desc())
-                        .limit(25)
+                        payment_query.order_by(PaymentAttempt.id.desc()).limit(25)
                     )
                 ).scalars()
             )
 
+            method_scope = _scope_filter(request, PaymentMethod)
+            method_query = select(PaymentMethod).where(
+                or_(
+                    PaymentMethod.binding_id.ilike(f"%{query}%"),
+                    PaymentMethod.impaya_user_id.ilike(f"%{query}%"),
+                    PaymentMethod.merchant_user_id.ilike(f"%{query}%"),
+                )
+            )
+            if method_scope is not None:
+                method_query = method_query.where(method_scope)
             methods = list(
                 (
                     await session.execute(
-                        select(PaymentMethod)
-                        .where(
-                            or_(
-                                PaymentMethod.binding_id.ilike(f"%{query}%"),
-                                PaymentMethod.impaya_user_id.ilike(f"%{query}%"),
-                                PaymentMethod.merchant_user_id.ilike(f"%{query}%"),
-                            )
-                        )
-                        .order_by(PaymentMethod.id.desc())
-                        .limit(25)
+                        method_query.order_by(PaymentMethod.id.desc()).limit(25)
                     )
                 ).scalars()
             )
 
+            source_scope = _scope_filter(request, TrafficSource)
+            source_query = select(TrafficSource).where(
+                or_(
+                    TrafficSource.name.ilike(f"%{query}%"),
+                    TrafficSource.code.ilike(f"%{query}%"),
+                    TrafficSource.source_url.ilike(f"%{query}%"),
+                )
+            )
+            if source_scope is not None:
+                source_query = source_query.where(source_scope)
             sources = list(
                 (
                     await session.execute(
-                        select(TrafficSource)
-                        .where(
-                            or_(
-                                TrafficSource.name.ilike(f"%{query}%"),
-                                TrafficSource.code.ilike(f"%{query}%"),
-                                TrafficSource.source_url.ilike(f"%{query}%"),
-                            )
-                        )
-                        .order_by(TrafficSource.id.desc())
-                        .limit(25)
+                        source_query.order_by(TrafficSource.id.desc()).limit(25)
                     )
                 ).scalars()
             )
