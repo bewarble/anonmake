@@ -53,28 +53,16 @@ def _backup_is_valid(path: Path) -> bool:
 
 def _backups(limit: int = 8) -> list[dict]:
     try:
-        files = sorted(
-            BACKUP_DIR.glob("*.dump"),
-            key=lambda path: path.stat().st_mtime,
-            reverse=True,
-        )
+        files = sorted(BACKUP_DIR.glob("*.dump"), key=lambda path: path.stat().st_mtime, reverse=True)
     except OSError:
         return []
-
     result: list[dict] = []
     for path in files[:limit]:
         try:
             stat = path.stat()
         except OSError:
             continue
-        result.append(
-            {
-                "name": path.name,
-                "size": stat.st_size,
-                "modified_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
-                "valid": _backup_is_valid(path),
-            }
-        )
+        result.append({"name": path.name, "size": stat.st_size, "modified_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc), "valid": _backup_is_valid(path)})
     return result
 
 
@@ -95,38 +83,13 @@ async def system_page(request: Request):
     redis_ok = False
     database_head = "Не определена"
     queues = {"delivery": 0, "broadcasts": 0, "payments": 0}
-
     try:
         async with SessionFactory() as session:
             postgres_ok = bool(await session.scalar(text("SELECT TRUE")))
-            database_head = str(
-                await session.scalar(text("SELECT version_num FROM alembic_version"))
-                or "Не определена"
-            )
-            queues["delivery"] = int(
-                await session.scalar(
-                    select(func.count(DeliveryOutbox.id)).where(
-                        DeliveryOutbox.status.in_(("pending", "processing"))
-                    )
-                )
-                or 0
-            )
-            queues["broadcasts"] = int(
-                await session.scalar(
-                    select(func.count(Broadcast.id)).where(
-                        Broadcast.status.in_(("scheduled", "processing"))
-                    )
-                )
-                or 0
-            )
-            queues["payments"] = int(
-                await session.scalar(
-                    select(func.count(PaymentAttempt.id)).where(
-                        PaymentAttempt.status == "pending"
-                    )
-                )
-                or 0
-            )
+            database_head = str(await session.scalar(text("SELECT version_num FROM alembic_version")) or "Не определена")
+            queues["delivery"] = int(await session.scalar(select(func.count(DeliveryOutbox.id)).where(DeliveryOutbox.status.in_(("pending", "processing")))) or 0)
+            queues["broadcasts"] = int(await session.scalar(select(func.count(Broadcast.id)).where(Broadcast.status.in_(("scheduled", "processing")))) or 0)
+            queues["payments"] = int(await session.scalar(select(func.count(PaymentAttempt.id)).where(PaymentAttempt.status == "pending")) or 0)
     except Exception:
         postgres_ok = False
 
@@ -159,23 +122,18 @@ async def system_page(request: Request):
     )
 
 
-# Stage 48 observability routes share the platform operations registration point.
 from app.web import admin_observability as admin_observability_module  # noqa: E402
 
 for observability_route in admin_observability_module.router.routes:
-    if not any(
-        getattr(existing, "path", None) == getattr(observability_route, "path", None)
-        and getattr(existing, "methods", None) == getattr(observability_route, "methods", None)
-        for existing in router.routes
-    ):
+    if not any(getattr(existing, "path", None) == getattr(observability_route, "path", None) and getattr(existing, "methods", None) == getattr(observability_route, "methods", None) for existing in router.routes):
         router.routes.append(observability_route)
 
 
-# Stage 50 installs admin-only error pages and the outer response safety net.
 from app.web.admin_audit_scoped import install_scoped_admin_audit  # noqa: E402
 from app.web.admin_csrf import install_admin_csrf_guard  # noqa: E402
 from app.web.admin_error_ux import install_admin_error_ux  # noqa: E402
 from app.web.app import app as web_app  # noqa: E402
+from app.web.metrics_endpoint import install_metrics_endpoint  # noqa: E402
 from app.web.payment_return import install_payment_return  # noqa: E402
 from app.web.payment_webhook import install_impaya_webhook  # noqa: E402
 
@@ -183,4 +141,5 @@ install_admin_csrf_guard(web_app)
 install_admin_error_ux(web_app)
 install_impaya_webhook(web_app)
 install_payment_return(web_app)
+install_metrics_endpoint(web_app)
 install_scoped_admin_audit(web_app)
