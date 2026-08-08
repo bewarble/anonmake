@@ -21,8 +21,9 @@ def main() -> None:
     loader = function_source(factory_path, "load_impaya_config")
 
     assert "class PaymentGatewayDisabledError" in factory
+    assert "allow_inactive: bool = False" in factory
     assert "gateway_for_bot_any(bot_id)" in loader
-    assert "item is not None and (not item.is_active)" in loader
+    assert "not item.is_active and (not allow_inactive)" in loader
     assert "PaymentGatewayDisabledError" in loader
     assert "if item is None:" in loader
     assert "settings.impaya_api_token" in loader
@@ -39,9 +40,38 @@ def main() -> None:
     assert "repo.gateway_for_bot_any(bot.id)" in admin
     assert "current = await repo.gateway_for_bot_any(bot_id)" in admin
 
+    reveal = function_source("app/bot/handlers/reveals.py", "confirm_reveal")
+    assert "PaymentGatewayDisabledError" in reveal
+    assert "VIP_PAYMENT_UNAVAILABLE" in reveal
+    assert "allow_inactive=True" not in reveal
+
+    testpay = function_source("app/bot/handlers/payments.py", "test_payment")
+    assert "PaymentGatewayDisabledError" in testpay
+    assert "impaya_config.api_token" in testpay
+    assert "impaya_config.payment_form_url_template" in testpay
+    assert "settings.impaya_api_token" not in testpay
+
+    webhook = function_source("app/web/payment_webhook.py", "impaya_webhook")
+    assert "allow_inactive=True" in webhook
+    subscription_finalize = function_source(
+        "app/web/subscription_payments.py",
+        "finalize_subscription_payment",
+    )
+    assert "allow_inactive=True" in subscription_finalize
+    reveal_finalize = function_source(
+        "app/services/payment_notifications.py",
+        "finalize_checkout_and_notify",
+    )
+    assert "allow_inactive=True" in reveal_finalize
+
+    runtime = function_source("scripts/check_stage_62_runtime.py", "check_active_projects")
+    assert "PaymentGatewayDisabledError" in runtime
+    assert "payments intentionally disabled" in runtime
+
     print("Project payment gateway disable check: OK")
-    print("Stored inactive gateway fails closed and never falls back to global Impaya")
-    print("Legacy global Impaya fallback remains only for projects without a gateway row")
+    print("Inactive project gateway blocks new invoices and recurrent charges")
+    print("In-flight transactions can still be authenticated and finalized")
+    print("Legacy global Impaya fallback is used only when no project gateway exists")
     print("Admin editing preserves encrypted credentials while gateway is disabled")
 
 
