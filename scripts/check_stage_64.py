@@ -14,6 +14,9 @@ def main() -> None:
         assert legacy not in services, f"legacy polling service remains: {legacy}"
     assert 'command: ["python", "-m", "app.managed_bots"]' in compose
 
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert 'CMD ["python", "-m", "app.managed_bots"]' in dockerfile
+
     managed = (ROOT / "app/managed_bots.py").read_text(encoding="utf-8")
     assert 'BotInstance.runtime_mode == "managed"' in managed
     assert "BotInstance.is_active.is_(True)" in managed
@@ -45,10 +48,15 @@ def main() -> None:
     assert "UPDATE bot_instances SET runtime_mode = 'managed'" in migration
     assert 'server_default="managed"' in migration
 
+    doc = ROOT / "docs/STAGE_64_UNIFIED_BOT_RUNTIME.md"
+    assert doc.is_file()
+    assert "Unified Bot Runtime" in doc.read_text(encoding="utf-8")
+
     print("Stage 64 check: OK")
     print("All Telegram projects: one managed-bots runtime")
     print("Legacy bot/bot-two/bot-three/bot-four polling services: removed")
     print("BotInstance runtime default: managed")
+    print("Default Docker image command: managed-bots")
     print("Admin-encrypted and legacy environment credentials: supported")
     print("Token changes: hot-restarted inside managed runtime")
     print("docker-up/deploy remove orphaned legacy bot containers")
