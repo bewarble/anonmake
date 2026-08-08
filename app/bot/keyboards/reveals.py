@@ -1,6 +1,6 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.bot.ui import REVEAL_CLOSE, REVEAL_CONFIRM
+from app.bot.ui import ACTION_CANCEL, REVEAL_CONFIRM
 
 
 def reveal_consent_keyboard(
@@ -18,7 +18,7 @@ def reveal_consent_keyboard(
             ],
             [
                 InlineKeyboardButton(
-                    text=REVEAL_CLOSE,
+                    text=ACTION_CANCEL,
                     callback_data="reveal_close",
                 ),
             ],
