@@ -14,8 +14,9 @@ def upgrade() -> None:
     # Legacy projects may still resolve their token from environment variables;
     # projects configured in the admin panel use encrypted DB credentials.
     op.execute("UPDATE bot_instances SET runtime_mode = 'managed'")
+    op.alter_column("bot_instances", "runtime_mode", server_default="managed")
 
 
 def downgrade() -> None:
-    # Historical deployments used per-project polling containers.
+    op.alter_column("bot_instances", "runtime_mode", server_default="external")
     op.execute("UPDATE bot_instances SET runtime_mode = 'external'")
