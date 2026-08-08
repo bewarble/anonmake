@@ -4,11 +4,11 @@ import argparse
 from datetime import datetime, timezone
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
 from scripts.deploy import (
-    BACKUP_DIR,
     COMPOSE_FILES,
     DEFAULT_SERVICES,
     POSTGRES_CUSTOM_MAGIC,
@@ -22,6 +22,10 @@ class RestoreError(RuntimeError):
     pass
 
 
+SAFE_DATABASE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
+BACKUPS_ROOT = ROOT / "backups"
+
+
 def compose_command(*args: str) -> list[str]:
     command = ["docker", "compose"]
     for file_name in COMPOSE_FILES:
@@ -30,14 +34,20 @@ def compose_command(*args: str) -> list[str]:
     return command
 
 
+def validate_database_name(value: str) -> str:
+    if not SAFE_DATABASE_NAME.fullmatch(value) or value == "postgres":
+        raise RestoreError(f"Unsafe PostgreSQL database name: {value!r}")
+    return value
+
+
 def validate_backup(path: Path) -> Path:
     resolved = path.expanduser().resolve()
-    allowed_root = BACKUP_DIR.resolve()
+    allowed_root = BACKUPS_ROOT.resolve()
     try:
         resolved.relative_to(allowed_root)
     except ValueError as exc:
         raise RestoreError(
-            f"Restore accepts only deploy backups under {allowed_root}"
+            f"Restore accepts only backups under {allowed_root}"
         ) from exc
     if not resolved.is_file():
         raise RestoreError(f"Backup does not exist: {resolved}")
@@ -59,6 +69,7 @@ def database_command(*args: str, capture: bool = False) -> subprocess.CompletedP
 
 
 def restore_dump(path: Path, database: str) -> None:
+    database = validate_database_name(database)
     command = compose_command(
         "exec",
         "-T",
@@ -78,6 +89,7 @@ def restore_dump(path: Path, database: str) -> None:
 
 
 def drop_database(database: str) -> None:
+    database = validate_database_name(database)
     user = os.getenv("POSTGRES_USER", "anonmake")
     database_command(
         "psql",
@@ -97,10 +109,12 @@ def drop_database(database: str) -> None:
 
 
 def create_database(database: str) -> None:
+    database = validate_database_name(database)
     database_command("createdb", "-U", os.getenv("POSTGRES_USER", "anonmake"), database)
 
 
 def alembic_head(database: str) -> str:
+    database = validate_database_name(database)
     result = database_command(
         "psql",
         "-U",
@@ -115,7 +129,7 @@ def alembic_head(database: str) -> str:
 
 
 def validate_restore_in_temporary_database(path: Path) -> str:
-    temporary = f"anonmake_restore_check_{os.getpid()}"
+    temporary = validate_database_name(f"anonmake_restore_check_{os.getpid()}")
     try:
         drop_database(temporary)
         create_database(temporary)
@@ -137,7 +151,7 @@ def validate_restore_in_temporary_database(path: Path) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Fail-safe restore of an AnonMake deploy backup"
+        description="Fail-safe restore of an AnonMake PostgreSQL custom backup"
     )
     parser.add_argument("backup", type=Path)
     parser.add_argument(
@@ -153,9 +167,7 @@ def main() -> None:
             "Confirmation mismatch. Pass --confirm with the exact backup filename."
         )
 
-    target = os.getenv("POSTGRES_DB", "anonmake")
-    if not target or target == "postgres":
-        raise RestoreError("Refusing to restore into an unsafe POSTGRES_DB value")
+    target = validate_database_name(os.getenv("POSTGRES_DB", "anonmake"))
 
     # Never destroy production before proving that pg_restore can consume the
     # selected dump completely in an isolated database.
