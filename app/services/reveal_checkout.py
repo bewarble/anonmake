@@ -23,6 +23,22 @@ SUCCESS_STATES = {
 }
 
 
+def _trial_binding_succeeded(*, result, state: str, binding: dict) -> bool:
+    """Return True for Impaya's successful bind-recurrent authorize+void flow.
+
+    The trial invoice is created with action=authorize, payment_option_action=
+    bind_recurrent and post_action=void. In that flow Impaya may finish the
+    authorization as Voided after successfully creating a recurrent binding.
+    A bare Voided transaction must never grant access; a binding id and Impaya
+    user id are required in addition to a successful API response.
+    """
+    if not result.success or state != "VOIDED":
+        return False
+    binding_id = binding.get("binding_id") or binding.get("id")
+    impaya_user_id = binding.get("user_id") or binding.get("impaya_user_id")
+    return bool(binding_id and impaya_user_id)
+
+
 class RevealCheckoutService:
     def __init__(
         self,
@@ -143,6 +159,11 @@ class RevealCheckoutService:
             or ""
         ).upper()
         binding = result.data.get("binding") or {}
+        binding_success = _trial_binding_succeeded(
+            result=result,
+            state=state,
+            binding=binding,
+        )
 
         logger.info(
             "Impaya reveal checkout state",
@@ -157,10 +178,13 @@ class RevealCheckoutService:
                 "impaya_has_binding": bool(
                     binding.get("binding_id") or binding.get("id")
                 ),
+                "impaya_binding_success": binding_success,
             },
         )
 
-        if not result.success or state not in SUCCESS_STATES:
+        if not result.success or (
+            state not in SUCCESS_STATES and not binding_success
+        ):
             return False
 
         subscription = await self.billing.get_or_create_subscription(user_id)
