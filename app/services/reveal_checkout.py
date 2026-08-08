@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import logging
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,8 @@ from app.models.billing import PaymentAttempt, PaymentMethod
 from app.models.reveal import RevealCheckout
 from app.repositories.billing import BillingRepository
 from app.services.impaya import ImpayaClient
+
+logger = logging.getLogger(__name__)
 
 SUCCESS_STATES = {
     "COMPLETED",
@@ -139,13 +142,29 @@ class RevealCheckoutService:
             or result.data.get("state")
             or ""
         ).upper()
+        binding = result.data.get("binding") or {}
+
+        logger.info(
+            "Impaya reveal checkout state",
+            extra={
+                "bot_code": current_bot.code,
+                "checkout_id": checkout.id,
+                "customer_operation_id": checkout.customer_operation_id,
+                "impaya_http_status": result.status_code,
+                "impaya_success": result.success,
+                "impaya_state": state or "<empty>",
+                "impaya_error_code": result.error_code or "",
+                "impaya_has_binding": bool(
+                    binding.get("binding_id") or binding.get("id")
+                ),
+            },
+        )
 
         if not result.success or state not in SUCCESS_STATES:
             return False
 
         subscription = await self.billing.get_or_create_subscription(user_id)
         method = await self.billing.payment_method_for_user(user_id)
-        binding = result.data.get("binding") or {}
         payment_option = result.data.get("payment_option") or {}
         card = payment_option.get("card") or {}
 
