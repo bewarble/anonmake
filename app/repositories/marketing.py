@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.bot_context import require_current_bot
 from app.models.billing import PaymentMethod, Subscription
+from app.models.bot_instance import BotInstance
 from app.models.delivery import DeliveryOutbox
 from app.models.marketing import Broadcast, SourceAttribution, SourceClick, TrafficSource
 from app.models.user import User
@@ -137,7 +138,20 @@ class MarketingRepository:
         return {"delivered": delivered, "failed": failed, "pending": pending, "blocked": blocked}
 
     async def next_broadcast(self) -> Broadcast | None:
-        result = await self.session.execute(select(Broadcast).where(Broadcast.status.in_(("queued", "processing"))).order_by(Broadcast.id).limit(1).with_for_update(skip_locked=True))
+        runnable_bot_ids = select(BotInstance.id).where(
+            BotInstance.is_active.is_(True),
+            BotInstance.is_maintenance.is_(False),
+        )
+        result = await self.session.execute(
+            select(Broadcast)
+            .where(
+                Broadcast.bot_id.in_(runnable_bot_ids),
+                Broadcast.status.in_(("queued", "processing")),
+            )
+            .order_by(Broadcast.id)
+            .limit(1)
+            .with_for_update(skip_locked=True)
+        )
         return result.scalar_one_or_none()
 
     async def mark_broadcast_started(self, item: Broadcast) -> None:
