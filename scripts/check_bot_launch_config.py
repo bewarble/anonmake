@@ -30,12 +30,28 @@ def main() -> None:
         "PAYMENT_TEST_COMMANDS_ENABLED must be false for public launch"
     )
 
+    # Production web-admin must never depend on an insecure transport cookie or
+    # a short signing key. Debug SQL/profiling can leak operational data into logs.
+    assert settings.web_admin_enabled, "WEB_ADMIN_ENABLED must be true for managed launch"
+    assert settings.web_admin_secure_cookie, (
+        "WEB_ADMIN_SECURE_COOKIE must be true for public HTTPS deployment"
+    )
+    assert len(settings.web_admin_secret.strip()) >= 32, (
+        "WEB_ADMIN_SECRET must contain at least 32 characters"
+    )
+    assert not settings.sql_echo, "SQL_ECHO must be false for public launch"
+    assert not settings.performance_profile_enabled, (
+        "PERF_PROFILE_ENABLED must be false for public launch"
+    )
+
     require_public_https("PUBLIC_BASE_URL", settings.public_base_url)
     if settings.offer_url.strip():
         require_public_https("OFFER_URL", settings.offer_url)
 
     assert settings.impaya_api_token.strip(), "IMPAYA_API_TOKEN is missing"
-    assert settings.impaya_webhook_secret.strip(), "IMPAYA_WEBHOOK_SECRET is missing"
+    assert len(settings.impaya_webhook_secret.strip()) >= 24, (
+        "IMPAYA_WEBHOOK_SECRET must contain at least 24 characters"
+    )
     assert settings.impaya_payment_form_url_template.strip(), (
         "IMPAYA_PAYMENT_FORM_URL_TEMPLATE is missing"
     )
@@ -73,7 +89,9 @@ def main() -> None:
     print("Billing and automatic renewal: enabled")
     print("Test payment commands: disabled")
     print("Public URLs and payment form: HTTPS")
-    print("Impaya webhook secret: configured")
+    print("Web admin cookie/signing configuration: production-safe")
+    print("SQL echo and performance profiling: disabled")
+    print("Impaya webhook secret: strong and configured")
     print("Impaya endpoint and terminals: non-test")
     print("Public billing copy matches runtime amounts and durations")
 
